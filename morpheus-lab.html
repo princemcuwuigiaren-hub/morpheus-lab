@@ -18,6 +18,8 @@
     var t = localStorage.getItem('morpheus.lab.theme') || 'dark';
     var light = t === 'light' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
     document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+    var fw = localStorage.getItem('morpheus.lab.weight');
+    if(fw === '400' || fw === '500' || fw === '600') document.documentElement.style.setProperty('--fw', fw);
     var ub = localStorage.getItem('morpheus.lab.bubble');
     if(/^#[0-9a-f]{6}$/i.test(ub || '')){
       var n = parseInt(ub.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
@@ -39,7 +41,7 @@
   --line:#434448;
   --line-soft:#2f3033;
   --text:#f1f1f3;
-  --muted:#85868b;
+  --muted:#9fa0a7;
   --icon:#c9cad0;
   --ok:#8fd19e;
   --bad:#e59a9a;
@@ -72,7 +74,7 @@
   --line:#d4d4da;
   --line-soft:#e0e0e5;
   --text:#1a1a1d;
-  --muted:#76767c;
+  --muted:#62626a;
   --icon:#4a4a50;
   --ok:#2e8b4f;
   --bad:#c24a4a;
@@ -97,8 +99,9 @@ html,body{
   overscroll-behavior:none;touch-action:pan-x pan-y;
   background:var(--bg);color:var(--text);
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
+  font-weight:var(--fw,500);
 }
+input,textarea,select{font-weight:inherit}
 *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;touch-action:manipulation}
@@ -194,6 +197,25 @@ svg{display:block;pointer-events:none}
   overflow-y:hidden;overscroll-behavior:contain;
 }
 #composer::placeholder{color:var(--muted)}
+/* attached files: one tile per file with its type, name and size */
+#attachRow{display:none;flex-wrap:nowrap;gap:8px;overflow-x:auto;margin:-4px 8px 10px -8px;padding:2px 2px 4px 8px;scrollbar-width:none}
+#attachRow::-webkit-scrollbar{display:none}
+#composerCard.hasfiles #attachRow{display:flex}
+.fchip{flex:none;display:flex;align-items:center;gap:10px;max-width:230px;padding:7px 8px 7px 8px;border-radius:14px;background:var(--chip);border:1px solid var(--line-soft)}
+.fchip .fext{flex:none;min-width:38px;height:38px;padding:0 6px;border-radius:10px;background:var(--bg);border:1px solid var(--edge);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--text)}
+.fchip .ftx{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.fchip .fnm{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fchip .fsb{font-size:12px;color:var(--muted);white-space:nowrap}
+.fchip .fx{flex:none;width:26px;height:26px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.fchip .fx:active{background:var(--press)}
+.fchip .fx svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.msg.u .mfiles{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;max-width:92%;margin-bottom:6px}
+.msg.u .mfiles .fchip{max-width:100%}
+.mact{display:flex;gap:6px;margin-top:6px}
+.msg.u .mact{justify-content:flex-end}
+.mact button{height:32px;padding:0 12px;border-radius:16px;font-size:13px;font-weight:600;color:var(--muted);background:var(--chip);border:1px solid var(--line-soft);display:flex;align-items:center;gap:6px}
+.mact button:active{background:var(--press)}
+.mact button svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #composerCard .card-row{justify-content:space-between;margin-top:8px}
 #send{
   width:44px;height:44px;border-radius:50%;
@@ -320,6 +342,10 @@ svg{display:block;pointer-events:none}
 .sec-body .nav-item{height:44px;font-size:16px}
 .sec-body .dots{width:38px;height:38px}
 .proj-empty{font-size:15px;color:var(--muted);padding:0 14px}
+#homeSidebar{display:flex;flex-direction:column}
+#homeSidebar>*{flex:none}
+#homeSidebar #projList{flex:1 1 auto;min-height:0}
+#projList>.proj-empty{margin:auto;padding:0 14px 20vh;text-align:center}
 .proj-row{display:flex;align-items:center;gap:2px}
 .proj-row .nav-item{flex:1;min-width:0}
 .dots{
@@ -715,7 +741,22 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
   --c-app-bg:#d6efe9;--c-app-fg:#1d7566;--c-mod-bg:#f5e6cc;--c-mod-fg:#9a6410;
   --c-ds-bg:#dbf0df;--c-ds-fg:#2a7f48;--c-sp-bg:#dce8fc;--c-sp-fg:#2b5cb3;
 }
-#home{background:radial-gradient(120% 52% at 50% 0%,var(--hglow),transparent 72%),var(--bg)}
+#home{background:radial-gradient(120% 52% at 50% 0%,var(--hglow),transparent 72%),var(--bg);--neon:168,85,247;--neon2:124,58,237;--neon-a:1}
+:root[data-theme="light"] #home{--neon-a:.55}
+/* a purple neon beam that drops from the top edge, with a metallic sheen down its middle */
+#home::before{
+  content:'';position:absolute;left:0;right:0;top:0;height:360px;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(46% 100% at 50% 0%,rgba(var(--neon),calc(.50*var(--neon-a))),rgba(var(--neon2),calc(.16*var(--neon-a))) 52%,transparent 78%);
+}
+#home::after{
+  content:'';position:absolute;left:50%;top:0;width:150px;height:300px;transform:translateX(-50%);pointer-events:none;z-index:0;
+  background:linear-gradient(180deg,rgba(245,232,255,calc(.55*var(--neon-a))) 0%,rgba(216,180,254,calc(.22*var(--neon-a))) 38%,transparent 100%);
+  clip-path:polygon(34% 0,66% 0,100% 100%,0 100%);filter:blur(14px);
+  animation:beamPulse 6s ease-in-out infinite;
+}
+@keyframes beamPulse{0%,100%{opacity:.85}50%{opacity:1}}
+#home .topbar,#home .stage{position:relative;z-index:1}
 #home .topbar{background:transparent;border-bottom-color:transparent}
 #home .stage{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:5vh 18px calc(var(--safe-bottom) + 28px);gap:22px;scrollbar-width:none}
 #home .stage::-webkit-scrollbar{display:none}
@@ -746,7 +787,21 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qbadge{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--line-soft);color:var(--tfg,var(--muted))}
 .qbadge svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .qtile.sel .qic{box-shadow:0 0 0 2px var(--text)}
-.qlb{font-size:13px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qtile{position:relative}
+/* the glow underneath, so each tile seems to hover above it */
+.qtile::before{
+  content:'';position:absolute;left:50%;top:58px;width:54px;height:16px;margin-left:-27px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(var(--neon,168,85,247),calc(1*var(--neon-a,1))),rgba(var(--neon,168,85,247),0) 75%);
+  filter:blur(5px);animation:glowSway 4.2s ease-in-out infinite;
+}
+.qic{animation:floatY 4.2s ease-in-out infinite}
+.qtile:nth-child(2) .qic,.qtile:nth-child(2)::before{animation-delay:-1s}
+.qtile:nth-child(3) .qic,.qtile:nth-child(3)::before{animation-delay:-2s}
+.qtile:nth-child(4) .qic,.qtile:nth-child(4)::before{animation-delay:-3s}
+@keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes glowSway{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.82)}}
+@media (prefers-reduced-motion:reduce){.qic,.qtile::before,#home::after{animation:none}}
+.qlb{position:relative;font-size:13px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .t-app{--tbg:var(--c-app-bg);--tfg:var(--c-app-fg)}
 .t-mod{--tbg:var(--c-mod-bg);--tfg:var(--c-mod-fg)}
 .t-ds{--tbg:var(--c-ds-bg);--tfg:var(--c-ds-fg)}
@@ -824,11 +879,11 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
     <button class="crumb" id="crumb"></button>
     <div id="sheet"></div>
     <div id="composerBar">
-      <input type="file" id="filePick" multiple hidden accept=".html,.htm,.css,.js,.mjs,.json,.txt,.md,.svg,text/*">
+      <input type="file" id="filePick" multiple hidden>
       <div id="plusBar" aria-label="Tools and modes">
         <div class="psec">Tools</div>
         <div class="prow">
-        <button class="ptool" id="toolImport"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9.5 13.5L12 11l2.5 2.5"/></svg>Import files</button>
+        <button class="ptool" id="toolImport"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9.5 13.5L12 11l2.5 2.5"/></svg>Attach files</button>
         <button class="ptool" id="toolInspect"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>Code inspection</button>
           <button class="ptool" id="toolTasks"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>Tasks</button>
         </div>
@@ -837,6 +892,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <div class="prow" id="modeRow"></div>
       </div>
       <div class="card" id="composerCard">
+        <div id="attachRow"></div>
         <div id="modeBar">
           <span class="mic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg></span>
           <span class="mtxt"><b>Code inspection</b><i id="modeSub">Paste the code to check, then send</i></span>
@@ -1762,6 +1818,9 @@ MStore.ready.then(function(){
   }
   applyTheme();
   /* the colour of your own message bubble; AI replies stay without a container */
+  var WEIGHT_KEY = 'morpheus.lab.weight';
+  function getWeight(){ try{ var v = localStorage.getItem(WEIGHT_KEY); return v === '400' || v === '600' ? v : '500'; }catch(e){ return '500'; } }
+  function setWeight(v){ try{ localStorage.setItem(WEIGHT_KEY, v); }catch(e){} document.documentElement.style.setProperty('--fw', v); }
   var BUBBLE_KEY = 'morpheus.lab.bubble';
   function getBubble(){ try{ var v = localStorage.getItem(BUBBLE_KEY) || ''; return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : ''; }catch(e){ return ''; } }
   function applyBubble(v){
@@ -2725,13 +2784,21 @@ MStore.ready.then(function(){
   function paintNav(){
     if(!current) return;
     var vis = navShow(current), nav = $('sidebar').querySelector('.nav'), more = $('navMoreBtn'), box = $('navMore'), hidden = 0;
+    var main = [], rest = [];
     NAV_ORDER.forEach(function(r){
       var b = nav.querySelector('.nav-item[data-route="' + r + '"]');
       if(!b) return;
-      if(vis[r] || curRoute === r) nav.insertBefore(b, more);
-      else{ box.appendChild(b); hidden++; }
+      if(vis[r] || curRoute === r) main.push(b); else{ rest.push(b); hidden++; }
     });
-    more.style.display = hidden ? 'flex' : 'none';
+    /* Only touch the DOM when something really moved. Re-inserting a button that is already in place
+       would cancel a tap that is happening on it right now (this ran every time a reply finished). */
+    var curMain = Array.prototype.filter.call(nav.children, function(x){ return x.hasAttribute('data-route'); });
+    var curRest = Array.prototype.slice.call(box.children);
+    var same = function(a, b){ return a.length === b.length && a.every(function(x, i){ return x === b[i]; }); };
+    if(!same(main, curMain)) main.forEach(function(b){ nav.insertBefore(b, more); });
+    if(!same(rest, curRest)) rest.forEach(function(b){ box.appendChild(b); });
+    var disp = hidden ? 'flex' : 'none';
+    if(more.style.display !== disp) more.style.display = disp;
     if(!hidden) $('sidebar').classList.remove('more');
   }
   $('navMoreBtn').addEventListener('click', function(){ $('sidebar').classList.toggle('more'); });
@@ -2808,7 +2875,7 @@ MStore.ready.then(function(){
     var u = (msgs || []).filter(function(m){ return m.r === 'u'; })[0];
     if(!u) return NEW_CHAT;
     if(u.kind === 'inspect') return 'Code inspection';
-    var t = u.t.replace(/\s+/g, ' ').trim();
+    var t = (u.t || (u.files && u.files[0] ? u.files[0].name : '')).replace(/\s+/g, ' ').trim();
     return t.length > 28 ? t.slice(0, 27).trim() + '…' : (t || NEW_CHAT);
   }
   function chatOf(p){
@@ -3128,7 +3195,7 @@ MStore.ready.then(function(){
   function enterLab(){
     $('titleBtn').textContent = current.name;
     ensureChats(current);
-    $('composer').value = ''; sizeComposer(); setMode(null); syncSend();
+    $('composer').value = ''; sizeComposer(); setMode(null); attached = []; paintAttach(); syncSend();
     go('chat');
   }
 
@@ -3353,6 +3420,22 @@ MStore.ready.then(function(){
     });
     tc.appendChild(tseg);
     body.appendChild(tc);
+
+    var wc = el('div', 'tool on'), wtop = el('div', 'tool-top');
+    wtop.appendChild(el('div', 'tool-name', 'Text weight'));
+    wc.appendChild(wtop);
+    wc.appendChild(el('div', 'xsub', 'Thicker text is easier to read on a phone screen.'));
+    var wseg = el('div', 'seg'); wseg.style.marginTop = '12px';
+    [['400', 'Regular'], ['500', 'Medium'], ['600', 'Bold']].forEach(function(w){
+      var b = el('button', getWeight() === w[0] ? 'sel' : '', w[1]);
+      b.addEventListener('click', function(){
+        setWeight(w[0]);
+        Array.prototype.forEach.call(wseg.children, function(x){ x.classList.toggle('sel', x === b); });
+      });
+      wseg.appendChild(b);
+    });
+    wc.appendChild(wseg);
+    body.appendChild(wc);
 
     var bc = el('div', 'tool on'), btop = el('div', 'tool-top');
     btop.appendChild(el('div', 'tool-name', 'Your message color'));
@@ -3675,7 +3758,7 @@ MStore.ready.then(function(){
   var busy = false, pending = null, lastErr = null, queued = null;
   var SEND_HTML = send.innerHTML, STOP_HTML = '<svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.2" fill="currentColor" stroke="none"/></svg>';
   function syncSend(){
-    var has = comp.value.trim().length > 0 || !!importBuf, stop = busy && !!stopCtl && !has;
+    var has = comp.value.trim().length > 0 || !!importBuf || (!!attached && attached.length > 0), stop = busy && !!stopCtl && !has;
     send.classList.toggle('ready', stop || (has && (!busy || !!stopCtl)));
     if(stop !== send.classList.contains('stop')){
       send.classList.toggle('stop', stop);
@@ -3970,7 +4053,7 @@ MStore.ready.then(function(){
     acts.appendChild(copyBtn(function(){ return code; }, 'Copy code'));
     head.appendChild(acts);
     box.appendChild(head);
-    box.appendChild(el('pre', '', code));
+    var pre = el('pre'); pre.innerHTML = highlightLang(code, lang); box.appendChild(pre);
     host.appendChild(box);
   }
   function existingSrc(p){ return p && p.code ? codeOf(p).src : ''; }
@@ -4115,7 +4198,15 @@ MStore.ready.then(function(){
   }
   function msgNode(m){
     var w = el('div', 'msg ' + (m.r === 'u' ? 'u' : 'm'));
-    if(m.r === 'u') w.appendChild(m.kind === 'inspect' ? inspBubble(m) : el('div', 'bubble', m.t));
+    if(m.r === 'u'){
+      if(m.files && m.files.length){
+        var mf = el('div', 'mfiles');
+        m.files.forEach(function(f){ mf.appendChild(fileChip(f)); });
+        w.appendChild(mf);
+      }
+      if(m.kind === 'inspect') w.appendChild(inspBubble(m));
+      else if(m.t) w.appendChild(el('div', 'bubble', m.t));
+    }
     else{
       var body = el('div', 'mbody');
       if(m.segs){
@@ -4144,6 +4235,31 @@ MStore.ready.then(function(){
     w.appendChild(tools);
     return w;
   }
+  /* run the last reply again from the same message. Whatever it already changed stays changed. */
+  async function retryLast(){
+    if(busy || !current) return;
+    var ch = chatOf(current), ms = ch.msgs;
+    var tail = [];
+    for(var i = ms.length - 1; i >= 0 && ms[i].r === 'm'; i--) tail.push(ms[i]);
+    if(!tail.length || i < 0) return;
+    var changed = tail.some(function(m){ return (m.segs || []).some(function(sg){ return sg.k === 'tool' && sg.st === 'ok' && IMPL[sg.name] && !IMPL[sg.name].read; }); });
+    if(changed && !(await UI.confirm('Retry this reply?', 'It already made changes. Those stay as they are, and the reply is written again from your message.', { confirmText:'Retry' }))) return;
+    ch.msgs = ms.slice(0, i + 1);
+    lastErr = null; ch.cut = false;
+    save(); renderThread(); respond(current);
+  }
+  /* take your last message back into the composer so it can be changed and sent again */
+  async function editLast(idx){
+    if(busy || !current) return;
+    var ch = chatOf(current), m = ch.msgs[idx];
+    if(!m || m.r !== 'u') return;
+    if(idx < ch.msgs.length - 1 && !(await UI.confirm('Edit this message?', 'The reply below it is removed so you can send it again. Changes the reply already made stay in place.', { confirmText:'Edit' }))) return;
+    ch.msgs = ch.msgs.slice(0, idx);
+    attached = (m.files || []).map(function(f){ return { name:f.name, size:f.size, lines:f.lines, text:f.text }; });
+    lastErr = null; ch.cut = false;
+    save(); renderSide(); renderThread();
+    comp.value = m.t || ''; paintAttach(); sizeComposer(); syncSend(); comp.focus();
+  }
   function renderThread(keep){
     var box = $('sheet'), top = box.scrollTop;
     box.innerHTML = '';
@@ -4151,8 +4267,24 @@ MStore.ready.then(function(){
     var msgs = chatOf(current).msgs;
     var waiting = busy && pending === chatOf(current);
     if(!msgs.length && !waiting) box.appendChild(el('div', 'empty', 'Ask your assistant anything about this project.'));
-    msgs.forEach(function(m){ box.appendChild(msgNode(m)); });
+    var nodes = msgs.map(function(m){ var n = msgNode(m); box.appendChild(n); return n; });
     var lastM = msgs[msgs.length - 1];
+    if(!busy && lastM){
+      var lastU = -1;
+      msgs.forEach(function(m, i){ if(m.r === 'u') lastU = i; });
+      if(lastU >= 0 && msgs[lastU].kind !== 'inspect'){
+        var ea = el('div', 'mact'), eb = el('button', '', 'Edit');
+        eb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg><span>Edit</span>';
+        eb.addEventListener('click', function(){ editLast(lastU); });
+        ea.appendChild(eb); nodes[lastU].appendChild(ea);
+      }
+      if(lastM.r === 'm' && lastU >= 0){
+        var ra = el('div', 'mact'), rb2 = el('button', '');
+        rb2.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg><span>Retry</span>';
+        rb2.addEventListener('click', retryLast);
+        ra.appendChild(rb2); nodes[msgs.length - 1].appendChild(ra);
+      }
+    }
     var streaming = !!(lastM && lastM.segs && lastM.segs.some(function(x){ return x.live; }));
     if(waiting && !streaming){
       var t = el('div', 'msg m'), d = el('div', 'think');
@@ -5347,8 +5479,19 @@ MStore.ready.then(function(){
     });
     return lines.slice(-10).join('\n');
   }
-  function forModel(m){
-    if(m.r === 'u') return m.kind === 'inspect' ? '[The person brought in ' + m.t.split('\n').length + ' lines of outside code to be inspected.]' : m.t;
+  function filesText(m, full){
+    if(!m.files || !m.files.length) return '';
+    return m.files.map(function(f){
+      if(!full) return '[The person attached ' + f.name + ' (' + (f.lines || '?') + ' lines) earlier in the chat.]';
+      return 'The person attached the file ' + f.name + ':\n```\n' + f.text + '\n```';
+    }).join('\n\n');
+  }
+  function forModel(m, full){
+    if(m.r === 'u'){
+      if(m.kind === 'inspect') return '[The person brought in ' + m.t.split('\n').length + ' lines of outside code to be inspected.]';
+      var ft = filesText(m, full);
+      return ft ? (m.t ? m.t + '\n\n' : '') + ft : m.t;
+    }
     if(!m.segs) return forModelText(m.t);
     return m.segs.map(function(sg){
       if(sg.k === 't') return forModelText(sg.t);
@@ -5548,9 +5691,10 @@ MStore.ready.then(function(){
     return t;
   }
   function buildContents(p, ch){
-    var out = [];
-    ch.msgs.slice(-24).forEach(function(m){
-      var role = m.r === 'u' ? 'user' : 'model', last = out[out.length - 1], txt = forModel(m);
+    var out = [], recent = ch.msgs.slice(-24), lastWithFiles = null;
+    recent.forEach(function(m){ if(m.r === 'u' && m.files && m.files.length) lastWithFiles = m; });
+    recent.forEach(function(m){
+      var role = m.r === 'u' ? 'user' : 'model', last = out[out.length - 1], txt = forModel(m, m === lastWithFiles);
       if(!txt) return;
       if(last && last.role === role) last.parts[0].text += '\n\n' + txt;
       else out.push({ role:role, parts:[{ text:txt }] });
@@ -5778,10 +5922,15 @@ MStore.ready.then(function(){
       comp.value = ''; sizeComposer(); setMode(null); inspectCode(current, ib);
       return;
     }
-    if(!t || !current) return;
+    if((!t && !attached.length) || !current) return;
     if(mode === 'inspect'){ comp.value = ''; sizeComposer(); setMode(null); inspectCode(current, t); return; }
     var ch = chatOf(current);
-    ch.msgs.push({ r:'u', t:t, ts:Date.now() });
+    var um = { r:'u', t:t, ts:Date.now() };
+    if(attached.length){
+      um.files = attached.map(function(f){ return { name:f.name, size:f.size, lines:f.lines, text:f.text }; });
+      attached = []; paintAttach();
+    }
+    ch.msgs.push(um);
     if(ch.title === NEW_CHAT && !ch.named) ch.title = titleFrom(ch.msgs);
     save(); renderSide(); paintOpMode();
     comp.value = ''; sizeComposer(); syncSend();
@@ -5808,6 +5957,7 @@ MStore.ready.then(function(){
       ? importBuf.names + ' \u00b7 ' + importBuf.lines + ' lines' + (importBuf.note ? ' \u00b7 ' + importBuf.note : '')
       : 'Paste the code to check, then send';
     comp.placeholder = mode === 'inspect' ? (importBuf ? 'Press send to inspect the files' : 'Paste the code to inspect') : 'Ask your assistant';
+    if(typeof paintAttach === 'function') paintAttach();
   }
   function setMode(m){
     mode = m; importBuf = null;
@@ -5865,19 +6015,51 @@ MStore.ready.then(function(){
     fs.filter(function(f){ return css.indexOf(f) < 0 && js.indexOf(f) < 0; }).forEach(function(f){ bits.push(f.text); });
     return { text:bits.join('\n\n'), note:'combined' };
   }
+  /* files attached to the next message (not the same as code inspection, which has its own mode) */
+  var attached = [];
+  var TEXT_EXT = /\.(html?|css|scss|less|m?js|cjs|jsx|tsx?|json|jsonc|txt|md|markdown|svg|xml|csv|tsv|ya?ml|toml|ini|env|py|java|c|h|cpp|hpp|cs|go|rs|rb|php|swift|kt|sh|bash|sql|log|diff|patch|vue)$/i;
+  function fileExt(n){ var m = /\.([A-Za-z0-9]+)$/.exec(n || ''); return m ? m[1].toUpperCase().slice(0, 5) : 'FILE'; }
+  function fileSize(n){ return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; }
+  function fileChip(f, onRemove){
+    var c = el('div', 'fchip'), x = el('span', 'fext', fileExt(f.name)), tx = el('div', 'ftx');
+    tx.appendChild(el('span', 'fnm', f.name));
+    tx.appendChild(el('span', 'fsb', fileSize(f.size || (f.text || '').length) + (f.lines ? ' · ' + f.lines + ' lines' : '')));
+    c.appendChild(x); c.appendChild(tx);
+    if(onRemove){
+      var rm = el('button', 'fx'); rm.setAttribute('aria-label', 'Remove ' + f.name);
+      rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+      rm.addEventListener('click', onRemove); c.appendChild(rm);
+    }
+    return c;
+  }
+  function paintAttach(){
+    var row = $('attachRow'); row.innerHTML = '';
+    attached.forEach(function(f, i){ row.appendChild(fileChip(f, function(){ attached.splice(i, 1); paintAttach(); syncSend(); })); });
+    $('composerCard').classList.toggle('hasfiles', attached.length > 0);
+    comp.placeholder = attached.length && mode !== 'inspect' ? 'Add a message, or just send the files' : (mode === 'inspect' ? comp.placeholder : 'Ask your assistant');
+  }
   async function importFiles(list){
     var files = Array.prototype.slice.call(list || []), got = [], skipped = 0;
     for(var i = 0; i < files.length; i++){
       var f = files[i];
-      if(f.size > 400000 || (!/\.(html?|css|m?js|json|txt|md|svg)$/i.test(f.name) && !/^text\//.test(f.type || ''))){ skipped++; continue; }
-      try{ got.push({ name:f.name, text:await readFile(f) }); }catch(e){ skipped++; }
+      if(f.size > 400000 || (!TEXT_EXT.test(f.name) && !/^text\//.test(f.type || ''))){ skipped++; continue; }
+      try{ got.push({ name:f.name, size:f.size, text:await readFile(f) }); }catch(e){ skipped++; }
     }
-    if(!got.length){ UI.alert('Nothing to inspect', 'Pick text files such as .html, .css or .js (up to 400 KB each).'); return; }
-    var mg = mergeFiles(got), text = mg.text.slice(0, 120000);
-    setMode('inspect');
-    importBuf = { text:text, names:got.map(function(g){ return g.name; }).join(', '), lines:text.split('\n').length,
-      note:[mg.note, skipped ? 'skipped ' + skipped : ''].filter(Boolean).join(' \u00b7 ') };
-    comp.value = ''; sizeComposer(); paintMode(); syncSend();
+    if(!got.length){ UI.alert('Could not attach', 'Pick text or code files such as .html, .js, .py, .json, .csv or .md (up to 400 KB each).'); return; }
+    if(mode === 'inspect'){
+      var mg = mergeFiles(got), text = mg.text.slice(0, 120000);
+      importBuf = { text:text, names:got.map(function(g){ return g.name; }).join(', '), lines:text.split('\n').length,
+        note:[mg.note, skipped ? 'skipped ' + skipped : ''].filter(Boolean).join(' · ') };
+      comp.value = ''; sizeComposer(); paintMode(); syncSend();
+      return;
+    }
+    got.forEach(function(g){
+      g.lines = g.text.split('\n').length; g.text = g.text.slice(0, 40000);
+      attached.push(g);
+    });
+    if(attached.length > 6) attached.length = 6;
+    if(skipped) UI.alert('Some files were skipped', skipped + ' file' + (skipped === 1 ? ' was' : 's were') + ' not text or code, or were over 400 KB.');
+    paintAttach(); sizeComposer(); syncSend(); comp.focus();
   }
   function pickFiles(){ var fp = $('filePick'); fp.value = ''; fp.click(); }
   $('filePick').addEventListener('change', function(){ if(this.files && this.files.length) importFiles(this.files); });
@@ -6667,6 +6849,13 @@ MStore.ready.then(function(){
         var h = d.hist[+v]; if(!h) return;
         pushHist(d); d.text = h.text; d.mod = Date.now(); d.approved = false; save(); renderDocs();
       }));
+      var cpb = mkBtn('ghost', 'Copy', '', async function(){
+        var ok = await copyText(d.text);
+        var sp0 = cpb.querySelector('span'); if(!sp0) return;
+        sp0.textContent = ok ? 'Copied' : 'Could not copy';
+        setTimeout(function(){ sp0.textContent = 'Copy'; }, 1400);
+      });
+      row.appendChild(cpb);
       row.appendChild(mkBtn('ghost', 'Export', '', function(){ exportDocRec(d); }));
       row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
         if(await UI.confirm('Delete this document?', '', { confirmText:'Delete', danger:true })){ p.docs = p.docs.filter(function(x){ return x !== d; }); save(); renderDocs(); }
@@ -7156,6 +7345,81 @@ MStore.ready.then(function(){
     return out;
   }
 
+  /* ---- colours for other languages: one configurable tokenizer ---- */
+  var KW_C = 'abstract|as|async|await|break|case|catch|chan|class|const|continue|crate|data|def|default|defer|delete|do|else|enum|export|extends|extern|final|finally|fn|for|foreach|from|fun|func|function|go|goto|if|impl|implements|import|in|include|inline|interface|internal|is|let|loop|match|mod|module|mut|namespace|new|object|of|open|operator|out|override|package|private|protected|pub|public|readonly|ref|return|sealed|select|self|static|struct|super|switch|synchronized|template|this|throw|throws|trait|try|type|typedef|typename|typeof|union|unsafe|use|using|val|var|virtual|void|volatile|when|where|while|with|yield|int|long|short|float|double|char|bool|boolean|string|byte|unsigned|signed|u8|u16|u32|u64|i8|i16|i32|i64|f32|f64|usize|str';
+  var LANGS = {
+    py:{ kw:'and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield|match|case|self|cls|print', lit:'True|False|None', com:'#[^\\n]*', str:'"""[\\s\\S]*?(?:"""|$)|\'\'\'[\\s\\S]*?(?:\'\'\'|$)|[rbfRBF]?"(?:\\\\[\\s\\S]|[^"\\\\\\n])*"?|[rbfRBF]?\'(?:\\\\[\\s\\S]|[^\'\\\\\\n])*\'?' },
+    c:{ kw:KW_C, lit:'true|false|null|nil|NULL|None|undefined', com:'//[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$)' },
+    php:{ kw:KW_C + '|echo|elseif|endif|endforeach|endwhile|array|isset|empty|global|require|require_once|include_once', lit:'true|false|null|TRUE|FALSE|NULL', com:'//[^\\n]*|#[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$)' },
+    ts:{ kw:'abstract|as|async|await|break|case|catch|class|const|continue|declare|default|delete|do|else|enum|export|extends|finally|for|from|function|get|if|implements|import|in|infer|instanceof|interface|is|keyof|let|namespace|new|of|private|protected|public|readonly|return|set|static|super|switch|this|throw|try|type|typeof|var|void|while|yield|any|number|string|boolean|unknown|never|object', lit:'true|false|null|undefined|NaN|Infinity', com:'//[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$)', str:'"(?:\\\\[\\s\\S]|[^"\\\\\\n])*"?|\'(?:\\\\[\\s\\S]|[^\'\\\\\\n])*\'?|`(?:\\\\[\\s\\S]|[^`\\\\])*`?' },
+    sh:{ kw:'if|then|else|elif|fi|for|while|until|do|done|case|esac|in|function|return|export|local|source|alias|unset|set|exit|break|continue|select|time|sudo|cd|echo|read|test', lit:'true|false', com:'#[^\\n]*' },
+    sql:{ kw:'select|from|where|and|or|not|in|is|null|as|join|left|right|inner|outer|full|cross|on|group|by|order|having|limit|offset|insert|into|values|update|set|delete|create|alter|drop|table|index|view|database|primary|key|foreign|references|unique|default|distinct|union|all|case|when|then|else|end|exists|between|like|ilike|asc|desc|with|returning|begin|commit|rollback|int|integer|text|varchar|boolean|date|timestamp|real|float', lit:'true|false', com:'--[^\\n]*|/\\*[\\s\\S]*?(?:\\*/|$)', ci:true },
+    yaml:{ kw:'', lit:'true|false|null|yes|no|on|off|True|False|Null', com:'#[^\\n]*', key:true },
+    json:{ kw:'', lit:'true|false|null', com:'(?!)', key:true },
+    ini:{ kw:'', lit:'true|false', com:'[#;][^\\n]*', key:true }
+  };
+  var LANG_ALIAS = { javascript:'js', mjs:'js', cjs:'js', jsx:'js', node:'js', typescript:'ts', tsx:'ts', python:'py', python3:'py', py3:'py', java:'c', c:'c', cpp:'c', 'c++':'c', cs:'c', csharp:'c', go:'c', golang:'c', rust:'c', rs:'c', swift:'c', kotlin:'c', kt:'c', dart:'c', scala:'c', objc:'c', php:'php', bash:'sh', shell:'sh', sh:'sh', zsh:'sh', console:'sh', powershell:'sh', sql:'sql', postgres:'sql', mysql:'sql', sqlite:'sql', yaml:'yaml', yml:'yaml', toml:'ini', ini:'ini', env:'ini', json:'json', jsonc:'json', json5:'json', webmanifest:'json', htm:'html', html:'html', xml:'html', svg:'html', vue:'html', css:'css', scss:'css', less:'css', diff:'diff', patch:'diff' };
+  var LANG_RE = {};
+  function langRe(k){
+    if(LANG_RE[k]) return LANG_RE[k];
+    var c = LANGS[k], str = c.str || '"(?:\\\\[\\s\\S]|[^"\\\\\\n])*"?|\'(?:\\\\[\\s\\S]|[^\'\\\\\\n])*\'?';
+    var re = new RegExp('(' + c.com + ')|(' + str + ')|(\\b\\d[\\w.]*\\b)|([A-Za-z_$@][\\w$-]*)|([\\s\\S])', 'g');
+    var kw = c.kw ? new RegExp('^(?:' + c.kw + ')$', c.ci ? 'i' : '') : null, lit = new RegExp('^(?:' + c.lit + ')$');
+    return (LANG_RE[k] = { re:re, kw:kw, lit:lit, key:!!c.key });
+  }
+  function hlLang(code, k){
+    var L = langRe(k), re = new RegExp(L.re.source, 'g'), out = '', plain = '', m;
+    function flush(){ if(plain){ out += esc(plain); plain = ''; } }
+    while((m = re.exec(code))){
+      var t = m[0], after = code.slice(re.lastIndex, re.lastIndex + 24);
+      if(m[1]){ flush(); out += sp('t-com', t); }
+      else if(m[2]){ flush(); out += sp(L.key && /^\s*:/.test(after) ? 't-attr' : 't-str', t); }
+      else if(m[3]){ flush(); out += sp('t-num', t); }
+      else if(m[4]){
+        if(L.kw && L.kw.test(t)){ flush(); out += sp('t-kw', t); }
+        else if(L.lit.test(t)){ flush(); out += sp('t-num', t); }
+        else if(L.key && /^\s*[:=]/.test(after) && /(?:^|\n)[ \t-]*$/.test(code.slice(Math.max(0, re.lastIndex - t.length - 12), re.lastIndex - t.length))){ flush(); out += sp('t-attr', t); }
+        else if(/^\(/.test(after) && !L.key){ flush(); out += sp('t-fn', t); }
+        else plain += t;
+      }else plain += t;
+    }
+    flush();
+    return out;
+  }
+  function hlDiff(code){
+    return code.split('\n').map(function(l){
+      if(/^(\+\+\+|---)/.test(l)) return sp('t-com', l);
+      if(l.charAt(0) === '+') return sp('t-str', l);
+      if(l.charAt(0) === '-') return sp('t-tag', l);
+      if(l.slice(0, 2) === '@@') return sp('t-kw', l);
+      return esc(l);
+    }).join('\n');
+  }
+  /* what a block with no language label probably is */
+  function sniffLang(src){
+    var t = src.trim();
+    if(/^<(!doctype|html|head|body|svg|[a-z][\w-]*[\s>\/])/i.test(t)) return 'html';
+    if(/^[\[{]/.test(t) && /[\]}]$/.test(t)){ try{ JSON.parse(t); return 'json'; }catch(e){} }
+    if(/^(def |class \w+.*:|import \w+$|from \w+ import )/m.test(t) || /^\s*print\(/m.test(t)) return 'py';
+    if(/^[^{}\n]+\{[^{}]*:[^{}]*;[^{}]*\}/m.test(t) && !/\b(function|const|let|var|=>)\b/.test(t)) return 'css';
+    if(/\b(function|const|let|var|=>|console\.|require\(|module\.exports)\b/.test(t)) return 'js';
+    return '';
+  }
+  /* colours for a code block in any language the lab knows; anything else stays plain */
+  function highlightLang(code, lang){
+    if(code.length > 60000) return esc(code);
+    var raw = String(lang || '').toLowerCase().replace(/^language-/, ''), k = LANG_ALIAS.hasOwnProperty(raw) ? LANG_ALIAS[raw] : (raw === 'js' || raw === 'css' || LANGS.hasOwnProperty(raw) ? raw : '');
+    if(!raw) k = sniffLang(code);
+    try{
+      if(k === 'html') return highlight(code);
+      if(k === 'css') return hlCss(code);
+      if(k === 'js') return hlJs(code);
+      if(k === 'diff') return hlDiff(code);
+      if(k && LANGS[k]) return hlLang(code, k);
+    }catch(e){}
+    return esc(code);
+  }
+
   /* ---- editor: transparent textarea over the coloured layer, line numbers beside it ---- */
   function sizeEditor(){
     ed.style.height = 'auto'; ed.style.width = '0px';
@@ -7165,7 +7429,7 @@ MStore.ready.then(function(){
   }
   function paintEditor(){
     var v = ed.value, n = v.split('\n').length, nums = [];
-    $('hlCode').innerHTML = highlight(v) + '\n';
+    $('hlCode').innerHTML = (sniffLang(v) === 'html' || !v.trim() ? highlight(v) : highlightLang(v, sniffLang(v) || 'js')) + '\n';
     for(var k = 1; k <= n; k++) nums.push(k);
     $('lines').textContent = nums.join('\n');
     sizeEditor();
@@ -7482,7 +7746,18 @@ MStore.ready.then(function(){
     var regSW = function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); };
     if(document.readyState === 'complete') regSW(); else window.addEventListener('load', regSW);
     navigator.serviceWorker.addEventListener('message', function(e){
-      if(e.data && e.data.type === 'morpheus-update-ready') $('updateToast').classList.add('show');
+      if(e.data && e.data.type === 'morpheus-update-ready'){
+        /* the newer build is already saved, so a reload lands on it. Do it quietly when nothing would be lost. */
+        if(!busy && !($('composer').value || '').trim() && !$('ui').classList.contains('show')) location.reload();
+        else $('updateToast').classList.add('show');
+      }
+    });
+    /* each time the app comes back to the front, check for a newer build so it is ready for the next launch */
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'visible'){
+        navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update(); }).catch(function(){});
+        fetch('./morpheus-lab.html', { cache:'no-cache' }).catch(function(){});
+      }
     });
     $('reloadBtn').addEventListener('click', function(){ location.reload(); });
   }

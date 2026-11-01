@@ -28,7 +28,7 @@ const PRECACHE_URLS = [
 ];
 
 // How long the shell waits on the network before falling back to the saved copy.
-const SHELL_NETWORK_TIMEOUT_MS = 2500;
+const SHELL_NETWORK_TIMEOUT_MS = 4000;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -86,6 +86,15 @@ async function shellSignature(resp) {
   try { return 'n:' + (await resp.clone().arrayBuffer()).byteLength; } catch (e) { return ''; }
 }
 
+// True when `fresh` is provably an older build than `old`. Hosts like GitHub Pages
+// can briefly answer from a CDN node that still holds the previous deploy right
+// after a release, which is what makes an app flip from new back to old.
+function isOlder(fresh, old) {
+  const a = Date.parse(fresh.headers.get('last-modified') || '');
+  const b = Date.parse(old.headers.get('last-modified') || '');
+  return !isNaN(a) && !isNaN(b) && a < b;
+}
+
 async function notifyUpdateReady() {
   const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
   windows.forEach((c) => c.postMessage({ type: 'morpheus-update-ready' }));
@@ -113,6 +122,12 @@ async function networkFirst(request, event) {
   const networkPromise = fetch(request, { cache: 'no-cache' }).then(async (fresh) => {
     // Only cache real, successful responses. A 404 or 500 never overwrites a good shell.
     if (fresh && fresh.ok) {
+      // Never step backwards: if the network handed back an older build than the
+      // one already saved, keep the saved one and use it.
+      try {
+        const have = await cache.match(isNav ? shellUrl : request);
+        if (have && isOlder(fresh, have)) return have;
+      } catch (e) { /* cannot compare: carry on */ }
       let changed = false;
       if (isNav) {
         try {
