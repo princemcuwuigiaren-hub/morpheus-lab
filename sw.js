@@ -8,6 +8,9 @@
 //  - If the network is slow, the saved copy opens right away while the new
 //    build finishes downloading in the background. When it lands, every open
 //    window is told, so the app can offer a Reload.
+//  - The KaTeX math library (stylesheet, script and fonts from jsDelivr) is
+//    saved in its own cache the first time it is used, so math keeps rendering
+//    offline. Versioned URLs never change, so the saved copy is served first.
 //  - Anything else (API calls to the AI backend, future services) is never
 //    touched. It goes straight to the network.
 //
@@ -15,6 +18,10 @@
 // index.html need no bump.
 
 const SHELL_CACHE_NAME = 'morpheus-lab-shell-v2';
+
+// Third-party libraries. Kept across shell updates (see activate).
+const LIBS_CACHE_NAME = 'morpheus-lab-libs-v1';
+const LIB_URL = /^https:\/\/cdn\.jsdelivr\.net\/npm\/katex@[\d.]+\/dist\//;
 
 const PRECACHE_URLS = [
   './morpheus-lab.html'
@@ -44,7 +51,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((names) =>
       Promise.all(
-        names.filter((name) => name !== SHELL_CACHE_NAME).map((name) => caches.delete(name))
+        names.filter((name) => name !== SHELL_CACHE_NAME && name !== LIBS_CACHE_NAME).map((name) => caches.delete(name))
       )
     )
   );
@@ -56,6 +63,11 @@ self.addEventListener('fetch', (event) => {
 
   // Only GETs are ever handled. Writes and API calls reach the network untouched.
   if (event.request.method !== 'GET') return;
+
+  if (LIB_URL.test(event.request.url)) {
+    event.respondWith(cacheFirstLib(event.request));
+    return;
+  }
 
   const isNavigation = event.request.mode === 'navigate';
   const isShellFile = url.origin === self.location.origin && url.pathname.endsWith('/morpheus-lab.html');
@@ -133,4 +145,15 @@ async function networkFirst(request, event) {
   } catch (e) { /* offline or failed: use the saved copy */ }
   servedSavedCopy = true;
   return cached;
+}
+
+// Library files are pinned to an exact version, so a saved copy is always right.
+async function cacheFirstLib(request) {
+  const cache = await caches.open(LIBS_CACHE_NAME);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const fresh = await fetch(request);
+  // Cross-origin files fetched with CORS come back as ordinary ok responses.
+  if (fresh && fresh.ok) cache.put(request, fresh.clone()).catch(() => {});
+  return fresh;
 }

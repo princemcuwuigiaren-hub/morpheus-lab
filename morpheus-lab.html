@@ -18,6 +18,12 @@
     var t = localStorage.getItem('morpheus.lab.theme') || 'dark';
     var light = t === 'light' || (t === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
     document.documentElement.setAttribute('data-theme', light ? 'light' : 'dark');
+    var ub = localStorage.getItem('morpheus.lab.bubble');
+    if(/^#[0-9a-f]{6}$/i.test(ub || '')){
+      var n = parseInt(ub.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+      document.documentElement.style.setProperty('--ub-bg', ub);
+      document.documentElement.style.setProperty('--ub-text', L > 0.6 ? '#16161a' : '#ffffff');
+    }
   }catch(e){ document.documentElement.setAttribute('data-theme', 'dark'); }
 })();
 </script>
@@ -407,9 +413,10 @@ svg{display:block;pointer-events:none}
 .msg.u{align-items:flex-end}
 .bubble{
   max-width:86%;padding:12px 16px;border-radius:22px 22px 6px 22px;
-  background:var(--chip);border:1px solid var(--line-soft);
+  background:var(--ub-bg,var(--chip));color:var(--ub-text,var(--text));border:1px solid var(--ub-bg,var(--line-soft));
   font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;
 }
+.bubble.insp{background:var(--chip);color:var(--text);border:1px solid var(--line-soft)}
 .mbody{font-size:16px;line-height:1.55;min-width:0;overflow-wrap:anywhere}
 .mbody>*+*{margin-top:12px}
 .ptxt{white-space:pre-wrap}
@@ -721,7 +728,8 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 #startCard #nameInput{flex:none;height:44px;font-size:20px;padding:0 10px 0 0}
 #startRow{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%}
 #createBtn{margin-left:auto}
-.tchip{display:none;align-items:center;gap:8px;height:40px;padding:0 12px 0 10px;border-radius:20px;background:var(--tbg);color:var(--tfg);font-size:15px;font-weight:500}
+.tchip{display:none;align-items:center;gap:8px;height:40px;padding:0 12px 0 10px;border-radius:20px;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);font-size:15px;font-weight:500}
+.tchip .tci{display:flex;color:var(--tfg)}
 .tchip .tci svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tchip>svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;opacity:.75}
 .tchip:active{transform:scale(.97)}
@@ -731,8 +739,12 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 6px}
 .qtile{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;padding:2px 0;transition:transform .12s}
 .qtile:active{transform:scale(.94)}
-.qic{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--tbg,var(--chip));color:var(--tfg,var(--icon));transition:box-shadow .15s}
-.qic svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.qic{position:relative;width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);transition:box-shadow .15s}
+.qic>svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.qdot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--tfg,var(--muted))}
+.qletter{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.qbadge{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--line-soft);color:var(--tfg,var(--muted))}
+.qbadge svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .qtile.sel .qic{box-shadow:0 0 0 2px var(--text)}
 .qlb{font-size:13px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .t-app{--tbg:var(--c-app-bg);--tfg:var(--c-app-fg)}
@@ -741,6 +753,10 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .t-sp{--tbg:var(--c-sp-bg);--tfg:var(--c-sp-fg)}
 
 /* math from the AI */
+.mm.kx{font-size:1em}
+.mmb.kx{padding:6px 12px}
+.mmb .katex-display{margin:.4em 0}
+.mmb .katex-display>.katex{white-space:nowrap}
 .mmb{text-align:center;padding:10px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--panel);overflow-x:auto;touch-action:pan-x pan-y;font-size:16px}
 </style>
 </head>
@@ -1745,6 +1761,16 @@ MStore.ready.then(function(){
     try{ matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(){ if(getTheme() === 'system') applyTheme(); }); }catch(e){}
   }
   applyTheme();
+  /* the colour of your own message bubble; AI replies stay without a container */
+  var BUBBLE_KEY = 'morpheus.lab.bubble';
+  function getBubble(){ try{ var v = localStorage.getItem(BUBBLE_KEY) || ''; return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : ''; }catch(e){ return ''; } }
+  function applyBubble(v){
+    var r = document.documentElement.style;
+    if(!v){ r.removeProperty('--ub-bg'); r.removeProperty('--ub-text'); return; }
+    var n = parseInt(v.slice(1), 16), L = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+    r.setProperty('--ub-bg', v); r.setProperty('--ub-text', L > 0.6 ? '#16161a' : '#ffffff');
+  }
+  function setBubble(v){ try{ if(v) localStorage.setItem(BUBBLE_KEY, v); else localStorage.removeItem(BUBBLE_KEY); }catch(e){} applyBubble(v); }
 
   /* =====================================================================
      LAB DIALOGS  (UI.alert, UI.confirm, UI.prompt, UI.sheet)
@@ -1940,7 +1966,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['web_search', 'list_docs', 'read_doc', 'dataset_info', 'list_subprojects', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'dataset_info', 'list_subprojects', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
   var MODE_SETS = {
     discovery:M_READ,
     research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc']),
@@ -2019,7 +2045,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['list_docs', 'read_doc', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -3066,9 +3092,16 @@ MStore.ready.then(function(){
     });
     return t;
   }
-  function homeTile(cls, icon, label, onTap, sel){
+  function homeTile(cls, icon, label, onTap, sel, letter){
     var b = el('button', 'qtile' + (sel ? ' sel' : '')); b.type = 'button';
-    var ic = el('span', 'qic ' + cls); ic.innerHTML = icon;
+    var ic = el('span', 'qic ' + cls);
+    if(letter){
+      ic.appendChild(el('span', 'qletter', letter));
+      var bd = el('span', 'qbadge'); bd.innerHTML = icon; ic.appendChild(bd);
+    }else{
+      ic.innerHTML = icon;
+      if(cls) ic.appendChild(el('span', 'qdot'));
+    }
     b.appendChild(ic); b.appendChild(el('span', 'qlb', label));
     b.addEventListener('click', onTap);
     return b;
@@ -3086,7 +3119,8 @@ MStore.ready.then(function(){
     $('recentWrap').style.display = tops.length ? '' : 'none';
     (tops.length > 4 ? tops.slice(0, 3) : tops).forEach(function(p){
       var ty = typeOf(p);
-      rg.appendChild(homeTile(TYPE_CLS[ty], TYPE_ICON[ty], p.name, function(){ closeSide(); openProject(p); }));
+      var first = Array.from(String(p.name || '').trim())[0] || '?';
+      rg.appendChild(homeTile(TYPE_CLS[ty], TYPE_ICON[ty], p.name, function(){ closeSide(); openProject(p); }, false, first.toLocaleUpperCase()));
     });
     if(tops.length > 4) rg.appendChild(homeTile('', TYPE_ICON.all, 'All ' + tops.length, function(){ $('homeMenuBtn').click(); }));
   }
@@ -3319,6 +3353,36 @@ MStore.ready.then(function(){
     });
     tc.appendChild(tseg);
     body.appendChild(tc);
+
+    var bc = el('div', 'tool on'), btop = el('div', 'tool-top');
+    btop.appendChild(el('div', 'tool-name', 'Your message color'));
+    bc.appendChild(btop);
+    bc.appendChild(el('div', 'xsub', 'The bubble around what you type. Replies from the AI stay plain.'));
+    var sws = el('div'); sws.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center';
+    var BUB = [['', 'Default'], ['#000000', 'Black'], ['#2d5bd6', 'Blue'], ['#1f7a4d', 'Green'], ['#7a3fa0', 'Plum'], ['#c2410c', 'Rust']];
+    var cp = document.createElement('input'); cp.type = 'color'; cp.setAttribute('aria-label', 'Custom color');
+    cp.style.cssText = 'width:38px;height:38px;padding:0;border:1px solid var(--edge);border-radius:12px;background:var(--bg)';
+    function paintSw(){
+      var cur = getBubble();
+      Array.prototype.forEach.call(sws.querySelectorAll('button'), function(b){
+        var on = (b.getAttribute('data-c') || '') === cur;
+        b.style.outline = on ? '2px solid var(--text)' : 'none'; b.style.outlineOffset = '2px';
+      });
+      if(cur) cp.value = cur;
+    }
+    BUB.forEach(function(x){
+      var b = el('button'); b.setAttribute('data-c', x[0]); b.setAttribute('aria-label', x[1]);
+      b.style.cssText = 'width:38px;height:38px;border-radius:12px;border:1px solid var(--edge);background:' + (x[0] || 'var(--chip)');
+      b.addEventListener('click', function(){ setBubble(x[0]); paintSw(); });
+      sws.appendChild(b);
+    });
+    cp.addEventListener('input', function(){ setBubble(cp.value); paintSw(); });
+    sws.appendChild(cp);
+    bc.appendChild(sws);
+    var prev = el('div', 'msg u'); prev.style.marginTop = '14px'; prev.appendChild(el('div', 'bubble', 'This is how your messages look.'));
+    bc.appendChild(prev);
+    body.appendChild(bc);
+    paintSw();
 
     integCard(body);
 
@@ -3725,6 +3789,40 @@ MStore.ready.then(function(){
     s = s.replace(/[{}]/g, '').replace(/\uE000/g, '{').replace(/\uE001/g, '}');
     return s.replace(/[ \t]+/g, ' ').trim();
   }
+  /* real typesetting with KaTeX, fetched the first time a reply has math, then kept by the service worker.
+     Until it arrives (or if it never does) the plain-text version above is shown. */
+  var KATEX_V = '0.16.11', KATEX_BASE = 'https://cdn.jsdelivr.net/npm/katex@' + KATEX_V + '/dist/';
+  var katexState = 0; /* 0 not asked, 1 loading, 2 ready, 3 failed */
+  function loadKatex(){
+    if(katexState) return;
+    katexState = 1;
+    try{
+      var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = KATEX_BASE + 'katex.min.css'; css.crossOrigin = 'anonymous';
+      document.head.appendChild(css);
+      var sc = document.createElement('script'); sc.src = KATEX_BASE + 'katex.min.js'; sc.crossOrigin = 'anonymous';
+      sc.onload = function(){
+        if(!window.katex){ katexState = 3; return; }
+        katexState = 2;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-tex]'), function(n){ typeset(n); });
+      };
+      sc.onerror = function(){ katexState = 3; };
+      document.head.appendChild(sc);
+    }catch(e){ katexState = 3; }
+  }
+  function typeset(n){
+    try{
+      var tex = n.getAttribute('data-tex');
+      var h = window.katex.renderToString(tex, { displayMode:n.getAttribute('data-disp') === '1', throwOnError:false, output:'html', trust:false });
+      n.innerHTML = h; n.classList.add('kx');
+    }catch(e){ /* keep the plain-text version */ }
+  }
+  function mathNode(tex, display){
+    tex = String(tex).trim();
+    var n = el(display ? 'div' : 'span', display ? 'mmb' : 'mm', texToText(tex.replace(/\s*\n\s*/g, ' ')));
+    n.setAttribute('data-tex', tex); n.setAttribute('data-disp', display ? '1' : '0');
+    if(katexState === 2) typeset(n); else loadKatex();
+    return n;
+  }
   /* plain text between markdown pieces: &amp; style entities and <br> become what they mean */
   function pushText(host, s){
     if(!s) return;
@@ -3747,8 +3845,8 @@ MStore.ready.then(function(){
       else if(m[4]){ node = el('del'); inner(node, t.slice(2, -2)); }
       else if(m[5]){ var lm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(t); node = mdLink(lm[2], lm[1]); }
       else if(m[6] || m[7]){ node = el('em'); inner(node, t.slice(1, -1)); }
-      else if(m[9]) node = el('span', 'mm', texToText(t.slice(0, 2) === '$$' ? t.slice(2, -2) : t.slice(1, -1)));
-      else if(m[10]) node = el('span', 'mm', texToText(t.slice(2, -2)));
+      else if(m[9]) node = mathNode(t.slice(0, 2) === '$$' ? t.slice(2, -2) : t.slice(1, -1), false);
+      else if(m[10]) node = mathNode(t.slice(2, -2), false);
       else if(m[11]){ node = el('strong'); var em3 = el('em'); inner(em3, t.slice(3, -3)); node.appendChild(em3); }
       else node = mdLink(t, t);
       host.appendChild(node);
@@ -3812,8 +3910,8 @@ MStore.ready.then(function(){
           }
         }
         if(dfound){
-          var dtxt = texToText(dbuf.join(' ').trim());
-          if(dtxt) host.appendChild(el('div', 'mmb', dtxt));
+          var dsrc = dbuf.join('\n').trim();
+          if(texToText(dsrc)) host.appendChild(mathNode(dsrc, true));
           i = dj + 1; continue;
         }
       }
@@ -4907,7 +5005,7 @@ MStore.ready.then(function(){
     analyze_code:{ d:'Inspect code for mistakes and clashes. With no argument it inspects the current page.', p:{ code:STR('Code to review instead of the current page') } },
     export_html:{ d:'Package the page as a single .html file and download it.', p:{ filename:STR('Optional file name') } },
     read_xray:{ d:'Look back at your own recent steps in this project: replies, tool calls and errors.', p:{ limit:S('INTEGER', 'How many entries, default 5') } },
-    write_doc:{ d:'Write or update a document the person can read, edit and export (a spec, report or design). Use markdown. Set replace to true to update an existing document.', p:{ title:STR('Document title'), text:STR('The document, in markdown'), replace:S('BOOLEAN', 'True to replace an existing document with the same title') }, req:['title', 'text'] },
+    write_doc:{ d:'Write or update a document the person can read, edit and export (a blueprint, spec, report or design). Use markdown unless another format fits better. Set replace to true to update an existing document.', p:{ title:STR('Document title'), text:STR('The document body, written in the chosen format (markdown by default)'), replace:S('BOOLEAN', 'True to replace an existing document with the same title'), kind:STR('What it is: blueprint, spec, report, notes or data. Use blueprint for a build plan the person will approve before code is written.'), format:STR('How the text is written: markdown, json, csv, yaml, mermaid, html, plain or code') }, req:['title', 'text'] },
     list_docs:{ d:'List the documents in this project.' },
     read_doc:{ d:'Read one document.', p:{ title:STR('Document title') }, req:['title'] },
     dataset_add:{ d:'Save one piece of gathered information to the dataset. One topic per record. Always give the source.', p:{ title:STR('Short title'), text:STR('The information, cleaned up or in your own words'), source:STR('Where it came from (URL or file)') }, req:['title', 'text'] },
@@ -5136,9 +5234,25 @@ MStore.ready.then(function(){
 
   /* --- the card for a tool call, in whatever state it is in --- */
   function lc(s){ return s.charAt(0).toLowerCase() + s.slice(1); }
+  /* models sometimes invent a near name for a tool; map the usual ones to the real tool */
+  var TOOL_ALIAS = {
+    write_document:'write_doc', create_document:'write_doc', save_document:'write_doc', update_document:'write_doc', edit_document:'write_doc',
+    write_blueprint:'write_doc', create_blueprint:'write_doc', save_blueprint:'write_doc', write_spec:'write_doc', write_report:'write_doc', create_doc:'write_doc', save_doc:'write_doc', update_doc:'write_doc',
+    list_documents:'list_docs', read_document:'read_doc', get_document:'read_doc', get_doc:'read_doc',
+    list_task:'list_tasks', get_tasks:'list_tasks', get_task:'read_task', create_task:'add_task', new_task:'add_task',
+    search_web:'web_search', google_search:'web_search', web_lookup:'web_search',
+    save_note:'write_note', add_note:'write_note', save_journal:'journal_save', write_journal:'journal_save'
+  };
+  function canonTool(n){
+    n = String(n || '');
+    if(IMPL[n]) return n;
+    var k = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if(IMPL[k]) return k;
+    return TOOL_ALIAS[k] && IMPL[TOOL_ALIAS[k]] ? TOOL_ALIAS[k] : n;
+  }
   function toolCard(m, seg){
     var I = IMPL[seg.name], a = seg.args || {};
-    if(!I) return slim('code', 'Unknown tool: ' + seg.name, 'bad');
+    if(!I) return slim('code', 'That action is not available here', 'warn');
     var label = I.label(a);
     if(seg.st === 'run') return (busy && pending === current) ? slim(I.icon, 'Working: ' + lc(label), 'warn') : slim(I.icon, 'Interrupted: ' + lc(label), 'warn');
     if(seg.st === 'ask'){
@@ -5173,7 +5287,11 @@ MStore.ready.then(function(){
   }
   async function runToolCall(p, seg, ctx, draw){
     var I = IMPL[seg.name], st = toolState(p)[seg.name], a = seg.args || {};
-    if(!I || !st || !st.enabled || st.perm === 'deny'){
+    if(!I){
+      seg.st = 'denied'; seg.res = 'Not available.';
+      return { result:{ error:'There is no tool called ' + seg.name + '. The tools you can call right now are: ' + ((ctx.allowed || Object.keys(IMPL)).join(', ') || 'none') + '. Use one of those exact names, or answer in plain words.' } };
+    }
+    if(!st || !st.enabled || st.perm === 'deny'){
       seg.st = 'denied'; seg.res = 'Not available.';
       return { result:{ error:'This tool is not available. Do not use it again.' } };
     }
@@ -5389,7 +5507,7 @@ MStore.ready.then(function(){
         R.push((has('propose_direction') ? 'For a big or uncertain piece of work, call propose_direction first and wait for the answer. ' : '') +
           (has('deliberate') ? 'When the person has to choose between ways, call deliberate, then stop and let them choose.' : ''));
       }
-      if(has('write_doc')) R.push('Use write_doc for written designs, specs and reports so the person can read, edit and export them. A design is a document, not an app.');
+      if(has('write_doc')) R.push('Use write_doc for written designs, specs, blueprints and reports so the person can read, edit and export them. A design is a document, not an app. Set kind (blueprint, spec, report, note or data) and format (markdown, json, csv, yaml, mermaid, html, plain or code) to fit the content. When asked to build something, call list_docs first: a document marked approved is the blueprint to follow, and one that is not approved is only a draft, so say so before building from it.');
       if(has('write_note')) R.push('write_note is loaded because the person asked to remember something. Save only that, once.');
       if(has('start_task') || has('update_task')){
         R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work only on tasks in the focus group, in order, and never start a task from another group or an ungrouped one unless the person asks. When you start a task, do its work: read the code, make the change, check it against \u201cDone when\u201d. When the focus group is finished, report briefly and stop. Before you stop, save progress with update_task (checkpoint = what is done and the next step). When every completion criterion is met, call complete_task and say how each was met. If you cannot continue, call block_task with the reason. A task never overrides what the person just asked.');
@@ -5572,7 +5690,7 @@ MStore.ready.then(function(){
           live = null;
         }else if(text) m.segs.push({ k:'t', t:text });
         var segsNow = calls.map(function(c){
-          var sg = { k:'tool', id:uid(), name:c.functionCall.name, args:c.functionCall.args || {}, st:'run' };
+          var sg = { k:'tool', id:uid(), name:canonTool(c.functionCall.name), args:c.functionCall.args || {}, st:'run' };
           m.segs.push(sg);
           return sg;
         });
@@ -6411,6 +6529,29 @@ MStore.ready.then(function(){
      DOCUMENTS: specs, reports and designs the AI writes and the person reads, edits and exports
      ===================================================================== */
   function docsOf(p){ if(!Array.isArray(p.docs)) p.docs = []; return p.docs; }
+  var DOC_KINDS = [['note', 'Note'], ['blueprint', 'Blueprint'], ['spec', 'Spec'], ['report', 'Report'], ['data', 'Data']];
+  /* ext: file ending when exported as-is; md means the normal document exports apply */
+  var DOC_FMTS = [['markdown', 'Markdown', 'md'], ['plain', 'Plain text', 'txt'], ['json', 'JSON', 'json'], ['csv', 'CSV', 'csv'], ['yaml', 'YAML', 'yaml'], ['mermaid', 'Mermaid diagram', 'mmd'], ['html', 'HTML', 'html'], ['code', 'Code', 'txt']];
+  function docKind(d){ return DOC_KINDS.some(function(k){ return k[0] === d.kind; }) ? d.kind : 'note'; }
+  function docFmt(d){ return DOC_FMTS.some(function(k){ return k[0] === d.format; }) ? d.format : 'markdown'; }
+  function kindLabel(k){ return (DOC_KINDS.filter(function(x){ return x[0] === k; })[0] || [0, 'Note'])[1]; }
+  function fmtLabel(f){ return (DOC_FMTS.filter(function(x){ return x[0] === f; })[0] || [0, 'Markdown'])[1]; }
+  function fmtExt(f){ return (DOC_FMTS.filter(function(x){ return x[0] === f; })[0] || [0, 0, 'md'])[2]; }
+  function pushHist(d){
+    if(!Array.isArray(d.hist)) d.hist = [];
+    d.hist.unshift({ text:d.text, ts:d.mod, title:d.title });
+    if(d.hist.length > 8) d.hist.length = 8;
+  }
+  /* markdown documents get every export; other formats leave as the file they really are */
+  async function exportDocRec(d){
+    var f = docFmt(d);
+    if(f === 'markdown') return exportMix(d.title, d.text, null);
+    var ext = fmtExt(f), types = { json:'application/json', csv:'text/csv', html:'text/html', yaml:'text/yaml', mmd:'text/plain', txt:'text/plain' };
+    var pick = await UI.sheet('Export', [{ label:fmtLabel(f) + ' (.' + ext + ')', value:'raw' }, { label:'As a document (.md)', value:'md' }]);
+    if(!pick) return '';
+    if(pick === 'md') return exportDoc(d.title, '# ' + d.title + '\n\n' + (f === 'plain' ? d.text : '```' + (f === 'code' ? '' : f) + '\n' + d.text + '\n```'), 'md');
+    return saveBlob(slug(d.title) + '.' + ext, new Blob([d.text], { type:types[ext] || 'text/plain' }));
+  }
   function findDoc(p, title){
     var r = String(title || '').trim().toLowerCase(), ds = docsOf(p);
     if(!r) return null;
@@ -6434,11 +6575,14 @@ MStore.ready.then(function(){
       var ds = docsOf(p), ex = ds.filter(function(d){ return sameG(d.title, title); })[0], now = Date.now();
       if(ex){
         if(!a.replace) return terr('A document with that title already exists. Set replace to true to update it, or choose another title.');
+        if(ex.text !== short(text, 60000)){ pushHist(ex); ex.approved = false; }
         ex.text = short(text, 60000); ex.mod = now;
-      }else ds.push({ id:uid(), title:title, text:short(text, 60000), ts:now, mod:now });
+        if(a.kind) ex.kind = docKind({ kind:String(a.kind).toLowerCase() });
+        if(a.format) ex.format = docFmt({ format:String(a.format).toLowerCase() });
+      }else ds.push({ id:uid(), title:title, text:short(text, 60000), ts:now, mod:now, kind:docKind({ kind:String(a.kind || '').toLowerCase() }), format:docFmt({ format:String(a.format || '').toLowerCase() }), approved:false });
       save();
       seg.data = { title:title, updated:!!ex };
-      return { ok:true, res:(ex ? 'Updated' : 'Wrote') + ' \u201c' + short(title, 30) + '\u201d', result:{ ok:true, message:'Saved. The person can read it under Documents and export it as Markdown, Word, PDF and more.' } };
+      return { ok:true, res:(ex ? 'Updated' : 'Wrote') + ' \u201c' + short(title, 30) + '\u201d', result:{ ok:true, message:'Saved. The person can read it under Documents, approve it, and export it. It is not approved until they approve it.' } };
     },
     card:function(m, seg){
       var d = seg.data || {}, c = tcard('note', d.updated ? 'Document updated' : 'Document written', short(d.title || '', 60), ['Done', 'ok']);
@@ -6451,7 +6595,7 @@ MStore.ready.then(function(){
     label:function(){ return 'List documents'; },
     run:function(p){
       var ds = docsOf(p);
-      return { ok:true, res:'Read documents (' + ds.length + ')', result:{ documents:ds.map(function(d){ return { title:d.title, size:d.text.length, updated:taskStamp(d.mod) }; }) } };
+      return { ok:true, res:'Read documents (' + ds.length + ')', result:{ documents:ds.map(function(d){ return { title:d.title, kind:docKind(d), format:docFmt(d), approved:!!d.approved, size:d.text.length, updated:taskStamp(d.mod) }; }) } };
     },
     card:function(m, seg){ return slim('note', seg.res || 'List documents'); }
   });
@@ -6461,7 +6605,7 @@ MStore.ready.then(function(){
     run:function(p, a){
       var d = findDoc(p, a.title);
       if(!d) return terr('No single document matches that title. Use list_docs.');
-      return { ok:true, res:'Read \u201c' + short(d.title, 30) + '\u201d', result:{ title:d.title, text:short(d.text, 20000) } };
+      return { ok:true, res:'Read \u201c' + short(d.title, 30) + '\u201d', result:{ title:d.title, kind:docKind(d), format:docFmt(d), approved:!!d.approved, text:short(d.text, 20000) } };
     },
     card:function(m, seg){ return slim('note', seg.res || 'Read a document'); }
   });
@@ -6474,7 +6618,10 @@ MStore.ready.then(function(){
     var bar = el('div', 'prow'); bar.style.margin = '14px 0 8px';
     bar.appendChild(mkBtn('solid', 'New document', '', function(){ editor(null); }));
     if(ds.length > 1) bar.appendChild(mkBtn('ghost', 'Export all (.zip)', '', function(){
-      saveBlob(slug(p.name) + '-documents.zip', makeZip(docsOf(p).map(function(d, i){ return { name:slug(d.title) + '.md', data:'# ' + d.title + '\n\n' + d.text + '\n' }; })));
+      saveBlob(slug(p.name) + '-documents.zip', makeZip(docsOf(p).map(function(d, i){
+        var raw = docFmt(d) !== 'markdown' && docFmt(d) !== 'plain';
+        return { name:slug(d.title) + '.' + (raw ? fmtExt(docFmt(d)) : 'md'), data:raw ? d.text + '\n' : '# ' + d.title + '\n\n' + d.text + '\n' };
+      })));
     }));
     body.appendChild(bar);
     var host = el('div'); body.appendChild(host);
@@ -6482,14 +6629,19 @@ MStore.ready.then(function(){
       host.innerHTML = '';
       var card = el('div', 'tool on'), ti = el('input', 'field'), tx = el('textarea', 'field');
       ti.maxLength = 120; ti.value = d ? d.title : ''; tx.rows = 14; tx.value = d ? d.text : ''; tx.style.resize = 'none';
+      var kp = pickField('Kind', DOC_KINDS, d ? docKind(d) : 'note'), fp = pickField('Format', DOC_FMTS.map(function(x){ return [x[0], x[1]]; }), d ? docFmt(d) : 'markdown');
       card.appendChild(el('div', 'label', 'Title')); card.appendChild(ti);
+      card.appendChild(el('div', 'label', 'Kind')); card.appendChild(kp);
+      card.appendChild(el('div', 'label', 'Format')); card.appendChild(fp);
       card.appendChild(el('div', 'label', 'Text')); card.appendChild(tx);
       var row = el('div', 'tool-top'); row.style.marginTop = '14px';
       row.appendChild(mkBtn('solid', 'Save', '', function(){
         var title = ti.value.trim(), text = tx.value.trim(), now = Date.now();
         if(!title && !text){ UI.alert('Empty document', 'Add a title or some text.'); return; }
-        if(d){ d.title = title || short(text, 60); d.text = text; d.mod = now; }
-        else docsOf(p).push({ id:uid(), title:title || short(text, 60), text:text, ts:now, mod:now });
+        if(d){
+          if(d.text !== text){ pushHist(d); d.approved = false; }
+          d.title = title || short(text, 60); d.text = text; d.mod = now; d.kind = kp.value; d.format = fp.value;
+        }else docsOf(p).push({ id:uid(), title:title || short(text, 60), text:text, ts:now, mod:now, kind:kp.value, format:fp.value, approved:false });
         save(); renderDocs();
       }));
       row.appendChild(mkBtn('ghost', 'Cancel', '', function(){ host.innerHTML = ''; }));
@@ -6499,6 +6651,8 @@ MStore.ready.then(function(){
     ds.forEach(function(d){
       var card = el('div', 'tool on'), top = el('div', 'tool-top');
       top.appendChild(el('div', 'tool-name', d.title));
+      if(d.approved) top.appendChild(el('span', 'spill', 'Approved'));
+      top.appendChild(el('span', 'spill', kindLabel(docKind(d)) + (docFmt(d) === 'markdown' ? '' : ' \u00b7 ' + fmtLabel(docFmt(d)))));
       var info = el('button', 'info', '?'); info.addEventListener('click', function(){ card.classList.toggle('open'); });
       top.appendChild(info); card.appendChild(top);
       var inf = el('div', 'tool-info'), tx = el('div', '', d.text); tx.style.whiteSpace = 'pre-wrap';
@@ -6506,7 +6660,14 @@ MStore.ready.then(function(){
       var mt = el('div', 'xsub', 'Updated ' + taskStamp(d.mod)); mt.style.marginTop = '8px'; inf.appendChild(mt);
       var row = el('div', 'prow'); row.style.marginTop = '10px';
       row.appendChild(mkBtn('ghost', 'Edit', '', function(){ editor(d); host.scrollIntoView({ block:'start' }); }));
-      row.appendChild(mkBtn('ghost', 'Export', '', function(){ exportMix(d.title, d.text, null); }));
+      if(docKind(d) === 'blueprint' || docKind(d) === 'spec') row.appendChild(mkBtn('ghost', d.approved ? 'Remove approval' : 'Approve', '', function(){ d.approved = !d.approved; save(); renderDocs(); }));
+      if((d.hist || []).length) row.appendChild(mkBtn('ghost', 'Versions', '', async function(){
+        var v = await UI.sheet('Restore an earlier version', d.hist.map(function(h, i){ return { label:taskStamp(h.ts) + ' \u00b7 ' + short(h.text.replace(/\s+/g, ' '), 40), value:String(i) }; }));
+        if(v === null || v === undefined) return;
+        var h = d.hist[+v]; if(!h) return;
+        pushHist(d); d.text = h.text; d.mod = Date.now(); d.approved = false; save(); renderDocs();
+      }));
+      row.appendChild(mkBtn('ghost', 'Export', '', function(){ exportDocRec(d); }));
       row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
         if(await UI.confirm('Delete this document?', '', { confirmText:'Delete', danger:true })){ p.docs = p.docs.filter(function(x){ return x !== d; }); save(); renderDocs(); }
       }));
@@ -6565,17 +6726,31 @@ MStore.ready.then(function(){
 
   /* ---- Discovery Journal page ---- */
   var jFilter = '', jDraft = '';
+  /* a button that looks like a field and opens the lab's own sheet; node.value holds the choice */
+  function pickField(title, opts, value, onChange){
+    var b = el('button', 'select'), nm = el('span');
+    b.appendChild(nm); b.insertAdjacentHTML('beforeend', ICON.chev);
+    b.value = value || ''; b.style.marginTop = '0';
+    function paint(){
+      var f = opts.filter(function(o){ return o[0] === b.value; })[0];
+      nm.textContent = f ? f[1] : (opts[0] ? opts[0][1] : '');
+    }
+    b.addEventListener('click', async function(){
+      var v = await UI.sheet(title, opts.map(function(o){ return { label:o[1], value:o[0], selected:o[0] === b.value }; }));
+      if(v === null || v === undefined) return;
+      b.value = v; paint(); if(onChange) onChange(v);
+    });
+    paint();
+    return b;
+  }
   function renderJournal(){
     var body = $('pageBody');
     body.innerHTML = '';
     var all = journalOf(current).slice().sort(function(a, b){ return b.mod - a.mod; });
     body.appendChild(el('div', 'summary', all.length + ' entr' + (all.length === 1 ? 'y' : 'ies')));
     var bar = el('div', 'tool-top'); bar.style.margin = '14px 0 4px';
-    var fs = el('select', 'field'); fs.style.flex = '1';
-    [['', 'All categories']].concat(JTYPES).forEach(function(o){
-      var op = el('option', '', o[1]); op.value = o[0]; if(o[0] === jFilter) op.selected = true; fs.appendChild(op);
-    });
-    fs.addEventListener('change', function(){ jFilter = fs.value; renderJournal(); });
+    var fs = pickField('Category', [['', 'All categories']].concat(JTYPES), jFilter, function(v){ jFilter = v; renderJournal(); });
+    fs.style.flex = '1';
     bar.appendChild(fs);
     bar.appendChild(mkBtn('solid', 'New entry', '', function(){ editor(null); }));
     bar.appendChild(mkBtn('ghost', 'Export', '', function(){ exportJournal(current); }));
@@ -6586,13 +6761,11 @@ MStore.ready.then(function(){
     function editor(en){
       host.innerHTML = '';
       host.appendChild(el('div', 'tool on'));
-      var ty = el('select', 'field'), ti = el('input', 'field'), tx = el('textarea', 'field'), tk = el('select', 'field'), cs = el('select', 'field');
-      JTYPES.forEach(function(o){ var op = el('option', '', o[1]); op.value = o[0]; if(en && en.type === o[0]) op.selected = true; ty.appendChild(op); });
+      var ti = el('input', 'field'), tx = el('textarea', 'field');
+      var ty = pickField('Category', JTYPES, en ? en.type : JTYPES[0][0]);
       ti.maxLength = 120; ti.value = en ? en.title : ''; tx.rows = 5; tx.value = en ? en.text : ''; tx.style.resize = 'none';
-      var n0 = el('option', '', 'None'); n0.value = ''; tk.appendChild(n0);
-      tasksOf(current).slice().sort(bySeq).forEach(function(t){ var op = el('option', '', '#' + t.seq + ' ' + short(t.title, 40)); op.value = t.id; if(en && en.task === t.id) op.selected = true; tk.appendChild(op); });
-      var c0 = el('option', '', 'None'); c0.value = ''; cs.appendChild(c0);
-      (current.chats || []).forEach(function(c){ var op = el('option', '', short(c.title || 'Chat', 40)); op.value = c.id; if((en ? en.chat : '') === c.id) op.selected = true; cs.appendChild(op); });
+      var tk = pickField('Related task', [['', 'None']].concat(tasksOf(current).slice().sort(bySeq).map(function(t){ return [t.id, '#' + t.seq + ' ' + short(t.title, 40)]; })), en ? en.task : '');
+      var cs = pickField('Related chat', [['', 'None']].concat((current.chats || []).map(function(c){ return [c.id, short(c.title || 'Chat', 40)]; })), en ? en.chat : '');
       fld('Category', ty); fld('Title', ti); fld('Entry', tx); fld('Related task', tk); fld('Related chat', cs);
       var row = el('div', 'tool-top'); row.style.marginTop = '14px';
       row.appendChild(mkBtn('solid', 'Save', '', function(){
