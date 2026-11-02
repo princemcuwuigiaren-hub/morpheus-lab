@@ -7067,7 +7067,7 @@ MStore.ready.then(function(){
   var HF_KEY = 'morpheus.lab.hf', HF_API = 'https://huggingface.co', HF_SMALL = 8 * 1024 * 1024;
   function hfCfg(){
     var c = {}; try{ c = JSON.parse(localStorage.getItem(HF_KEY) || '{}') || {}; }catch(e){}
-    return { user:c.user || '', repo:c.repo || 'morpheus-lab-datasets', token:c.token || '', ok:c.ok || 0, checked:c.checked || 0, large:c.large || 0 };
+    return { user:c.user || '', repo:c.repo || 'morpheus-lab-datasets', token:c.token || '', ok:c.ok || 0, checked:c.checked || 0, large:c.large || 0, wifi:!!c.wifi };
   }
   function hfSave(c){ try{ localStorage.setItem(HF_KEY, JSON.stringify(c)); }catch(e){} }
   function hfRepoId(c){ return c.user + '/' + c.repo; }
@@ -7161,10 +7161,23 @@ MStore.ready.then(function(){
       x.send(blob);
     });
   }
+  /* waits while paused, offline, or on mobile data when Wi-Fi only is on; throws when stopped */
+  async function hfGate(job){
+    if(!job) return;
+    var shown = '';
+    for(;;){
+      if(job.stop) throw new Error('Stopped.');
+      var c = job.c || {}, conn = navigator.connection;
+      var why = job.paused ? 'Paused' : navigator.onLine === false ? 'Waiting for a connection' : (c.wifi && conn && conn.type === 'cellular') ? 'Waiting for Wi-Fi' : '';
+      if(why !== shown){ shown = why; if(job.onWhy) job.onWhy(why); }
+      if(!why) return;
+      await hfWait(800);
+    }
+  }
   async function hfPutRetry(url, blob, headers, onProg, job){
     var last = null;
-    for(var t = 0; t < 4; t++){
-      if(job && job.stop) throw new Error('Stopped.');
+    for(var t = 0; t < 6; t++){
+      await hfGate(job);
       try{ return await hfPut(url, blob, headers, onProg, job); }
       catch(e){ last = e; if(e && e.message === 'Stopped.') throw e; await hfWait(1500 * (t + 1)); }
     }
@@ -7178,6 +7191,8 @@ MStore.ready.then(function(){
   /* gets one file into the repository's storage; nothing is visible until hfCommit */
   async function hfStage(c, path, blob, sha, onProg, job){
     if(!sha) throw new Error('Checksums are not available in this browser, so uploads cannot be verified.');
+    if(job) job.c = c;
+    await hfGate(job);
     var id = hfRepoId(c), sample = await hfB64(blob.slice(0, 512));
     var pr = await (await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + id + '/preupload/main', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ files:[{ path:path, sample:sample, size:blob.size }] }) }), 'Preparing the upload')).json();
     var f0 = pr.files && pr.files[0];
@@ -7222,7 +7237,7 @@ MStore.ready.then(function(){
   }
   /* the large-file test: a 12 MB file through the same path datasets use */
   async function hfLargeTest(c, step){
-    var name = 'morpheus-large-test.bin', cur = 'Prepare', job = { stop:false, abort:null };
+    var name = 'morpheus-large-test.bin', cur = 'Prepare', job = { stop:false, abort:null, onWhy:function(w){ if(w) step('Upload', 'run', w); } };
     try{
       step(cur, 'run');
       var chunks = [], x = 123456789;
@@ -7275,52 +7290,70 @@ MStore.ready.then(function(){
   async function hfUploadDataset(p, say, job){
     var c = hfCfg();
     if(!c.user || !c.repo || !c.token) throw new Error('Set up Hugging Face in Settings first.');
-    var m = dsMetaOf(p), dir = slug(p.name), SH = 64 * 1024 * 1024, staged = [], shards = [], imageIndex = [], pend = [], missing = [], done = 0, total = 0, textRecs = 0;
+    var m = dsMetaOf(p);
+    if(m.remote && m.remote.freed) throw new Error('This dataset was moved off this device. Restore it first, so the upload does not replace the Hugging Face copy with a partial one.');
+    var dir = slug(p.name), SH = 64 * 1024 * 1024, staged = [], shards = [], imageIndex = [], missing = [], done = 0, textRecs = 0, usedCache = false;
+    var cache = m.hfStaged || (m.hfStaged = {}), stat = dsStatOf(p);
     var imgs = m.files.filter(function(f){ return f.kind === 'image'; });
-    total = dsStatOf(p).bytes + imgs.reduce(function(a, f){ return a + (f.bytes || 0); }, 0);
+    var total = stat.bytes + imgs.reduce(function(a, f){ return a + (f.bytes || 0); }, 0);
     if(!total) throw new Error('There is nothing in this dataset to upload.');
+    job.c = c;
     say('Checking the repository...');
     var me = (await HFS.who(c)).name, rp = await HFS.ensure(c, me);
     if(!rp.priv) throw new Error('The repository is public. Make it private on Hugging Face first.');
-    async function stageOne(path, blob, kind, count){
-      if(job.stop) throw new Error('Stopped.');
-      var sha = await sha256Of(blob), base = done;
-      var sg = await hfStage(c, path, blob, sha, function(l){ say('Uploading ' + fmtBytes(Math.min(total, base + l)) + ' of about ' + fmtBytes(total) + ' \u00b7 ' + path.split('/').pop()); }, job);
-      done += blob.size; staged.push(sg); shards.push({ path:path, bytes:blob.size, sha256:sha, kind:kind, count:count });
-      return path;
+    async function stageOne(path, make, kind, count, key){
+      await hfGate(job);
+      var sg = null, hit = cache[path];
+      if(hit && hit.key === key){ sg = { path:path, size:hit.size, sha:hit.sha, mode:'lfs' }; usedCache = true; say('Already sent earlier: ' + path.split('/').pop()); }
+      else{
+        var blob = await make(), sha = await sha256Of(blob), base = done;
+        for(var att = 0; ; att++){
+          try{ sg = await hfStage(c, path, blob, sha, function(l){ say('Uploading ' + fmtBytes(Math.min(total, base + l)) + ' of about ' + fmtBytes(total) + ' \u00b7 ' + path.split('/').pop()); }, job); break; }
+          catch(e){
+            var msg = (e && e.message) || '';
+            if(msg === 'Stopped.' || att >= 4 || !((e && e.name === 'TypeError') || /answered (5\d\d|429)|status (5\d\d|429)/.test(msg))) throw e;
+            await hfGate(job); await hfWait(2000 * (att + 1));
+          }
+        }
+        if(sg.mode === 'lfs'){ cache[path] = { key:key, sha:sg.sha, size:sg.size }; save(); }
+      }
+      done += sg.size; staged.push(sg); shards.push({ path:path, bytes:sg.size, sha256:sg.sha, kind:kind, count:count });
     }
     var after = 0, n = 0;
     for(;;){
       var b = await dsBatch(p.id, after, SH);
       if(!b.recs.length) break;
       after = b.last; n++; textRecs += b.recs.length;
-      var lines = b.recs.map(function(r){ return JSON.stringify({ title:r.title, text:r.text, source:r.source || '', saved:new Date(r.ts).toISOString() }) + '\n'; });
-      await stageOne(dir + '/text-' + pad5(n) + '.jsonl', new Blob(lines, { type:'application/x-ndjson' }), 'text', b.recs.length);
-      if(b.recs.length < 1) break;
+      var recs = b.recs, key = [m.version, stat.n, stat.bytes, b.last, recs.length].join(':');
+      await stageOne(dir + '/text-' + pad5(n) + '.jsonl', async function(){
+        return new Blob(recs.map(function(r){ return JSON.stringify({ title:r.title, text:r.text, source:r.source || '', saved:new Date(r.ts).toISOString() }) + '\n'; }), { type:'application/x-ndjson' });
+      }, 'text', recs.length, key);
     }
-    var tarParts = [], tarSize = 0, ti = 0, used = {};
-    async function flushTar(){
-      if(!pend.length) return;
-      tarParts.push(new Uint8Array(1024)); ti++;
-      var path = dir + '/images-' + pad5(ti) + '.tar';
-      await stageOne(path, new Blob(tarParts, { type:'application/x-tar' }), 'images', pend.length);
-      pend.forEach(function(x){ x.shard = path; imageIndex.push(x); });
-      tarParts = []; tarSize = 0; pend = [];
+    var group = [], gsize = 0, ti = 0, used = {};
+    async function flushGroup(){
+      if(!group.length) return;
+      var g = group; group = []; gsize = 0; ti++;
+      var path = dir + '/images-' + pad5(ti) + '.tar', key = hashOf(g.map(function(x){ return x.f.id + ':' + x.f.bytes; }).join('|'));
+      await stageOne(path, async function(){
+        var parts = [];
+        for(var i = 0; i < g.length; i++){
+          var rec = null; try{ rec = await LOCAL.get(g[i].f.id); }catch(e){}
+          if(!rec || !rec.blob){ missing.push(g[i].f.name); continue; }
+          var pad = (512 - rec.blob.size % 512) % 512;
+          parts.push(tarHeader(g[i].entry, rec.blob.size, g[i].f.ts), rec.blob); if(pad) parts.push(new Uint8Array(pad));
+        }
+        parts.push(new Uint8Array(1024));
+        return new Blob(parts, { type:'application/x-tar' });
+      }, 'images', g.length, key);
+      g.forEach(function(x){ if(missing.indexOf(x.f.name) < 0) imageIndex.push({ fid:x.f.id, name:x.f.name, entry:x.entry, shard:path, sha256:x.f.sha || '', bytes:x.f.bytes }); });
     }
     for(var k = 0; k < imgs.length; k++){
-      if(job.stop) throw new Error('Stopped.');
-      var f = imgs[k], rec = null;
-      try{ rec = await LOCAL.get(f.id); }catch(e){}
-      if(!rec || !rec.blob){ missing.push(f.name); continue; }
-      var nm = String(f.name || 'image').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-90) || 'image';
+      var f = imgs[k], nm = String(f.name || 'image').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-90) || 'image';
       if(used[nm]){ used[nm]++; nm = used[nm] + '-' + nm; } else used[nm] = 1;
-      var pad = (512 - rec.blob.size % 512) % 512;
-      tarParts.push(tarHeader(nm, rec.blob.size, f.ts), rec.blob); if(pad) tarParts.push(new Uint8Array(pad));
-      tarSize += 512 + rec.blob.size + pad;
-      pend.push({ name:f.name, entry:nm, sha256:f.sha || '', bytes:rec.blob.size });
-      if(tarSize >= SH) await flushTar();
+      group.push({ f:f, entry:nm }); gsize += 1024 + (f.bytes || 0);
+      if(gsize >= SH) await flushGroup();
     }
-    await flushTar();
+    await flushGroup();
     if(!shards.length) throw new Error('Nothing could be read from this dataset.');
     var manifest = { app:'morpheus-lab', format:1, uploaded:new Date().toISOString(),
       dataset:{ name:p.name, description:m.description, tags:m.tags, source:m.source, licence:m.licence, collected:m.collected, version:m.version, records:textRecs, images:imageIndex.length },
@@ -7328,13 +7361,14 @@ MStore.ready.then(function(){
       files:m.files.map(function(x){ return { path:x.name, bytes:x.bytes, sha256:x.sha, format:x.format, kind:x.kind || 'text', records:x.records, added:new Date(x.ts).toISOString() }; }),
       history:m.history.map(function(x){ return { version:x.version, ts:new Date(x.ts).toISOString(), note:x.note }; }) };
     var mb = new Blob([JSON.stringify(manifest, null, 2)], { type:'application/json' }), mpath = dir + '/manifest.json';
-    var ms = await hfStage(c, mpath, mb, await sha256Of(mb), null, job);
-    staged.push(ms);
+    staged.push(await hfStage(c, mpath, mb, await sha256Of(mb), null, job));
+    await hfGate(job);
     say('Saving to the repository...');
     var keep = {}; staged.forEach(function(x){ keep[x.path] = 1; });
     var before = await HFS.list(c);
     var stale = before.filter(function(x){ return x.type === 'file' && x.path.indexOf(dir + '/') === 0 && !keep[x.path]; }).map(function(x){ return x.path; });
-    await hfCommit(c, staged, stale, 'Upload ' + p.name + ' version ' + m.version);
+    try{ await hfCommit(c, staged, stale, 'Upload ' + p.name + ' version ' + m.version); }
+    catch(e){ if(usedCache){ m.hfStaged = {}; save(); throw new Error((e && e.message || 'Saving failed.') + ' Run the upload again; it will send everything fresh.'); } throw e; }
     say('Verifying on Hugging Face...');
     var after2 = await HFS.list(c), at = {}; after2.forEach(function(x){ at[x.path] = x; });
     var bad = [];
@@ -7345,9 +7379,126 @@ MStore.ready.then(function(){
       else{ var back = await HFS.get(c, sg.path); if((await sha256Of(back)) !== sg.sha) bad.push(sg.path + ' (does not match)'); }
     }
     if(bad.length) throw new Error('The upload finished but these did not verify: ' + bad.slice(0, 4).join(', ') + '.');
-    m.remote = { repo:hfRepoId(c), dir:dir, ts:Date.now(), version:m.version, shards:shards };
+    delete m.hfStaged;
+    m.remote = { repo:hfRepoId(c), dir:dir, ts:Date.now(), version:m.version, shards:shards, images:imageIndex };
     save();
     return { files:staged.length, bytes:done, missing:missing };
+  }
+
+  /* ---- reading the Hugging Face copy back: one shard at a time, stopping early when enough is found ---- */
+  async function hfReadLines(c, path, onLine){
+    var r = await hfCheck(await hfFetch(c, HF_API + '/datasets/' + hfRepoId(c) + '/resolve/main/' + hfPath(path)), 'Download');
+    var rd = r.body && r.body.getReader ? r.body.getReader() : null, dec = new TextDecoder(), buf = '';
+    async function eat(txt){ var ls = txt.split('\n'); for(var i = 0; i < ls.length; i++){ if(ls[i].trim() && (await onLine(ls[i])) === false) return false; } return true; }
+    if(!rd){ await eat(await r.text()); return; }
+    for(;;){
+      var x = await rd.read();
+      if(x.done) break;
+      buf += dec.decode(x.value, { stream:true });
+      var cut = buf.lastIndexOf('\n');
+      if(cut >= 0){ var chunk = buf.slice(0, cut); buf = buf.slice(cut + 1); if(!(await eat(chunk))){ try{ rd.cancel(); }catch(e){} return; } }
+    }
+    if(buf.trim()) await eat(buf);
+  }
+  async function hfSearch(c, rm, q, limit, note){
+    var out = [], qq = String(q || '').toLowerCase(), sh = (rm.shards || []).filter(function(x){ return x.kind === 'text'; });
+    for(var i = 0; i < sh.length && out.length < limit; i++){
+      if(note) note('Reading ' + sh[i].path.split('/').pop() + ' (' + (i + 1) + ' of ' + sh.length + ')...');
+      await hfReadLines(c, sh[i].path, function(ln){
+        var r; try{ r = JSON.parse(ln); }catch(e){ return true; }
+        if(!qq || ((r.title || '') + ' ' + (r.text || '')).toLowerCase().indexOf(qq) >= 0){ out.push(r); if(out.length >= limit) return false; }
+        return true;
+      });
+    }
+    return out;
+  }
+  async function tarEach(blob, fn){
+    var pos = 0;
+    function str(h, a, b){ var t = ''; for(var i = a; i < b && h[i]; i++) t += String.fromCharCode(h[i]); return t; }
+    while(pos + 512 <= blob.size){
+      var h = new Uint8Array(await blob.slice(pos, pos + 512).arrayBuffer()), empty = true;
+      for(var i = 0; i < 512; i++){ if(h[i]){ empty = false; break; } }
+      if(empty) break;
+      var name = str(h, 0, 100), size = parseInt(str(h, 124, 136).trim() || '0', 8) || 0;
+      pos += 512;
+      await fn(name, blob.slice(pos, pos + size));
+      pos += Math.ceil(size / 512) * 512;
+    }
+  }
+  function mimeOfName(n){ return /\.png$/i.test(n) ? 'image/png' : /\.webp$/i.test(n) ? 'image/webp' : 'image/jpeg'; }
+  async function hfVerifyRemote(c, rm){
+    var ls = await HFS.list(c), at = {}, bad = [];
+    ls.forEach(function(x){ at[x.path] = x; });
+    (rm.shards || []).forEach(function(sh){
+      var e = at[sh.path];
+      if(!e) bad.push(sh.path.split('/').pop() + ' is missing');
+      else if(e.lfs){ if(e.lfs.oid !== sh.sha256) bad.push(sh.path.split('/').pop() + ' does not match'); }
+      else if(e.size !== sh.bytes) bad.push(sh.path.split('/').pop() + ' has a different size');
+    });
+    if(!at[rm.dir + '/manifest.json']) bad.push('manifest.json is missing');
+    return bad;
+  }
+  async function hfRepoUsage(c){
+    var ls = await HFS.list(c), t = 0;
+    ls.forEach(function(x){ if(x.type === 'file') t += (x.lfs && x.lfs.size) || x.size || 0; });
+    return t;
+  }
+  async function hfRestore(p, say, job){
+    var c = hfCfg(), m = dsMetaOf(p), rm = m.remote;
+    if(!rm) throw new Error('This dataset has no Hugging Face copy.');
+    if(!c.user || !c.repo || !c.token) throw new Error('Set up Hugging Face in Settings first.');
+    if(hfRepoId(c) !== rm.repo) throw new Error('The Hugging Face settings point to a different repository than this copy (' + rm.repo + ').');
+    job.c = c;
+    var out = { added:0, skipped:0, images:0, bad:[] }, idx = rm.images, map = null, batch = [];
+    async function flushB(){ if(batch.length){ var x = await dsAdd(p, batch, true); out.added += x.added; out.skipped += x.skipped; batch = []; } }
+    for(var i = 0; i < (rm.shards || []).length; i++){
+      var sh = rm.shards[i]; await hfGate(job);
+      say('Restoring ' + sh.path.split('/').pop() + ' (' + (i + 1) + ' of ' + rm.shards.length + ')...');
+      if(sh.kind === 'text'){
+        await hfReadLines(c, sh.path, async function(ln){
+          var r; try{ r = JSON.parse(ln); }catch(e){ return true; }
+          batch.push({ title:r.title || '', text:r.text || '', source:r.source || '', ts:Date.parse(r.saved) || Date.now(), fid:'' });
+          if(batch.length >= 400) await flushB();
+          return !job.stop;
+        });
+        await flushB();
+      }else{
+        var blob = await (await hfCheck(await hfFetch(c, HF_API + '/datasets/' + hfRepoId(c) + '/resolve/main/' + hfPath(sh.path)), 'Download')).blob();
+        if(!idx) idx = JSON.parse(await (await HFS.get(c, rm.dir + '/manifest.json')).text()).images || [];
+        if(!map){ map = {}; idx.forEach(function(x){ map[x.shard + '|' + x.entry] = x; }); }
+        await tarEach(blob, async function(name, eb){
+          var img = map[sh.path + '|' + name];
+          var f = img && (m.files.filter(function(x){ return x.id === img.fid; })[0] || m.files.filter(function(x){ return x.kind === 'image' && x.name === img.name; })[0]);
+          if(!f){ out.bad.push(name + ' (not in the catalogue)'); return; }
+          if(f.sha && (await sha256Of(eb)) !== f.sha){ out.bad.push(f.name + ' (checksum differs)'); return; }
+          await LOCAL.put({ id:f.id, pid:p.id, kind:'dsfile', name:f.name, type:mimeOfName(f.name), size:eb.size, ts:f.ts, blob:eb });
+          f.kept = true; out.images++;
+        });
+      }
+      if(job.stop) throw new Error('Stopped.');
+    }
+    if(!out.bad.length) delete rm.freed;
+    save();
+    return out;
+  }
+  async function hfFreeUp(p, say){
+    var c = hfCfg(), m = dsMetaOf(p), rm = m.remote;
+    if(!rm) throw new Error('This dataset has no Hugging Face copy.');
+    if(rm.version !== m.version) throw new Error('This dataset changed after the last upload. Upload it again first.');
+    if(!c.user || !c.repo || !c.token) throw new Error('Set up Hugging Face in Settings first.');
+    if(hfRepoId(c) !== rm.repo) throw new Error('The Hugging Face settings point to a different repository than this copy (' + rm.repo + ').');
+    say('Checking the Hugging Face copy before deleting anything...');
+    var bad = await hfVerifyRemote(c, rm);
+    if(bad.length) throw new Error('The copy on Hugging Face does not check out, so nothing was deleted: ' + bad.slice(0, 3).join('; ') + '.');
+    var st = dsStatOf(p), recs = st.n, bytes = st.bytes, imgs = 0, orig = 0;
+    await dsPrune(p, function(){ return false; });
+    for(var i = 0; i < m.files.length; i++){
+      var f = m.files[i];
+      if(f.kept){ try{ await LOCAL.remove(f.id); }catch(e){} if(f.kind === 'image') imgs++; else orig++; f.kept = false; }
+    }
+    rm.freed = { ts:Date.now(), records:recs, bytes:bytes, images:imgs, originals:orig };
+    save();
+    return rm.freed;
   }
 
   function hfCard(body){
@@ -7367,19 +7518,35 @@ MStore.ready.then(function(){
       card.appendChild(i);
     }
     field('Username or organization', 'user'); field('Repository name', 'repo'); field('Token', 'token', true);
-    var row = el('div', 'btnrow'), steps = el('div'), tb, lb;
+    var wr = el('div', 'tool-top'); wr.style.marginTop = '14px';
+    wr.appendChild(el('div', '', 'Upload only on Wi-Fi'));
+    var sw = el('button', 'sw' + (c.wifi ? ' on' : '')); sw.setAttribute('role', 'switch'); sw.setAttribute('aria-checked', c.wifi ? 'true' : 'false'); sw.setAttribute('aria-label', 'Upload only on Wi-Fi');
+    sw.addEventListener('click', function(){ c.wifi = !c.wifi; sw.classList.toggle('on', c.wifi); sw.setAttribute('aria-checked', c.wifi ? 'true' : 'false'); hfSave(c); });
+    wr.appendChild(sw); card.appendChild(wr);
+    if(!(navigator.connection && navigator.connection.type)) card.appendChild(el('div', 'xsub', 'This browser cannot tell Wi-Fi from mobile data, so this setting cannot be enforced here.'));
+    var row = el('div', 'btnrow'), steps = el('div'), tb, lb, ub;
     function need(){ if(!c.user || !c.repo || !c.token){ UI.alert('Missing details', 'Fill in the username, repository name and token first.'); return false; } return true; }
     async function run(fn, done){
-      tb.disabled = lb.disabled = true; steps.innerHTML = ''; var lines = {};
+      tb.disabled = lb.disabled = ub.disabled = true; steps.innerHTML = ''; var lines = {};
       var r = await fn(c, function(label, st, msg){
         var ln = lines[label]; if(!ln){ ln = lines[label] = el('div', 'hint'); steps.appendChild(ln); }
         ln.textContent = label + ' \u00b7 ' + (st === 'run' ? (msg || 'checking') : msg || st);
       });
-      done(r); c.checked = Date.now(); hfSave(c); tb.disabled = lb.disabled = false; paint();
+      done(r); c.checked = Date.now(); hfSave(c); tb.disabled = lb.disabled = ub.disabled = false; paint();
     }
     tb = mkBtn('solid', 'Test connection', '', function(){ if(need()) run(hfTest, function(r){ c.ok = r.ok ? Date.now() : 0; if(!r.ok) c.large = 0; }); });
     lb = mkBtn('ghost', 'Test large upload', '', function(){ if(need()) run(hfLargeTest, function(r){ c.large = r.ok ? Date.now() : 0; }); });
-    row.appendChild(tb); row.appendChild(lb); card.appendChild(row); card.appendChild(steps);
+    ub = mkBtn('ghost', 'Check usage', '', async function(){
+      if(!need()) return;
+      ub.disabled = true; steps.innerHTML = ''; var ln = el('div', 'hint', 'Usage \u00b7 checking'); steps.appendChild(ln);
+      try{
+        var t = await hfRepoUsage(c);
+        ln.textContent = 'Usage \u00b7 this repository holds ' + fmtBytes(t) + '. Free accounts include 100 GB of private storage across all repositories.' + (t > 80 * 1073741824 ? ' You are close to that limit.' : '');
+      }catch(e){ ln.textContent = 'Usage \u00b7 ' + hfNetMsg(e, 'Hugging Face'); }
+      ub.disabled = false;
+    });
+    row.appendChild(tb); row.appendChild(lb); card.appendChild(row);
+    var row2 = el('div', 'btnrow'); row2.appendChild(ub); card.appendChild(row2); card.appendChild(steps);
     var stat = el('div', 'hint', ''); card.appendChild(stat);
     function paint(){
       pill.className = 'spill ' + (c.ok ? 'ok' : c.checked ? 'bad' : 'warn');
@@ -7408,7 +7575,7 @@ MStore.ready.then(function(){
     label:function(){ return 'Read the dataset'; },
     run:async function(p, a){
       var rs = await dsPage(p.id, 0, 6, a.query || ''), s = dsStatOf(p), imgN = dsMetaOf(p).files.filter(function(x){ return x.kind === 'image'; }).length;
-      return { ok:true, res:'Read dataset \u00b7 ' + s.n + ' records' + (imgN ? ' \u00b7 ' + imgN + ' images' : ''), result:{ records:s.n, images:imgN, size:fmtBytes(s.bytes),
+      return { ok:true, res:'Read dataset \u00b7 ' + s.n + ' records' + (imgN ? ' \u00b7 ' + imgN + ' images' : ''), result:{ records:s.n, images:imgN, moved_to_huggingface:(dsMetaOf(p).remote && dsMetaOf(p).remote.freed) ? dsMetaOf(p).remote.freed.records : 0, size:fmtBytes(s.bytes),
         samples:rs.map(function(r){ return { title:r.title, source:r.source || '', text:short(r.text, 200) }; }) } };
     },
     card:function(m, seg){ return slim('note', seg.res || 'Read the dataset'); }
@@ -7511,7 +7678,7 @@ MStore.ready.then(function(){
         var d = el('div', 'tool-info');
         d.appendChild(el('div', '', (f.kind === 'image' ? 'Image' : f.records.toLocaleString('en-US') + ' records' + (f.skipped ? ', ' + f.skipped.toLocaleString('en-US') + ' duplicates skipped' : '')) + ' \u00b7 ' + f.format.toUpperCase()));
         var ck = el('div', 'xsub', f.sha ? 'SHA-256 ' + f.sha.slice(0, 16) + '\u2026' : 'No checksum (file too large to hash)'); ck.style.marginTop = '6px'; d.appendChild(ck);
-        d.appendChild(el('div', 'xsub', (f.kept ? 'Original kept' : 'Chunks only, original not kept') + ' \u00b7 added ' + taskStamp(f.ts)));
+        d.appendChild(el('div', 'xsub', (f.kept ? 'Original kept' : (meta.remote && meta.remote.freed && f.kind === 'image') ? 'Image is on Hugging Face only' : 'Chunks only, original not kept') + ' \u00b7 added ' + taskStamp(f.ts)));
         var row = el('div', 'prow'); row.style.marginTop = '10px';
         if(f.kept) row.appendChild(mkBtn('ghost', 'Download original', '', async function(){
           var rec = null; try{ rec = await LOCAL.get(f.id); }catch(e){}
@@ -7528,6 +7695,21 @@ MStore.ready.then(function(){
     function repaintSum(){ var t = dsStatOf(p); sum.textContent = t.n.toLocaleString('en-US') + ' record' + (t.n === 1 ? '' : 's') + ' \u00b7 ' + fmtBytes(t.bytes); }
     var prog = el('div', 'hint'); prog.style.display = 'none';
     function say(t){ prog.style.display = ''; prog.textContent = t; }
+    /* runs a long Hugging Face job with Pause and Stop, and keeps the screen awake */
+    async function withJob(fn){
+      var job = { stop:false, paused:false, abort:null, c:null }, lock = null, out = null;
+      var stopB = mkBtn('ghost', 'Stop', '', function(){ job.stop = true; if(job.abort) job.abort(); });
+      var pauseB = mkBtn('ghost', 'Pause', '', function(){ job.paused = !job.paused; pauseB.querySelector('span').textContent = job.paused ? 'Resume' : 'Pause'; say(job.paused ? 'Pausing after the current chunk.' : 'Resuming.'); });
+      job.onWhy = function(w){ if(w) say(w + '. It carries on by itself when it can.'); };
+      if(prog.parentNode){ prog.parentNode.insertBefore(stopB, prog.nextSibling); prog.parentNode.insertBefore(pauseB, prog.nextSibling); }
+      try{ if(navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); }catch(e){}
+      try{ out = await fn(job); }
+      catch(e){ say((e && e.message === 'Stopped.' ? 'Stopped.' : hfNetMsg(e, 'Hugging Face')) + ' Nothing is lost. Run it again to continue.'); out = null; }
+      [stopB, pauseB].forEach(function(b){ if(b.parentNode) b.parentNode.removeChild(b); });
+      try{ if(lock) lock.release(); }catch(e){}
+      paintDetails(); paintRemote(); repaintSum(); paintFiles(); paintList();
+      return out;
+    }
     function importFlow(){
       pickDataFiles(async function(files){
         var added = 0, skipped = 0, imgs = 0, bad = [], same = [];
@@ -7567,22 +7749,15 @@ MStore.ready.then(function(){
       else if(v === 'hf'){
         var hc = hfCfg();
         if(!hc.ok){ UI.alert('Hugging Face is not connected', 'Open Settings, fill in the Hugging Face card and run the connection test first.'); return; }
+        if(meta.remote && meta.remote.freed){ UI.alert('Restore first', 'This dataset was moved off this device. Restore it from the Hugging Face copy before uploading again, so the copy there is not replaced by a partial one.'); return; }
         var imgB = meta.files.filter(function(x){ return x.kind === 'image'; }).reduce(function(a, x){ return a + (x.bytes || 0); }, 0), tot = dsStatOf(p).bytes + imgB;
         if(!tot){ UI.alert('Nothing to upload', 'This dataset has no records or images yet.'); return; }
-        if(!(await UI.confirm('Upload to Hugging Face?', 'About ' + fmtBytes(tot) + ' goes to the private repository ' + hfRepoId(hc) + '. Keep this screen open until it finishes.', { confirmText:'Upload' }))) return;
-        var job = { stop:false, abort:null }, lock = null;
-        var stopB = mkBtn('ghost', 'Stop', '', function(){ job.stop = true; if(job.abort) job.abort(); });
-        if(prog.parentNode) prog.parentNode.insertBefore(stopB, prog.nextSibling);
-        try{ if(navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); }catch(e){}
-        try{
-          var out = await hfUploadDataset(p, say, job);
-          say('Uploaded ' + out.files + ' file' + (out.files === 1 ? '' : 's') + ' (' + fmtBytes(out.bytes) + ') and checked them on Hugging Face.' + (out.missing.length ? ' ' + out.missing.length + ' saved image' + (out.missing.length === 1 ? ' was' : 's were') + ' missing on this device and skipped.' : ''));
-        }catch(e){
-          say((e && e.message === 'Stopped.' ? 'Upload stopped.' : 'Upload stopped: ' + hfNetMsg(e, 'Hugging Face')) + ' Nothing is lost. Run the upload again to continue; files already sent are not sent twice.');
-        }
-        if(stopB.parentNode) stopB.parentNode.removeChild(stopB);
-        try{ if(lock) lock.release(); }catch(e){}
-        paintDetails();
+        var warn = '';
+        try{ var usedB = await hfRepoUsage(hc); if(usedB + tot > 90 * 1073741824) warn = ' The repository already holds ' + fmtBytes(usedB) + ' and free accounts include 100 GB, so this may not fit.'; }catch(e){}
+        var conn = navigator.connection, wnote = hc.wifi ? (conn && conn.type ? ' It will wait for Wi-Fi.' : ' Wi-Fi only is on, but this browser cannot tell whether you are on Wi-Fi.') : '';
+        if(!(await UI.confirm('Upload to Hugging Face?', 'About ' + fmtBytes(tot) + ' goes to the private repository ' + hfRepoId(hc) + '. Keep this screen open until it finishes.' + wnote + warn, { confirmText:'Upload' }))) return;
+        var out = await withJob(function(job){ return hfUploadDataset(p, say, job); });
+        if(out) say('Uploaded ' + out.files + ' file' + (out.files === 1 ? '' : 's') + ' (' + fmtBytes(out.bytes) + ') and checked them on Hugging Face.' + (out.missing.length ? ' ' + out.missing.length + ' saved image' + (out.missing.length === 1 ? ' was' : 's were') + ' missing on this device and skipped.' : ''));
       }
       else if(v === 'verify'){
         say('Checking saved originals...');
@@ -7599,7 +7774,60 @@ MStore.ready.then(function(){
       }
     });
     bar.appendChild(more);
-    body.appendChild(bar); body.appendChild(prog); body.appendChild(fbox); paintFiles();
+    var rbox = el('div');
+    function paintRemote(){
+      rbox.innerHTML = '';
+      var rm = meta.remote; if(!rm) return;
+      rbox.appendChild(el('div', 'group-h', 'Hugging Face copy'));
+      var card = el('div', 'tool on'), fr = rm.freed;
+      card.appendChild(el('div', '', rm.repo + ' \u00b7 ' + rm.shards.length + ' file' + (rm.shards.length === 1 ? '' : 's') + ' \u00b7 uploaded ' + taskStamp(rm.ts)));
+      var st = el('div', 'xsub', 'Version ' + rm.version + (rm.version !== meta.version ? ', this dataset has changed since' : ', matches this device')); st.style.marginTop = '6px'; card.appendChild(st);
+      if(fr){ var fl = el('div', 'xsub', 'Freed from this device ' + taskStamp(fr.ts) + ': ' + fr.records.toLocaleString('en-US') + ' records, ' + fr.images.toLocaleString('en-US') + ' images, ' + fmtBytes(fr.bytes) + ' of text.'); fl.style.marginTop = '6px'; card.appendChild(fl); }
+      var qf2 = el('input', 'field'); qf2.setAttribute('aria-label', 'Search the Hugging Face copy'); qf2.setAttribute('autocomplete', 'off'); qf2.style.marginTop = '12px'; card.appendChild(qf2);
+      var rres = el('div'); rres.style.marginTop = '8px';
+      function showRows(rows){
+        rres.innerHTML = '';
+        if(!rows.length){ rres.appendChild(el('div', 'hint', 'No matches')); return; }
+        rows.forEach(function(r){
+          var cd = el('div', 'hint'); cd.style.whiteSpace = 'pre-wrap'; cd.style.marginBottom = '10px';
+          cd.textContent = (r.title ? r.title + '\n' : '') + short(r.text || '', 400) + (r.source ? '\nSource: ' + r.source : '');
+          rres.appendChild(cd);
+        });
+      }
+      async function look(qv){
+        var c = hfCfg();
+        if(!c.token || hfRepoId(c) !== rm.repo){ rres.textContent = 'Set up Hugging Face in Settings for ' + rm.repo + ' first.'; return; }
+        rres.innerHTML = ''; var nt = el('div', 'hint', 'Reading...'); rres.appendChild(nt);
+        try{ showRows(await hfSearch(c, rm, qv, qv ? 20 : 6, function(t){ nt.textContent = t; })); }
+        catch(e){ rres.innerHTML = ''; rres.appendChild(el('div', 'hint', hfNetMsg(e, 'Hugging Face'))); }
+      }
+      var r1 = el('div', 'btnrow'); r1.style.marginTop = '8px';
+      r1.appendChild(mkBtn('solid', 'Search', '', function(){ look(qf2.value.trim()); }));
+      r1.appendChild(mkBtn('ghost', 'Preview', '', function(){ look(''); }));
+      card.appendChild(r1); card.appendChild(rres);
+      var r2 = el('div', 'btnrow'); r2.style.marginTop = '8px';
+      r2.appendChild(mkBtn('ghost', 'Check copy', '', async function(){
+        var c = hfCfg(); if(!c.token || hfRepoId(c) !== rm.repo){ say('Set up Hugging Face in Settings for ' + rm.repo + ' first.'); return; }
+        say('Checking the Hugging Face copy...');
+        try{ var bad = await hfVerifyRemote(c, rm); say(bad.length ? 'Problems: ' + bad.slice(0, 4).join('; ') + '.' : 'All ' + rm.shards.length + ' files and the manifest are on Hugging Face and match.'); }
+        catch(e){ say(hfNetMsg(e, 'Hugging Face')); }
+      }));
+      r2.appendChild(mkBtn('ghost', 'Restore to this device', '', async function(){
+        if(!(await UI.confirm('Restore from Hugging Face?', 'The records and images are downloaded back to this device. Anything already here is skipped.', { confirmText:'Restore' }))) return;
+        var o = await withJob(function(job){ return hfRestore(p, say, job); });
+        if(o) say('Restored ' + o.added.toLocaleString('en-US') + ' records and ' + o.images.toLocaleString('en-US') + ' images' + (o.skipped ? ', skipped ' + o.skipped.toLocaleString('en-US') + ' already here' : '') + (o.bad.length ? '. Problems: ' + o.bad.slice(0, 4).join('; ') : '') + '.');
+      }));
+      if(!fr) r2.appendChild(mkBtn('ghost', 'Free up phone space', '', async function(){
+        if(rm.version !== meta.version){ UI.alert('Upload again first', 'This dataset changed after the last upload, so the copy on Hugging Face is out of date.'); return; }
+        if(!(await UI.confirm('Free up phone space?', 'The copy on Hugging Face is checked first. Then the text records, images and saved originals on this device are deleted, and Hugging Face holds the only copy. Hugging Face is hosting, not a backup service, so keep your own backup of anything you cannot replace.', { confirmText:'Free up', danger:true }))) return;
+        say('Working...');
+        try{ var fr2 = await hfFreeUp(p, say); say('Freed ' + fr2.records.toLocaleString('en-US') + ' records and ' + fr2.images.toLocaleString('en-US') + ' images from this device.'); }
+        catch(e){ say(hfNetMsg(e, 'Hugging Face')); }
+        paintDetails(); paintRemote(); repaintSum(); paintFiles(); paintList();
+      }));
+      card.appendChild(r2); rbox.appendChild(card);
+    }
+    body.appendChild(bar); body.appendChild(prog); body.appendChild(rbox); body.appendChild(fbox); paintFiles(); paintRemote();
     var host = el('div'); body.appendChild(host);
     body.appendChild(el('div', 'label', 'Search'));
     var qf = el('input', 'field'); qf.value = dsQuery; qf.setAttribute('aria-label', 'Search records'); qf.setAttribute('autocomplete', 'off');
