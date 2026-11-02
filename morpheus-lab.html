@@ -919,6 +919,17 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 #lab #sheet{padding-bottom:calc(var(--cbar,96px) + 12px)}
 #composerCard{background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.035) 100%),rgba(22,22,26,.5)}
 :root[data-theme="light"] #composerCard{background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.5)),rgba(255,255,255,.35)}
+
+/* project tiles on the home screen share one neutral steel; only the small type badge keeps its colour */
+.qic{--b1:#f2f2f6;--b2:#a9abb5}
+.t-app{--b1:#c9f3e9;--b2:#5fb9a6}
+.t-mod{--b1:#fbe9b8;--b2:#d9a840}
+.t-ds{--b1:#d3f1da;--b2:#6cbf83}
+.t-sp{--b1:#d6e5fc;--b2:#7ea7e8}
+.qrec .qic{--m1:#f4f5f8;--m2:#aeb2bd;--m3:#5c606c;--mi:#23252c}
+.qbadge{border:1px solid var(--b2,var(--m2));color:var(--b1,var(--m1))}
+.nowrapbtns{flex-wrap:wrap}
+.nowrapbtns>button{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -3329,6 +3340,54 @@ MStore.ready.then(function(){
   $('menuBtn3').addEventListener('click', openSide);
   $('crumb').addEventListener('click', function(){ var par = parentOf(current); if(par) openProject(par); });
   $('sideBackdrop').addEventListener('click', closeSide);
+  /* ---- swipe from the left edge to draw a sidebar out; drag it back to close. The buttons still work. ---- */
+  (function(){
+    var EDGE = 36, st = null, bd = $('sideBackdrop');
+    function shown(id){ var b = $(id); return !!b && b.getClientRects().length > 0; }
+    function target(){
+      if($('home').classList.contains('active')) return { el:$('homeSidebar'), prep:function(){ renderProjects(); } };
+      if(shown('menuBtn') || shown('menuBtn2') || shown('menuBtn3')) return { el:$('sidebar'), prep:function(){ paintNav(); } };
+      return null;
+    }
+    document.addEventListener('touchstart', function(e){
+      st = null;
+      if(e.touches.length !== 1) return;
+      var x = e.touches[0].clientX, y = e.touches[0].clientY;
+      var opened = $('sidebar').classList.contains('open') ? $('sidebar') : $('homeSidebar').classList.contains('open') ? $('homeSidebar') : null;
+      if(opened){ st = { mode:'close', el:opened, x0:x, y0:y, t0:Date.now(), locked:false, p:1, dx:0 }; return; }
+      if(x > EDGE) return;
+      var t = target(); if(!t) return;
+      st = { mode:'open', t:t, el:t.el, x0:x, y0:y, t0:Date.now(), locked:false, p:0, dx:0 };
+    }, { passive:true });
+    document.addEventListener('touchmove', function(e){
+      if(!st) return;
+      var dx = e.touches[0].clientX - st.x0, dy = e.touches[0].clientY - st.y0;
+      if(!st.locked){
+        if(Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if(Math.abs(dy) > Math.abs(dx) || (st.mode === 'open' && dx < 0) || (st.mode === 'close' && dx > 0)){ st = null; return; }
+        st.locked = true; st.w = st.el.offsetWidth || 300;
+        if(st.mode === 'open') st.t.prep();
+        st.el.style.transition = 'none'; bd.style.transition = 'none';
+      }
+      e.preventDefault();
+      var p = st.mode === 'open' ? dx / st.w : 1 + dx / st.w;
+      p = Math.max(0, Math.min(1, p)); st.p = p; st.dx = dx;
+      st.el.style.transform = 'translateX(' + ((p - 1) * 100) + '%)';
+      bd.classList.add('show'); bd.style.opacity = String(p);
+    }, { passive:false });
+    function finish(){
+      var s = st; st = null;
+      if(!s || !s.locked) return;
+      var v = s.dx / Math.max(1, Date.now() - s.t0);
+      var open = s.mode === 'open' ? ((s.p > 0.4 || v > 0.5) && v > -0.3) : (s.p >= 0.6 && v > -0.5);
+      s.el.style.transition = ''; s.el.style.transform = ''; bd.style.transition = ''; bd.style.opacity = '';
+      if(open){ s.el.classList.add('open'); bd.classList.add('show'); }
+      else{ s.el.classList.remove('open'); bd.classList.remove('show'); }
+    }
+    document.addEventListener('touchend', finish, { passive:true });
+    document.addEventListener('touchcancel', finish, { passive:true });
+  })();
+
 
   /* =====================================================================
      SIDEBAR SECTIONS: one reusable collapsible block (underlined header,
@@ -6111,7 +6170,7 @@ MStore.ready.then(function(){
     var t = el('input', 'field'); t.type = 'password'; t.value = b.token; t.autocapitalize = 'off'; t.spellcheck = false;
     t.addEventListener('input', function(){ b.token = t.value.trim(); saveG(); });
     c.appendChild(t);
-    var row = el('div', 'btnrow');
+    var row = el('div', 'btnrow nowrapbtns');
     row.appendChild(mkBtn('solid', 'Connect', '', function(){ txTest(); }));
     row.appendChild(mkBtn('ghost', 'Copy setup command', '', async function(){
       var ok = await copyText(txInstallCommand());
@@ -6174,13 +6233,13 @@ MStore.ready.then(function(){
     sw.addEventListener('click', function(){ p.txSend = !p.txSend; sw.classList.toggle('on', p.txSend); sw.setAttribute('aria-checked', p.txSend ? 'true' : 'false'); save(); });
     sr.appendChild(sw); body.appendChild(sr);
 
-    var btns = el('div', 'btnrow'), runB, stopB;
+    var btns = el('div', 'btnrow nowrapbtns'), runB, stopB;
     runB = mkBtn('solid', 'Run', '', function(){ run(); });
     stopB = mkBtn('ghost', 'Stop', '', function(){ if(ctl) ctl.abort(); });
     btns.appendChild(runB); btns.appendChild(stopB);
     btns.appendChild(mkBtn('ghost', 'Clear', '', function(){ con.textContent = ''; }));
     btns.appendChild(mkBtn('ghost', 'Copy output', '', async function(){ var ok = await copyText(con.textContent); if(!ok) UI.alert('Could not copy', 'Long-press the output and choose copy.'); }));
-    btns.appendChild(mkBtn('ghost', 'Send test files', '', async function(){
+    btns.appendChild(mkBtn('ghost', 'Send tests', '', async function(){
       var s0 = INT.st.termux; if(!s0 || !s0.ok){ UI.alert('Not connected', 'Start the bridge in Termux and connect it in Settings first.'); return; }
       var w = await txSendTests(p); p.txUsed = true;
       add(w.ok ? 'Sent ' + w.written.length + ' test file' + (w.written.length === 1 ? '' : 's') + '\n' : w.error + '\n', w.ok ? 'm' : 'e'); listFiles();
@@ -8462,7 +8521,7 @@ MStore.ready.then(function(){
     sw.addEventListener('click', function(){ c.wifi = !c.wifi; sw.classList.toggle('on', c.wifi); sw.setAttribute('aria-checked', c.wifi ? 'true' : 'false'); hfSave(c); });
     wr.appendChild(sw); card.appendChild(wr);
     if(!(navigator.connection && navigator.connection.type)) card.appendChild(el('div', 'xsub', 'This browser cannot tell Wi-Fi from mobile data, so this setting cannot be enforced here.'));
-    var row = el('div', 'btnrow'), steps = el('div'), tb, lb, ub;
+    var row = el('div', 'btnrow nowrapbtns'), steps = el('div'), tb, lb, ub;
     function need(){ if(!c.user || !c.repo || !c.token){ UI.alert('Missing details', 'Fill in the username, repository name and token first.'); return false; } return true; }
     async function run(fn, done){
       tb.disabled = lb.disabled = ub.disabled = true; steps.innerHTML = ''; var lines = {};
