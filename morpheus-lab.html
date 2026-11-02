@@ -209,6 +209,13 @@ svg{display:block;pointer-events:none}
 .fchip .fx{flex:none;width:26px;height:26px;border-radius:13px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .fchip .fx:active{background:var(--press)}
 .fchip .fx svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2;stroke-linecap:round}
+.fchip{cursor:pointer}
+.fprev{margin:0 8px 10px -8px;padding:10px 12px;border-radius:14px;background:var(--bg);border:1px solid var(--edge)}
+.msg.u .fprev{margin:0 0 8px;max-width:92%;align-self:flex-end;width:100%}
+.fprev pre{margin:0;font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);max-height:260px;overflow-y:auto;-webkit-user-select:text;user-select:text}
+.fprev .fnote{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
+.fprev .frow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+#attachPrev:empty{display:none}
 .msg.u .mfiles{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;max-width:92%;margin-bottom:6px}
 .msg.u .mfiles .fchip{max-width:100%}
 .mact{display:flex;gap:6px;margin-top:6px}
@@ -893,6 +900,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
       </div>
       <div class="card" id="composerCard">
         <div id="attachRow"></div>
+        <div id="attachPrev"></div>
         <div id="modeBar">
           <span class="mic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg></span>
           <span class="mtxt"><b>Code inspection</b><i id="modeSub">Paste the code to check, then send</i></span>
@@ -1013,6 +1021,10 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
       <button class="nav-item" data-route="docs">
         <svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>
         Documents
+      </button>
+      <button class="nav-item" data-route="testfiles">
+        <svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
+        Test files
       </button>
       <button class="nav-item" data-route="data">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
@@ -1999,6 +2011,10 @@ MStore.ready.then(function(){
      desc:'Lets the AI see which documents exist.'},
     {id:'read_doc', group:'Documents', name:'Read document', perm:'allow',
      desc:'Lets the AI read one document.'},
+    {id:'list_test_files', group:'Test files', name:'List test files', perm:'allow',
+     desc:'Lets the AI see which test files you keep and how they are grouped.'},
+    {id:'read_test_file', group:'Test files', name:'Read test file', perm:'allow',
+     desc:'Lets the AI read the text of one test file (up to 20,000 characters).'},
     {id:'dataset_add', group:'Dataset', name:'Add to dataset', perm:'allow',
      desc:'Saves a piece of gathered information to the dataset, with its source.'},
     {id:'dataset_info', group:'Dataset', name:'Read dataset', perm:'allow',
@@ -2025,7 +2041,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'dataset_info', 'list_subprojects', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'list_subprojects', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
   var MODE_SETS = {
     discovery:M_READ,
     research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc']),
@@ -2104,7 +2120,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -2349,6 +2365,8 @@ MStore.ready.then(function(){
     projects = projects.filter(function(p){ return p.id !== id; });
     if(current && current.id === id) current = null;
     save();
+    try{ LOCAL.removeWhere(id, function(){ return true; })['catch'](function(){}); }catch(e){}
+    try{ dsPrune({ id:id }, function(){ return false; })['catch'](function(){}); }catch(e){}
   }
 
   /* =====================================================================
@@ -2762,7 +2780,7 @@ MStore.ready.then(function(){
   }
   function openSide(){ paintNav(); $('sidebar').classList.add('open'); $('sideBackdrop').classList.add('show'); }
   /* ---- sidebar: each kind of project shows only the pages it uses; the rest sit under More ---- */
-  var NAV_ORDER = ['code', 'notebook', 'journal', 'docs', 'data', 'tools', 'xray', 'settings'];
+  var NAV_ORDER = ['code', 'notebook', 'journal', 'docs', 'data', 'testfiles', 'tools', 'xray', 'settings'];
   function codeStarted(p){
     var c = p && p.code;
     if(!c || typeof c.src !== 'string' || !c.src.trim()) return false;
@@ -2776,6 +2794,7 @@ MStore.ready.then(function(){
       journal:journalOf(p).length > 0,
       docs:ty === 'spec' || docsOf(p).length > 0,
       data:ty === 'dataset' || dsStatOf(p).n > 0,
+      testfiles:(p.tfCount || 0) > 0,
       tools:true,
       xray:(p.xray || []).length > 0,
       settings:true
@@ -2975,6 +2994,7 @@ MStore.ready.then(function(){
     if(route === 'journal'){ $('pageTitle').textContent = 'Journal'; renderJournal(); }
     if(route === 'docs'){ $('pageTitle').textContent = 'Documents'; renderDocs(); }
     if(route === 'data'){ $('pageTitle').textContent = 'Data'; renderData(); }
+    if(route === 'testfiles'){ $('pageTitle').textContent = 'Test files'; renderTestFiles(); }
     if(route === 'xray'){ $('pageTitle').textContent = 'X-ray log'; renderXray(); }
     if(route === 'settings'){ $('pageTitle').textContent = 'Project settings'; renderProjectSettings(); }
     $('pageBody').scrollTop = 0;
@@ -4200,9 +4220,16 @@ MStore.ready.then(function(){
     var w = el('div', 'msg ' + (m.r === 'u' ? 'u' : 'm'));
     if(m.r === 'u'){
       if(m.files && m.files.length){
-        var mf = el('div', 'mfiles');
-        m.files.forEach(function(f){ mf.appendChild(fileChip(f)); });
-        w.appendChild(mf);
+        var mf = el('div', 'mfiles'), pvh = el('div'), openId = '';
+        m.files.forEach(function(f){
+          mf.appendChild(fileChip(f, null, function(){
+            pvh.innerHTML = '';
+            if(openId === (f.id || f.name)){ openId = ''; return; }
+            openId = f.id || f.name;
+            pvh.appendChild(filePreview(f.name, savedFileText(f), [addToDatasetBtn(f.name, savedFileText(f))]));
+          }));
+        });
+        w.appendChild(mf); w.appendChild(pvh);
       }
       if(m.kind === 'inspect') w.appendChild(inspBubble(m));
       else if(m.t) w.appendChild(el('div', 'bubble', m.t));
@@ -4255,7 +4282,7 @@ MStore.ready.then(function(){
     if(!m || m.r !== 'u') return;
     if(idx < ch.msgs.length - 1 && !(await UI.confirm('Edit this message?', 'The reply below it is removed so you can send it again. Changes the reply already made stay in place.', { confirmText:'Edit' }))) return;
     ch.msgs = ch.msgs.slice(0, idx);
-    attached = (m.files || []).map(function(f){ return { name:f.name, size:f.size, lines:f.lines, text:f.text }; });
+    attached = (m.files || []).map(function(f){ return { id:f.id || uid(), name:f.name, size:f.size, lines:f.lines, text:f.text, truncated:!!f.truncated }; });
     lastErr = null; ch.cut = false;
     save(); renderSide(); renderThread();
     comp.value = m.t || ''; paintAttach(); sizeComposer(); syncSend(); comp.focus();
@@ -5139,6 +5166,8 @@ MStore.ready.then(function(){
     read_xray:{ d:'Look back at your own recent steps in this project: replies, tool calls and errors.', p:{ limit:S('INTEGER', 'How many entries, default 5') } },
     write_doc:{ d:'Write or update a document the person can read, edit and export (a blueprint, spec, report or design). Use markdown unless another format fits better. Set replace to true to update an existing document.', p:{ title:STR('Document title'), text:STR('The document body, written in the chosen format (markdown by default)'), replace:S('BOOLEAN', 'True to replace an existing document with the same title'), kind:STR('What it is: blueprint, spec, report, notes or data. Use blueprint for a build plan the person will approve before code is written.'), format:STR('How the text is written: markdown, json, csv, yaml, mermaid, html, plain or code') }, req:['title', 'text'] },
     list_docs:{ d:'List the documents in this project.' },
+    list_test_files:{ d:'List the test files the person keeps in this project, with their groups.' },
+    read_test_file:{ d:'Read the text of one test file by name.', p:{ name:STR('File name, or part of it') }, req:['name'] },
     read_doc:{ d:'Read one document.', p:{ title:STR('Document title') }, req:['title'] },
     dataset_add:{ d:'Save one piece of gathered information to the dataset. One topic per record. Always give the source.', p:{ title:STR('Short title'), text:STR('The information, cleaned up or in your own words'), source:STR('Where it came from (URL or file)') }, req:['title', 'text'] },
     dataset_info:{ d:'See how many records the dataset holds and read a few. Pass query to search it.', p:{ query:STR('Optional word to search for') } },
@@ -5483,7 +5512,7 @@ MStore.ready.then(function(){
     if(!m.files || !m.files.length) return '';
     return m.files.map(function(f){
       if(!full) return '[The person attached ' + f.name + ' (' + (f.lines || '?') + ' lines) earlier in the chat.]';
-      return 'The person attached the file ' + f.name + ':\n```\n' + f.text + '\n```';
+      return 'The person attached the file ' + f.name + ':\n```\n' + f.text + '\n```' + (f.truncated ? '\n[This file is longer. Only its first ' + f.text.length.toLocaleString('en-US') + ' characters were provided, so say so if the missing part matters.]' : '');
     }).join('\n\n');
   }
   function forModel(m, full){
@@ -5650,6 +5679,7 @@ MStore.ready.then(function(){
         R.push((has('propose_direction') ? 'For a big or uncertain piece of work, call propose_direction first and wait for the answer. ' : '') +
           (has('deliberate') ? 'When the person has to choose between ways, call deliberate, then stop and let them choose.' : ''));
       }
+      if(has('list_test_files')) R.push('The person keeps test files under Test files, sorted into groups. When they mention test data, sample input or a test file, call list_test_files, then read_test_file for the one you need.');
       if(has('write_doc')) R.push('Use write_doc for written designs, specs, blueprints and reports so the person can read, edit and export them. A design is a document, not an app. Set kind (blueprint, spec, report, note or data) and format (markdown, json, csv, yaml, mermaid, html, plain or code) to fit the content. When asked to build something, call list_docs first: a document marked approved is the blueprint to follow, and one that is not approved is only a draft, so say so before building from it.');
       if(has('write_note')) R.push('write_note is loaded because the person asked to remember something. Save only that, once.');
       if(has('start_task') || has('update_task')){
@@ -5927,8 +5957,15 @@ MStore.ready.then(function(){
     var ch = chatOf(current);
     var um = { r:'u', t:t, ts:Date.now() };
     if(attached.length){
-      um.files = attached.map(function(f){ return { name:f.name, size:f.size, lines:f.lines, text:f.text }; });
-      attached = []; paintAttach();
+      um.files = attached.map(function(f){ return { id:f.id, name:f.name, size:f.size, lines:f.lines, text:f.text, truncated:!!f.truncated }; });
+      var keepPid = current.id;
+      attached.forEach(function(f, i){
+        var blob = new Blob([f.full || f.text], { type:'text/plain' });
+        LOCAL.put({ id:f.id, pid:keepPid, kind:'attachment', name:f.name, type:'text/plain', size:f.size, lines:f.lines, ts:Date.now(), blob:blob })
+          .then(function(){ return sha256Of(blob); })
+          .then(function(h){ if(h){ um.files[i].sha = h; save(); } }, function(){});
+      });
+      attached = []; prevOpen = ''; paintAttach();
     }
     ch.msgs.push(um);
     if(ch.title === NEW_CHAT && !ch.named) ch.title = titleFrom(ch.msgs);
@@ -6020,11 +6057,12 @@ MStore.ready.then(function(){
   var TEXT_EXT = /\.(html?|css|scss|less|m?js|cjs|jsx|tsx?|json|jsonc|txt|md|markdown|svg|xml|csv|tsv|ya?ml|toml|ini|env|py|java|c|h|cpp|hpp|cs|go|rs|rb|php|swift|kt|sh|bash|sql|log|diff|patch|vue)$/i;
   function fileExt(n){ var m = /\.([A-Za-z0-9]+)$/.exec(n || ''); return m ? m[1].toUpperCase().slice(0, 5) : 'FILE'; }
   function fileSize(n){ return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB' : (n / 1048576).toFixed(1) + ' MB'; }
-  function fileChip(f, onRemove){
+  function fileChip(f, onRemove, onTap){
     var c = el('div', 'fchip'), x = el('span', 'fext', fileExt(f.name)), tx = el('div', 'ftx');
     tx.appendChild(el('span', 'fnm', f.name));
     tx.appendChild(el('span', 'fsb', fileSize(f.size || (f.text || '').length) + (f.lines ? ' · ' + f.lines + ' lines' : '')));
     c.appendChild(x); c.appendChild(tx);
+    if(onTap) c.addEventListener('click', function(e){ if(!e.target.closest('.fx')) onTap(); });
     if(onRemove){
       var rm = el('button', 'fx'); rm.setAttribute('aria-label', 'Remove ' + f.name);
       rm.innerHTML = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
@@ -6032,9 +6070,76 @@ MStore.ready.then(function(){
     }
     return c;
   }
+  /* a readable look at a file: a short excerpt first, more on request. It never changes what is sent. */
+  function filePreview(name, getText, extra){
+    var box = el('div', 'fprev'), pre = el('pre'), note = el('div', 'fnote'), row = el('div', 'frow'), more = el('button', 'lnk', 'Show more'), expanded = false, text = '';
+    box.appendChild(pre); box.appendChild(note); row.appendChild(more);
+    (extra || []).forEach(function(b){ row.appendChild(b); });
+    box.appendChild(row);
+    function paint(){
+      var lines = text.split('\n'), n = Math.min(lines.length, expanded ? 400 : 12), lim = expanded ? 40000 : 1500;
+      var shown = lines.slice(0, n).join('\n'), cut = shown.length > lim;
+      if(cut) shown = shown.slice(0, lim) + '\u2026';
+      pre.innerHTML = highlightLang(shown, extOf(name));
+      note.textContent = 'Showing ' + (cut ? 'the start of ' : '') + n + ' of ' + lines.length + ' line' + (lines.length === 1 ? '' : 's') + '. The preview never changes what is sent.';
+      more.textContent = expanded ? 'Show less' : 'Show more';
+      more.style.display = (lines.length > 12 || cut || text.length > 1500) ? '' : 'none';
+    }
+    more.addEventListener('click', function(){ expanded = !expanded; paint(); });
+    pre.textContent = 'Loading...';
+    Promise.resolve(getText()).then(function(t){ text = String(t || ''); paint(); }, function(){ pre.textContent = 'Could not read this file.'; });
+    return box;
+  }
+  /* put a file's text into the dataset, keeping the original */
+  function addToDatasetBtn(name, getText, size){
+    var b = mkBtn('ghost', 'Add to dataset', '', async function(){
+      if(!current) return;
+      var sp0 = b.querySelector('span'), t = await getText();
+      if(!String(t || '').trim()){ UI.alert('Nothing to add', 'This file has no text.'); return; }
+      var nm = DS_EXT.test(name) ? name : name + '.txt';
+      sp0.textContent = 'Adding...';
+      var r = await dsIngest(current, new File([t], nm, { type:'text/plain' }));
+      sp0.textContent = r.same ? 'Already in the dataset' : 'Added \u00b7 ' + (r.added || 0).toLocaleString('en-US') + ' records';
+      setTimeout(function(){ sp0.textContent = 'Add to dataset'; }, 2600);
+      if(!r.same){ save(); }
+    });
+    return b;
+  }
+  function savedFileText(f){
+    return async function(){
+      try{ var r = await LOCAL.get(f.id); if(r && r.blob) return await r.blob.text(); }catch(e){}
+      return f.text || '';
+    };
+  }
+  var prevOpen = '';
+  function paintAttachPrev(){
+    var host = $('attachPrev'); host.innerHTML = '';
+    var f = attached.filter(function(x){ return x.id === prevOpen; })[0];
+    if(!f){ prevOpen = ''; return; }
+    host.appendChild(filePreview(f.name, function(){ return f.full || f.text; }, [addToDatasetBtn(f.name, function(){ return f.full || f.text; })]));
+  }
+  function attachText(name, text){
+    var full = text.slice(0, 400000);
+    attached.push({ id:uid(), name:name, size:text.length, lines:full.split('\n').length, text:full.slice(0, 40000), full:full, truncated:full.length > 40000 });
+    if(attached.length > 6) attached.length = 6;
+    paintAttach(); sizeComposer(); syncSend();
+  }
+  var pasteN = 0;
+  comp.addEventListener('paste', function(e){
+    if(mode === 'inspect') return;
+    var t = ''; try{ t = (e.clipboardData || window.clipboardData).getData('text') || ''; }catch(er){}
+    if(t.length < 4000) return;
+    e.preventDefault();
+    if(attached.length >= 6){ UI.alert('Too many attachments', 'Send these first, or remove one.'); return; }
+    attachText('pasted-text-' + (++pasteN) + '.txt', t);
+    if(t.length > 400000) UI.alert('Pasted text was cut', 'Only the first 400,000 characters were kept.');
+  });
   function paintAttach(){
     var row = $('attachRow'); row.innerHTML = '';
-    attached.forEach(function(f, i){ row.appendChild(fileChip(f, function(){ attached.splice(i, 1); paintAttach(); syncSend(); })); });
+    attached.forEach(function(f, i){
+      row.appendChild(fileChip(f, function(){ attached.splice(i, 1); if(prevOpen === f.id) prevOpen = ''; paintAttach(); syncSend(); }, function(){ prevOpen = prevOpen === f.id ? '' : f.id; paintAttachPrev(); }));
+    });
+    paintAttachPrev();
     $('composerCard').classList.toggle('hasfiles', attached.length > 0);
     comp.placeholder = attached.length && mode !== 'inspect' ? 'Add a message, or just send the files' : (mode === 'inspect' ? comp.placeholder : 'Ask your assistant');
   }
@@ -6054,7 +6159,8 @@ MStore.ready.then(function(){
       return;
     }
     got.forEach(function(g){
-      g.lines = g.text.split('\n').length; g.text = g.text.slice(0, 40000);
+      g.id = uid(); g.full = g.text.slice(0, 400000); g.lines = g.full.split('\n').length;
+      g.truncated = g.full.length > 40000; g.text = g.full.slice(0, 40000);
       attached.push(g);
     });
     if(attached.length > 6) attached.length = 6;
@@ -6421,6 +6527,57 @@ MStore.ready.then(function(){
     return downloadSrc(p.name, src);
   }
   /* =====================================================================
+     FILE STORE: whole files (attachments, kept originals, test files) in their own database.
+     Everything goes through LOCAL, a small adapter, so a remote provider can replace it later.
+     ===================================================================== */
+  var FSDB = null, KEEP_MAX = 50 * 1024 * 1024;
+  function fsOpen(){
+    if(FSDB) return Promise.resolve(FSDB);
+    return new Promise(function(res, rej){
+      var rq = indexedDB.open('morpheus-lab-files', 1);
+      rq.onupgradeneeded = function(){ var st = rq.result.createObjectStore('files', { keyPath:'id' }); st.createIndex('pid', 'pid'); };
+      rq.onsuccess = function(){ FSDB = rq.result; res(FSDB); };
+      rq.onerror = function(){ rej(rq.error); };
+    });
+  }
+  function fsReq(mode, fn){
+    return fsOpen().then(function(db){
+      return new Promise(function(res, rej){
+        var tx = db.transaction('files', mode), out;
+        try{ out = fn(tx.objectStore('files')); }catch(e){ rej(e); return; }
+        tx.oncomplete = function(){ res(out && 'result' in out ? out.result : undefined); };
+        tx.onerror = tx.onabort = function(){ rej(tx.error || new Error('Storage failed')); };
+      });
+    });
+  }
+  var LOCAL = {
+    id:'local',
+    put:function(rec){ return fsReq('readwrite', function(st){ return st.put(rec); }); },
+    get:function(id){ return fsReq('readonly', function(st){ return st.get(id); }); },
+    remove:function(id){ return fsReq('readwrite', function(st){ return st['delete'](id); }); },
+    list:function(pid, kind){
+      return fsReq('readonly', function(st){ return st.index('pid').getAll(IDBKeyRange.only(pid)); })
+        .then(function(a){ return (a || []).filter(function(r){ return !kind || r.kind === kind; }); });
+    },
+    removeWhere:function(pid, pred){
+      return fsReq('readwrite', function(st){
+        var cur = st.index('pid').openCursor(IDBKeyRange.only(pid));
+        cur.onsuccess = function(){ var c = cur.result; if(!c) return; if(pred(c.value)) c['delete'](); c['continue'](); };
+        return cur;
+      });
+    },
+    limits:function(){ return { maxFileBytes:KEEP_MAX, notes:'Stored on this device' }; }
+  };
+  async function sha256Of(blob){
+    try{
+      if(!(window.crypto && crypto.subtle)) return '';
+      var d = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+      return Array.prototype.map.call(new Uint8Array(d), function(b){ return ('0' + b.toString(16)).slice(-2); }).join('');
+    }catch(e){ return ''; }
+  }
+  function extOf(n){ var m = /\.([A-Za-z0-9]+)$/.exec(n || ''); return m ? m[1].toLowerCase() : ''; }
+
+  /* =====================================================================
      DATASET: data and information gathered in advance.
      Kept in its own IndexedDB store (not in the project record), so it can grow large.
      ===================================================================== */
@@ -6448,6 +6605,23 @@ MStore.ready.then(function(){
     return a.toString(36) + b.toString(36) + t.length.toString(36);
   }
   function dsStatOf(p){ if(!p.dsStat) p.dsStat = { n:0, bytes:0 }; return p.dsStat; }
+  /* the dataset's manifest: details about the collection and one entry per imported file */
+  function dsMetaOf(p){
+    var m = p.dsMeta;
+    if(!m || typeof m !== 'object') m = p.dsMeta = {};
+    if(typeof m.description !== 'string') m.description = '';
+    ['source', 'licence', 'collected'].forEach(function(k){ if(typeof m[k] !== 'string') m[k] = ''; });
+    if(!Array.isArray(m.tags)) m.tags = [];
+    if(!m.version) m.version = 1;
+    if(!Array.isArray(m.files)) m.files = [];
+    if(!Array.isArray(m.history)) m.history = [];
+    return m;
+  }
+  function dsBump(p, note){
+    var m = dsMetaOf(p); m.version++;
+    m.history.unshift({ version:m.version, ts:Date.now(), note:note });
+    if(m.history.length > 40) m.history.length = 40;
+  }
   /* adds records; with skipDup, anything already in the dataset is left out */
   function dsAdd(p, recs, skipDup){
     return dsOpen().then(function(db){
@@ -6518,7 +6692,7 @@ MStore.ready.then(function(){
 
   /* reading files in parts, so a very large file never has to fit in memory at once */
   var DS_EXT = /\.(txt|md|markdown|json|jsonl|ndjson|csv|tsv|html?|xml|log)$/i;
-  async function dsImportFile(p, file, onProg){
+  async function dsImportFile(p, file, onProg, fid){
     if(!DS_EXT.test(file.name)) return { added:0, skipped:0, bad:true };
     var lineMode = /\.(jsonl|ndjson|csv|tsv)$/i.test(file.name), dec = new TextDecoder('utf-8'), carry = '', pos = 0, CH = 4 * 1024 * 1024, batch = [], tot = { added:0, skipped:0 }, k = 0;
     async function flush(force){
@@ -6527,14 +6701,14 @@ MStore.ready.then(function(){
     async function addText(body){
       if(lineMode){
         var ls = body.split('\n');
-        for(var i = 0; i < ls.length; i++){ var l = ls[i].trim(); if(l){ batch.push({ title:file.name + ' #' + (++k), text:l, source:'file:' + file.name }); await flush(false); } }
+        for(var i = 0; i < ls.length; i++){ var l = ls[i].trim(); if(l){ batch.push({ title:file.name + ' #' + (++k), text:l, source:'file:' + file.name, fid:fid || '' }); await flush(false); } }
       }else{
         var ls2 = body.split('\n'), acc = '';
         for(var j = 0; j < ls2.length; j++){
           acc += ls2[j] + '\n';
-          if(acc.length >= 6000){ batch.push({ title:file.name + ' #' + (++k), text:acc.trim(), source:'file:' + file.name }); acc = ''; await flush(false); }
+          if(acc.length >= 6000){ batch.push({ title:file.name + ' #' + (++k), text:acc.trim(), source:'file:' + file.name, fid:fid || '' }); acc = ''; await flush(false); }
         }
-        if(acc.trim()){ batch.push({ title:file.name + ' #' + (++k), text:acc.trim(), source:'file:' + file.name }); await flush(false); }
+        if(acc.trim()){ batch.push({ title:file.name + ' #' + (++k), text:acc.trim(), source:'file:' + file.name, fid:fid || '' }); await flush(false); }
       }
     }
     if(/\.json$/i.test(file.name) && file.size <= 30 * 1024 * 1024){
@@ -6543,7 +6717,7 @@ MStore.ready.then(function(){
         if(Array.isArray(arr)){
           for(var a = 0; a < arr.length; a++){
             var tx = typeof arr[a] === 'string' ? arr[a] : JSON.stringify(arr[a]);
-            if(tx && tx.trim()){ batch.push({ title:file.name + ' #' + (a + 1), text:tx.trim(), source:'file:' + file.name }); await flush(false); }
+            if(tx && tx.trim()){ batch.push({ title:file.name + ' #' + (a + 1), text:tx.trim(), source:'file:' + file.name, fid:fid || '' }); await flush(false); }
           }
           await flush(true); if(onProg) onProg(1);
           return tot;
@@ -6561,6 +6735,42 @@ MStore.ready.then(function(){
     }
     await flush(true);
     return tot;
+  }
+
+  /* import one file: keep the original, record its checksum, then cut it into records */
+  async function dsIngest(p, file, onProg){
+    if(!DS_EXT.test(file.name)) return { added:0, skipped:0, bad:true };
+    var m = dsMetaOf(p), fid = uid(), keep = file.size <= KEEP_MAX, sha = keep ? await sha256Of(file) : '';
+    var dupe = sha && m.files.filter(function(f){ return f.sha === sha; })[0];
+    if(dupe) return { added:0, skipped:0, same:true, name:dupe.name };
+    var r = await dsImportFile(p, file, onProg, fid), kept = false;
+    if(keep){
+      try{ await LOCAL.put({ id:fid, pid:p.id, kind:'dataset', name:file.name, type:file.type || '', size:file.size, sha:sha, ts:Date.now(), blob:file }); kept = true; }catch(e){}
+    }
+    m.files.push({ id:fid, name:file.name, bytes:file.size, sha:sha, format:extOf(file.name) || 'txt', records:r.added, skipped:r.skipped, kept:kept, ts:Date.now() });
+    dsBump(p, 'Imported ' + file.name + ' (' + r.added.toLocaleString('en-US') + ' records)');
+    save();
+    return r;
+  }
+  async function dsRemoveFile(p, f){
+    var n = await dsPrune(p, function(r){ return r.fid !== f.id; });
+    try{ await LOCAL.remove(f.id); }catch(e){}
+    var m = dsMetaOf(p); m.files = m.files.filter(function(x){ return x.id !== f.id; });
+    dsBump(p, 'Removed ' + f.name + ' (' + n.toLocaleString('en-US') + ' records)');
+    save();
+    return n;
+  }
+  async function dsVerify(p){
+    var m = dsMetaOf(p), ok = 0, bad = [], skip = 0;
+    for(var i = 0; i < m.files.length; i++){
+      var f = m.files[i];
+      if(!f.kept || !f.sha){ skip++; continue; }
+      var rec = null;
+      try{ rec = await LOCAL.get(f.id); }catch(e){}
+      if(!rec || !rec.blob){ bad.push(f.name + ' (original is missing)'); continue; }
+      if((await sha256Of(rec.blob)) === f.sha) ok++; else bad.push(f.name + ' (checksum differs)');
+    }
+    return { ok:ok, bad:bad, skip:skip };
   }
 
   /* tools: the AI can gather into the dataset and look at it */
@@ -6601,21 +6811,101 @@ MStore.ready.then(function(){
     body.innerHTML = '';
     var s = dsStatOf(p), sum = el('div', 'summary', s.n.toLocaleString('en-US') + ' record' + (s.n === 1 ? '' : 's') + ' \u00b7 ' + fmtBytes(s.bytes));
     body.appendChild(sum);
+    var meta = dsMetaOf(p), dcard = el('div', 'tool on'), fbox = el('div');
+    function paintDetails(){
+      dcard.innerHTML = '';
+      var top = el('div', 'tool-top');
+      top.appendChild(el('div', 'tool-name', 'About this dataset'));
+      top.appendChild(el('span', 'spill', 'Version ' + meta.version));
+      dcard.appendChild(top);
+      var has = false;
+      [['Description', meta.description], ['Source', meta.source], ['Licence', meta.licence], ['Collected', meta.collected]].forEach(function(r){
+        if(!r[1]) return; has = true;
+        var l = el('div', 'xsub', r[0]); l.style.marginTop = '10px'; dcard.appendChild(l);
+        var v = el('div', '', r[1]); v.style.whiteSpace = 'pre-wrap'; dcard.appendChild(v);
+      });
+      if(meta.tags.length){
+        has = true;
+        var tr = el('div'); tr.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:12px';
+        meta.tags.forEach(function(t){ tr.appendChild(el('span', 'spill', t)); });
+        dcard.appendChild(tr);
+      }
+      if(!has){ var hh = el('div', 'xsub', 'Add a description, tags, source and licence so the collection explains itself.'); hh.style.marginTop = '8px'; dcard.appendChild(hh); }
+      var er = el('div', 'prow'); er.style.marginTop = '12px';
+      er.appendChild(mkBtn('ghost', 'Edit details', '', editDetails));
+      er.appendChild(mkBtn('ghost', 'History', '', function(){
+        var h = meta.history;
+        UI.alert('Version history', h.length ? h.slice(0, 12).map(function(x){ return 'v' + x.version + ' \u00b7 ' + taskStamp(x.ts) + ' \u00b7 ' + x.note; }).join('\n') : 'No changes recorded yet.');
+      }));
+      dcard.appendChild(er);
+    }
+    function editDetails(){
+      dcard.innerHTML = '';
+      var ds = el('textarea', 'field'), tg = el('input', 'field'), so = el('input', 'field'), li = el('input', 'field'), co = el('input', 'field');
+      ds.rows = 3; ds.maxLength = 600; ds.value = meta.description; ds.style.resize = 'none';
+      tg.value = meta.tags.join(', '); tg.placeholder = 'research, chemistry, lab'; so.value = meta.source; so.maxLength = 300;
+      li.value = meta.licence; li.maxLength = 120; co.value = meta.collected; co.placeholder = 'YYYY-MM-DD'; co.maxLength = 20;
+      [['Description', ds], ['Tags (separate with commas)', tg], ['Source', so], ['Licence', li], ['Collected on', co]].forEach(function(x){
+        dcard.appendChild(el('div', 'label', x[0])); dcard.appendChild(x[1]);
+      });
+      var row = el('div', 'tool-top'); row.style.marginTop = '14px';
+      row.appendChild(mkBtn('solid', 'Save', '', function(){
+        var tags = tg.value.split(',').map(function(t){ return t.trim(); }).filter(Boolean).slice(0, 20);
+        var changed = ds.value.trim() !== meta.description || tags.join('|') !== meta.tags.join('|') || so.value.trim() !== meta.source || li.value.trim() !== meta.licence || co.value.trim() !== meta.collected;
+        meta.description = ds.value.trim(); meta.tags = tags; meta.source = so.value.trim(); meta.licence = li.value.trim(); meta.collected = co.value.trim();
+        if(changed) dsBump(p, 'Updated details');
+        save(); paintDetails();
+      }));
+      row.appendChild(mkBtn('ghost', 'Cancel', '', paintDetails));
+      dcard.appendChild(row);
+    }
+    paintDetails();
+    body.appendChild(dcard);
+    function paintFiles(){
+      fbox.innerHTML = '';
+      if(!meta.files.length){
+        if(dsStatOf(p).n) fbox.appendChild(el('div', 'xsub', 'Files imported before file tracking was added are not listed here. New imports are.'));
+        return;
+      }
+      var h = el('div', 'group-h', 'Files \u00b7 ' + meta.files.length); fbox.appendChild(h);
+      meta.files.slice().reverse().forEach(function(f){
+        var card = el('div', 'tool on'), top = el('div', 'tool-top');
+        top.appendChild(el('div', 'tool-name', f.name));
+        top.appendChild(el('span', 'spill', fmtBytes(f.bytes)));
+        var info = el('button', 'info', '?'); info.addEventListener('click', function(){ card.classList.toggle('open'); });
+        top.appendChild(info); card.appendChild(top);
+        var d = el('div', 'tool-info');
+        d.appendChild(el('div', '', f.records.toLocaleString('en-US') + ' records' + (f.skipped ? ', ' + f.skipped.toLocaleString('en-US') + ' duplicates skipped' : '') + ' \u00b7 ' + f.format.toUpperCase()));
+        var ck = el('div', 'xsub', f.sha ? 'SHA-256 ' + f.sha.slice(0, 16) + '\u2026' : 'No checksum (file too large to hash)'); ck.style.marginTop = '6px'; d.appendChild(ck);
+        d.appendChild(el('div', 'xsub', (f.kept ? 'Original kept' : 'Chunks only, original not kept') + ' \u00b7 added ' + taskStamp(f.ts)));
+        var row = el('div', 'prow'); row.style.marginTop = '10px';
+        if(f.kept) row.appendChild(mkBtn('ghost', 'Download original', '', async function(){
+          var rec = null; try{ rec = await LOCAL.get(f.id); }catch(e){}
+          if(!rec || !rec.blob){ UI.alert('Original not found', 'The saved copy is missing on this device.'); return; }
+          saveBlob(f.name, rec.blob);
+        }));
+        row.appendChild(mkBtn('ghost', 'Remove', '', async function(){
+          if(!(await UI.confirm('Remove this file?', 'Its ' + f.records.toLocaleString('en-US') + ' records and the saved original are deleted.', { confirmText:'Remove', danger:true }))) return;
+          await dsRemoveFile(p, f); repaintSum(); paintFiles(); paintDetails(); paintList();
+        }));
+        d.appendChild(row); card.appendChild(d); fbox.appendChild(card);
+      });
+    }
     function repaintSum(){ var t = dsStatOf(p); sum.textContent = t.n.toLocaleString('en-US') + ' record' + (t.n === 1 ? '' : 's') + ' \u00b7 ' + fmtBytes(t.bytes); }
     var bar = el('div', 'prow'); bar.style.margin = '14px 0 8px';
     var prog = el('div', 'hint'); prog.style.display = 'none';
     bar.appendChild(mkBtn('solid', 'Import files', '', function(){
       pickDataFiles(async function(files){
-        var added = 0, skipped = 0, bad = [];
+        var added = 0, skipped = 0, bad = [], same = [];
         prog.style.display = '';
         for(var i = 0; i < files.length; i++){
           prog.textContent = 'Importing ' + files[i].name + ' (' + (i + 1) + ' of ' + files.length + ')';
-          var r = await dsImportFile(p, files[i], function(f){ prog.textContent = 'Importing ' + files[i].name + ' \u00b7 ' + Math.round(f * 100) + '%'; });
-          if(r.bad) bad.push(files[i].name); else{ added += r.added; skipped += r.skipped; }
+          var r = await dsIngest(p, files[i], function(f){ prog.textContent = 'Importing ' + files[i].name + ' \u00b7 ' + Math.round(f * 100) + '%'; });
+          if(r.bad) bad.push(files[i].name); else if(r.same) same.push(files[i].name); else{ added += r.added; skipped += r.skipped; }
           save(); repaintSum();
         }
-        prog.textContent = 'Added ' + added.toLocaleString('en-US') + ' records' + (skipped ? ', skipped ' + skipped.toLocaleString('en-US') + ' duplicates' : '') + (bad.length ? '. Not text files: ' + bad.join(', ') : '') + '.';
-        paintList();
+        prog.textContent = 'Added ' + added.toLocaleString('en-US') + ' records' + (skipped ? ', skipped ' + skipped.toLocaleString('en-US') + ' duplicates' : '') + (same.length ? '. Already imported: ' + same.join(', ') : '') + (bad.length ? '. Not text files: ' + bad.join(', ') : '') + '.';
+        paintList(); paintFiles(); paintDetails();
       });
     }));
     bar.appendChild(mkBtn('ghost', 'Add text', '', function(){ editor(); }));
@@ -6623,7 +6913,12 @@ MStore.ready.then(function(){
       var n = await dsDedupe(p); save(); repaintSum(); prog.style.display = ''; prog.textContent = n ? 'Removed ' + n.toLocaleString('en-US') + ' duplicate' + (n === 1 ? '' : 's') + '.' : 'No duplicates found.'; paintList();
     }));
     bar.appendChild(mkBtn('ghost', 'Export', '', function(){ exportData(p); }));
-    body.appendChild(bar); body.appendChild(prog);
+    bar.appendChild(mkBtn('ghost', 'Verify files', '', async function(){
+      prog.style.display = ''; prog.textContent = 'Checking saved originals...';
+      var v = await dsVerify(p);
+      prog.textContent = v.ok + ' file' + (v.ok === 1 ? '' : 's') + ' match their checksum' + (v.bad.length ? '. Problems: ' + v.bad.join('; ') : '') + (v.skip ? '. ' + v.skip + ' not checked (no saved original).' : '.');
+    }));
+    body.appendChild(bar); body.appendChild(prog); body.appendChild(fbox); paintFiles();
     var host = el('div'); body.appendChild(host);
     body.appendChild(el('div', 'label', 'Search'));
     var qf = el('input', 'field'); qf.value = dsQuery; qf.setAttribute('aria-label', 'Search records'); qf.setAttribute('autocomplete', 'off');
@@ -6680,12 +6975,19 @@ MStore.ready.then(function(){
     });
     cl.style.marginTop = '20px'; body.appendChild(cl);
   }
-  var DS_FORMATS = [['jsonl', 'JSON Lines (.jsonl)'], ['json', 'JSON (.json)'], ['csv', 'CSV (.csv)'], ['txt', 'Plain text (.txt)']];
+  var DS_FORMATS = [['jsonl', 'JSON Lines (.jsonl)'], ['json', 'JSON (.json)'], ['csv', 'CSV (.csv)'], ['txt', 'Plain text (.txt)'], ['manifest', 'Manifest (.json)']];
   async function exportData(p){
     var s = dsStatOf(p);
     if(!s.n){ UI.alert('Nothing to export', 'The dataset is empty.'); return; }
     var f = await UI.sheet('Export dataset', DS_FORMATS.map(function(x){ return { label:x[1], value:x[0] }; }));
     if(!f) return;
+    if(f === 'manifest'){
+      var mm = dsMetaOf(p);
+      saveBlob(slug(p.name) + '-manifest.json', new Blob([JSON.stringify({ dataset:{ name:p.name, description:mm.description, tags:mm.tags, source:mm.source, licence:mm.licence, collected:mm.collected, version:mm.version, records:s.n, bytes:s.bytes },
+        files:mm.files.map(function(x){ return { path:x.name, bytes:x.bytes, sha256:x.sha, format:x.format, records:x.records, original_kept:x.kept, added:new Date(x.ts).toISOString() }; }),
+        history:mm.history.map(function(x){ return { version:x.version, ts:new Date(x.ts).toISOString(), note:x.note }; }) }, null, 2)], { type:'application/json' }));
+      return;
+    }
     if(f === 'json' && s.n > 100000){ UI.alert('Too many records for one JSON file', 'Use JSON Lines instead. It works the same way and handles any size.'); return; }
     var base = slug(p.name) + '-data', LIMIT = 50 * 1024 * 1024, part = 1, parts = [], size = 0, first = true, files = [];
     var mime = { jsonl:'application/x-ndjson', json:'application/json', csv:'text/csv', txt:'text/plain' }[f];
@@ -6863,6 +7165,180 @@ MStore.ready.then(function(){
       inf.appendChild(row); card.appendChild(inf); body.appendChild(card);
     });
   }
+  /* =====================================================================
+     TEST FILES: files kept for testing, sorted into groups the person names
+     ===================================================================== */
+  var TF_MAX = 25 * 1024 * 1024, tfShut = {};
+  function tfGroups(p){ if(!Array.isArray(p.tfGroups)) p.tfGroups = []; return p.tfGroups; }
+  function isTextFile(f){ return !!(f.isText || TEXT_EXT.test(f.name || '') || /^text\//.test(f.type || '')); }
+  function findTestFile(list, q){
+    var r = String(q || '').trim().toLowerCase();
+    if(!r) return null;
+    var hit = list.filter(function(f){ return f.name.toLowerCase() === r; })[0];
+    if(hit) return hit;
+    var m = list.filter(function(f){ return f.name.toLowerCase().indexOf(r) >= 0; });
+    return m.length === 1 ? m[0] : null;
+  }
+  async function tfAdd(p, files, gid){
+    var added = 0, big = [];
+    for(var i = 0; i < files.length; i++){
+      var f = files[i];
+      if(f.size > TF_MAX){ big.push(f.name); continue; }
+      var rec = { id:uid(), pid:p.id, kind:'test', gid:gid || '', name:f.name, type:f.type || '', size:f.size, ts:Date.now(), isText:TEXT_EXT.test(f.name) || /^text\//.test(f.type || ''), blob:f };
+      try{ if(f.size <= KEEP_MAX) rec.sha = await sha256Of(f); await LOCAL.put(rec); added++; }catch(e){ big.push(f.name); }
+    }
+    p.tfCount = (p.tfCount || 0) + added; save();
+    return { added:added, big:big };
+  }
+  async function renderTestFiles(){
+    var body = $('pageBody'), p = current, pid = p.id;
+    body.innerHTML = '';
+    var recs = [];
+    try{ recs = await LOCAL.list(pid, 'test'); }catch(e){}
+    if(current !== p || currentView !== 'page') return;
+    p.tfCount = recs.length;
+    var gs = tfGroups(p), total = recs.reduce(function(a, r){ return a + r.size; }, 0);
+    body.innerHTML = '';
+    body.appendChild(el('div', 'summary', recs.length + ' file' + (recs.length === 1 ? '' : 's') + ' · ' + fmtBytes(total) + (gs.length ? ' · ' + gs.length + ' group' + (gs.length === 1 ? '' : 's') : '')));
+    var bar = el('div', 'prow'); bar.style.margin = '14px 0 8px';
+    var note = el('div', 'hint'); note.style.display = 'none';
+    function say(t){ note.style.display = t ? '' : 'none'; note.textContent = t; }
+    bar.appendChild(mkBtn('solid', 'Add files', '', async function(){
+      var gid = '';
+      if(gs.length){
+        var pick = await UI.sheet('Add to', [{ label:'No group', value:'-' }].concat(gs.map(function(g){ return { label:g.name, value:g.id }; })));
+        if(pick === null || pick === undefined) return;
+        gid = pick === '-' ? '' : pick;
+      }
+      var inp = document.createElement('input'); inp.type = 'file'; inp.multiple = true;
+      inp.addEventListener('change', async function(){
+        if(!inp.files || !inp.files.length) return;
+        say('Saving...');
+        var r = await tfAdd(p, Array.prototype.slice.call(inp.files), gid);
+        renderTestFiles();
+        if(r.big.length) UI.alert('Some files were not saved', r.big.join(', ') + ' (over 25 MB or could not be stored).');
+      });
+      inp.click();
+    }));
+    bar.appendChild(mkBtn('ghost', 'New group', '', async function(){
+      var v = await UI.prompt('New group', { confirmText:'Create', maxLength:40, placeholder:'For example: Valid inputs' });
+      if(!v || !String(v).trim()) return;
+      gs.push({ id:uid(), name:String(v).trim().slice(0, 40) }); save(); renderTestFiles();
+    }));
+    body.appendChild(bar); body.appendChild(note);
+    if(!recs.length && !gs.length) body.appendChild(el('div', 'proj-empty', 'No test files yet. Add files, then sort them into groups such as valid inputs, bad inputs or sample data.'));
+    function groupBlock(gid, name){
+      var mine = recs.filter(function(r){ return (r.gid || '') === gid; }).sort(function(a, b){ return a.name.localeCompare(b.name); });
+      if(!gid && !mine.length) return;
+      var shut = !!tfShut[pid + ':' + gid];
+      var head = el('div', 'tool-top'); head.style.marginTop = '18px';
+      var tg = el('button', 'sec-toggle'); tg.style.cssText = 'flex:1;min-width:0;height:36px;display:flex;align-items:center;gap:8px;text-align:left;font-size:15px;font-weight:600;color:var(--text)';
+      tg.innerHTML = ICON.chev; tg.firstChild.style.cssText = 'width:16px;height:16px;flex:none;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s;' + (shut ? 'transform:rotate(-90deg)' : '');
+      tg.appendChild(el('span', '', name)); var cn = el('span', 'xsub', String(mine.length)); cn.style.margin = '0'; tg.appendChild(cn);
+      tg.addEventListener('click', function(){ tfShut[pid + ':' + gid] = !shut; renderTestFiles(); });
+      head.appendChild(tg);
+      if(gid){
+        var mb = mkBtn('ghost', 'Group', '', async function(){
+          var a = await UI.sheet(name, [{ label:'Rename group', value:'rename' }, { label:'Delete group, keep its files', value:'ungroup' }, { label:'Delete group and its files', value:'wipe', danger:true }]);
+          var g = gs.filter(function(x){ return x.id === gid; })[0];
+          if(!a || !g) return;
+          if(a === 'rename'){
+            var v = await UI.prompt('Rename group', { value:g.name, confirmText:'Save', maxLength:40 });
+            if(v && String(v).trim()){ g.name = String(v).trim().slice(0, 40); save(); renderTestFiles(); }
+          }else if(a === 'ungroup'){
+            for(var i = 0; i < mine.length; i++){ mine[i].gid = ''; await LOCAL.put(mine[i]); }
+            p.tfGroups = gs.filter(function(x){ return x.id !== gid; }); save(); renderTestFiles();
+          }else if(a === 'wipe'){
+            if(!(await UI.confirm('Delete this group and its files?', mine.length + ' file' + (mine.length === 1 ? '' : 's') + ' will be removed.', { confirmText:'Delete', danger:true }))) return;
+            for(var j = 0; j < mine.length; j++) await LOCAL.remove(mine[j].id);
+            p.tfCount = Math.max(0, (p.tfCount || 0) - mine.length);
+            p.tfGroups = gs.filter(function(x){ return x.id !== gid; }); save(); renderTestFiles();
+          }
+        });
+        head.appendChild(mb);
+      }
+      body.appendChild(head);
+      if(shut) return;
+      if(!mine.length){ var em = el('div', 'proj-empty', 'Empty group'); em.style.marginTop = '6px'; body.appendChild(em); return; }
+      mine.forEach(function(r){ body.appendChild(fileCard(r)); });
+    }
+    gs.forEach(function(g){ groupBlock(g.id, g.name); });
+    groupBlock('', gs.length ? 'No group' : 'Files');
+    function fileCard(r){
+      var card = el('div', 'tool on'), top = el('div', 'tool-top');
+      top.appendChild(el('div', 'tool-name', r.name));
+      top.appendChild(el('span', 'spill', (extOf(r.name) || 'file').toUpperCase() + ' · ' + fmtBytes(r.size)));
+      var info = el('button', 'info', '?');
+      var d = el('div', 'tool-info'), loaded = false;
+      info.addEventListener('click', function(){
+        card.classList.toggle('open');
+        if(loaded) return; loaded = true;
+        if(isTextFile(r)){
+          d.insertBefore(filePreview(r.name, function(){ return r.blob.text(); }, [addToDatasetBtn(r.name, function(){ return r.blob.text(); })]), d.firstChild);
+          d.firstChild.style.margin = '0 0 10px';
+        }else if(/^image\//.test(r.type || '')){
+          var im = document.createElement('img'); im.src = URL.createObjectURL(r.blob); im.alt = r.name;
+          im.style.cssText = 'display:block;max-width:100%;max-height:240px;border-radius:12px;margin-bottom:10px;border:1px solid var(--edge)';
+          d.insertBefore(im, d.firstChild);
+        }else d.insertBefore(el('div', 'xsub', 'No preview for this kind of file. You can still download or move it.'), d.firstChild);
+      });
+      top.appendChild(info); card.appendChild(top);
+      var row = el('div', 'prow'); row.style.marginTop = '10px';
+      if(isTextFile(r)){
+        var cb = mkBtn('ghost', 'Copy', '', async function(){
+          var ok = await copyText(await r.blob.text()), s0 = cb.querySelector('span');
+          s0.textContent = ok ? 'Copied' : 'Could not copy'; setTimeout(function(){ s0.textContent = 'Copy'; }, 1400);
+        });
+        row.appendChild(cb);
+        row.appendChild(mkBtn('ghost', 'Attach to chat', '', async function(){
+          if(attached.length >= 6){ UI.alert('Too many attachments', 'Send the current ones first, or remove one.'); return; }
+          var t = await r.blob.text(); attachText(r.name, t); go('chat'); comp.focus();
+        }));
+      }
+      row.appendChild(mkBtn('ghost', 'Download', '', function(){ saveBlob(r.name, r.blob); }));
+      row.appendChild(mkBtn('ghost', 'Move', '', async function(){
+        var opts = [{ label:'No group', value:'-', selected:!r.gid }].concat(gs.map(function(g){ return { label:g.name, value:g.id, selected:r.gid === g.id }; }));
+        if(opts.length < 2){ UI.alert('No groups yet', 'Create a group first with New group.'); return; }
+        var v = await UI.sheet('Move to', opts);
+        if(v === null || v === undefined) return;
+        r.gid = v === '-' ? '' : v; await LOCAL.put(r); renderTestFiles();
+      }));
+      row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
+        if(!(await UI.confirm('Delete this file?', r.name, { confirmText:'Delete', danger:true }))) return;
+        await LOCAL.remove(r.id); p.tfCount = Math.max(0, (p.tfCount || 1) - 1); save(); renderTestFiles();
+      }));
+      d.appendChild(row);
+      if(r.sha){ var ck = el('div', 'xsub', 'SHA-256 ' + r.sha.slice(0, 16) + '… · added ' + taskStamp(r.ts)); ck.style.marginTop = '8px'; d.appendChild(ck); }
+      card.appendChild(d);
+      return card;
+    }
+  }
+  T('list_test_files', {
+    icon:'note', read:true,
+    label:function(){ return 'List test files'; },
+    run:async function(p){
+      var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
+      var gs = tfGroups(p);
+      return { ok:true, res:'Read test files (' + rs.length + ')', result:{ files:rs.map(function(r){
+        var g = gs.filter(function(x){ return x.id === r.gid; })[0];
+        return { name:r.name, group:g ? g.name : '', bytes:r.size, text:isTextFile(r) };
+      }) } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'List test files'); }
+  });
+  T('read_test_file', {
+    icon:'note', read:true,
+    label:function(a){ return 'Read test file: ' + short(a.name || '', 40); },
+    run:async function(p, a){
+      var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
+      var f = findTestFile(rs, a.name);
+      if(!f) return terr('No single test file matches that name. Use list_test_files.');
+      if(!isTextFile(f)) return terr('That file is not text, so it cannot be read here.');
+      var t = await f.blob.text();
+      return { ok:true, res:'Read “' + short(f.name, 30) + '”', result:{ name:f.name, text:short(t, 20000), truncated:t.length > 20000 } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Read a test file'); }
+  });
   /* =====================================================================
      PROJECT TYPES: what a project is for decides what the AI makes and how it is run
      ===================================================================== */
