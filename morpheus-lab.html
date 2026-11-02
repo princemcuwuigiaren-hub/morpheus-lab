@@ -839,6 +839,86 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .mmb .katex-display{margin:.4em 0}
 .mmb .katex-display>.katex{white-space:nowrap}
 .mmb{text-align:center;padding:10px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--panel);overflow-x:auto;touch-action:pan-x pan-y;font-size:16px}
+
+/* ===== redesign: metal tiles, glass start card, black sidebars ===== */
+.qic{--m1:#f2f2f6;--m2:#a9abb5;--m3:#5a5c68;--mi:#26272e}
+.t-app{--m1:#c9f3e9;--m2:#5fb9a6;--m3:#2a6b5e;--mi:#0d3a31}
+.t-mod{--m1:#fbe9b8;--m2:#d9a840;--m3:#85591a;--mi:#44290a}
+.t-ds{--m1:#d3f1da;--m2:#6cbf83;--m3:#2c6a42;--mi:#103a21}
+.t-sp{--m1:#d6e5fc;--m2:#7ea7e8;--m3:#2e4f8a;--mi:#12274f}
+.qic{
+  color:var(--mi);border:1px solid rgba(255,255,255,.4);
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.62) 0%,rgba(255,255,255,.08) 34%,rgba(255,255,255,0) 52%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 1px,rgba(0,0,0,.05) 1px 2px),
+    linear-gradient(165deg,var(--m1) 0%,var(--m2) 44%,var(--m3) 52%,var(--m2) 76%,var(--m1) 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -2px 3px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.18),0 6px 14px rgba(0,0,0,.45);
+}
+.qic>svg{stroke-width:1.9;filter:drop-shadow(0 1px 0 rgba(255,255,255,.55))}
+.qdot{background:var(--mi);box-shadow:0 1px 0 rgba(255,255,255,.55)}
+.qletter{font-weight:700;color:var(--mi);text-shadow:0 1px 0 rgba(255,255,255,.55)}
+.qbadge{background:linear-gradient(160deg,#3b3c44,#0f0f12);border:1px solid var(--m2);color:var(--m1);box-shadow:0 2px 4px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.22)}
+.qtile.sel .qic{box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -2px 3px rgba(0,0,0,.35),0 0 0 2px var(--text),0 6px 14px rgba(0,0,0,.45)}
+.qlb{
+  font-weight:600;letter-spacing:.01em;
+  background:linear-gradient(180deg,#ffffff 0%,#cfd1d9 46%,#8b8e9a 54%,#dcdee5 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;
+}
+:root[data-theme="light"] .qlb{background-image:linear-gradient(180deg,#4a4b53 0%,#202126 46%,#0c0c0f 54%,#34353c 100%)}
+:root[data-theme="light"] .qic{box-shadow:inset 0 1px 0 rgba(255,255,255,.85),inset 0 -2px 3px rgba(0,0,0,.28),inset 0 0 0 1px rgba(0,0,0,.14),0 5px 12px rgba(30,30,50,.22)}
+.tchip{color:var(--mi);border:1px solid rgba(255,255,255,.4);background:linear-gradient(165deg,var(--m1) 0%,var(--m2) 46%,var(--m3) 54%,var(--m2) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 8px rgba(0,0,0,.35);font-weight:600}
+.tchip .tci{color:var(--mi)}
+.tchip>svg{opacity:.85}
+
+/* start card: lean and glassy */
+#startCard{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px 8px;
+  min-height:0;padding:7px 7px 7px 20px;border-radius:26px;
+  background:linear-gradient(180deg,rgba(255,255,255,.11) 0%,rgba(255,255,255,.04) 100%);
+  border:1px solid rgba(255,255,255,.14);
+  -webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.04),0 12px 30px rgba(0,0,0,.38),0 0 44px var(--hglow2);
+}
+#startCard:focus-within{border-color:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 12px 30px rgba(0,0,0,.4),0 0 0 3px rgba(var(--neon),.16),0 0 44px var(--hglow2)}
+#startCard #nameInput{grid-column:1;grid-row:1;height:44px;font-size:18px;padding:0}
+#startRow{display:contents}
+#createBtn{grid-column:2;grid-row:1;width:44px;height:44px;padding:0;border-radius:50%;font-size:0;gap:0;justify-content:center}
+#createBtn svg{width:20px;height:20px}
+#startCard .tchip{grid-column:1 / -1;grid-row:2;justify-self:start;height:34px;margin:0 0 3px}
+:root[data-theme="light"] #startCard{background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.52));border-color:rgba(255,255,255,.95);box-shadow:inset 0 1px 0 #fff,0 10px 26px rgba(30,30,60,.13),0 0 0 1px rgba(0,0,0,.05)}
+:root[data-theme="light"] #startCard:focus-within{border-color:#fff;box-shadow:inset 0 1px 0 #fff,0 10px 26px rgba(30,30,60,.16),0 0 0 3px rgba(var(--neon),.2)}
+#home.typing .stage{padding-top:5vh}
+
+/* sidebars: deep black, with the items lifted off it */
+:root:not([data-theme="light"]) #sidebar,:root:not([data-theme="light"]) #homeSidebar{background:#040405;border-right-color:#222327}
+:root:not([data-theme="light"]) #sidebar.open,:root:not([data-theme="light"]) #homeSidebar.open{box-shadow:14px 0 48px rgba(0,0,0,.8)}
+:root:not([data-theme="light"]) #sidebar .side-title,:root:not([data-theme="light"]) #homeSidebar .side-title{border-bottom-color:#25262a}
+:root:not([data-theme="light"]) #sidebar .sec-head,:root:not([data-theme="light"]) #homeSidebar .sec-head{border-bottom-color:#25262a}
+:root:not([data-theme="light"]) #homeSidebar .proj-row{background:#141519;border-color:#2c2d33}
+:root:not([data-theme="light"]) #sidebar .nav-item,:root:not([data-theme="light"]) #homeSidebar .nav-item{color:#d9dae0}
+:root:not([data-theme="light"]) #sidebar .nav-item.active,:root:not([data-theme="light"]) #homeSidebar .nav-item.active{background:#202228;color:#fff;box-shadow:inset 0 0 0 1px #30323a}
+:root:not([data-theme="light"]) #sidebar .nav-item:active,:root:not([data-theme="light"]) #homeSidebar .nav-item:active{background:#1a1b20}
+
+/* chat composer: the same lean glass as the start card */
+#composerBar{padding:8px 10px calc(var(--safe-bottom) + 10px)}
+#composerCard{
+  padding:11px 9px 8px 18px;border-radius:26px;
+  background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.04) 100%);
+  border:1px solid rgba(255,255,255,.14);
+  -webkit-backdrop-filter:blur(22px) saturate(1.5);backdrop-filter:blur(22px) saturate(1.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(255,255,255,.04),0 10px 26px rgba(0,0,0,.34);
+  transition:border-color .15s,box-shadow .15s;
+}
+#composerCard:focus-within{border-color:rgba(255,255,255,.3);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 10px 26px rgba(0,0,0,.38),0 0 0 3px rgba(168,85,247,.14)}
+#composerCard .card-row{margin-top:4px}
+:root[data-theme="light"] #composerCard{background:linear-gradient(180deg,rgba(255,255,255,.85),rgba(255,255,255,.55));border-color:rgba(255,255,255,.95);box-shadow:inset 0 1px 0 #fff,0 8px 22px rgba(30,30,60,.12),0 0 0 1px rgba(0,0,0,.05)}
+:root[data-theme="light"] #composerCard:focus-within{box-shadow:inset 0 1px 0 #fff,0 8px 22px rgba(30,30,60,.15),0 0 0 3px rgba(124,58,237,.18)}
+
+/* the composer floats over the chat, so the messages scroll behind the glass and blur through it */
+#lab #composerBar{position:absolute;left:0;right:0;bottom:0;z-index:6}
+#lab #sheet{padding-bottom:calc(var(--cbar,96px) + 12px)}
+#composerCard{background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,.035) 100%),rgba(22,22,26,.5)}
+:root[data-theme="light"] #composerCard{background:linear-gradient(180deg,rgba(255,255,255,.8),rgba(255,255,255,.5)),rgba(255,255,255,.35)}
 </style>
 </head>
 <body>
@@ -3144,19 +3224,37 @@ MStore.ready.then(function(){
   var nameInput = $('nameInput'), createBtn = $('createBtn');
   function syncCreate(){ createBtn.classList.toggle('ready', nameInput.value.trim().length > 0); }
   $('startCard').addEventListener('click', function(){ nameInput.focus(); });
-  var kbBase = 0, kbSeen = false;
+  /* typing mode hides the app icon while the keyboard is up. It ends as soon as the keyboard closes,
+     even if the field keeps focus and still holds text. The full height is learned whenever the keyboard is closed. */
+  var kbFull = 0, kbWasOpen = false, kbTimer = 0, kbW = 0;
   function viewH(){ return window.visualViewport ? window.visualViewport.height : window.innerHeight; }
-  nameInput.addEventListener('focus', function(){ kbBase = viewH(); kbSeen = false; $('home').classList.add('typing'); });
-  /* the keyboard can close (back gesture) while the field keeps focus: leave typing mode when the view grows back */
-  function kbWatch(){
-    if(!$('home').classList.contains('typing')) return;
-    var h = viewH();
-    if(h < kbBase - 120) kbSeen = true;
-    else if(kbSeen && h >= kbBase - 60){ kbSeen = false; nameInput.blur(); }
+  function homeTyping(){ return $('home').classList.contains('typing'); }
+  function leaveTyping(){
+    kbWasOpen = false; clearInterval(kbTimer); kbTimer = 0;
+    if(document.activeElement === nameInput) nameInput.blur();
+    $('home').classList.remove('typing');
   }
-  if(window.visualViewport) window.visualViewport.addEventListener('resize', kbWatch);
-  window.addEventListener('resize', kbWatch);
-  function typingOff(){ setTimeout(function(){ if(document.activeElement !== nameInput) $('home').classList.remove('typing'); }, 80); }
+  function kbCheck(){
+    var h = viewH();
+    if(window.innerWidth !== kbW){ kbW = window.innerWidth; kbFull = h; kbWasOpen = false; return; }
+    if(!homeTyping()){ kbFull = h; return; }
+    if(h > kbFull) kbFull = h;
+    if(h < kbFull - 100) kbWasOpen = true;
+    else if(kbWasOpen && h >= kbFull - 60) leaveTyping();
+  }
+  if(window.visualViewport) window.visualViewport.addEventListener('resize', kbCheck);
+  window.addEventListener('resize', kbCheck);
+  kbCheck();
+  nameInput.addEventListener('focus', function(){
+    kbFull = Math.max(kbFull, viewH()); kbWasOpen = false;
+    $('home').classList.add('typing');
+    if(!kbTimer) kbTimer = setInterval(kbCheck, 250);
+  });
+  function typingOff(){
+    setTimeout(function(){
+      if(document.activeElement !== nameInput){ $('home').classList.remove('typing'); kbWasOpen = false; clearInterval(kbTimer); kbTimer = 0; }
+    }, 80);
+  }
   nameInput.addEventListener('blur', typingOff);
   nameInput.addEventListener('input', function(){
     if(/\n/.test(nameInput.value)) nameInput.value = nameInput.value.replace(/\n/g, ' ');
@@ -3224,7 +3322,7 @@ MStore.ready.then(function(){
     return t;
   }
   function homeTile(cls, icon, label, onTap, sel, letter){
-    var b = el('button', 'qtile' + (sel ? ' sel' : '')); b.type = 'button';
+    var b = el('button', 'qtile' + (sel ? ' sel' : '') + (letter ? ' qrec' : '')); b.type = 'button';
     var ic = el('span', 'qic ' + cls);
     if(letter){
       ic.appendChild(el('span', 'qletter', letter));
@@ -3770,6 +3868,10 @@ MStore.ready.then(function(){
     body.appendChild(verBox);
     function paintVer(){
       verBox.innerHTML = '';
+      if(current.code && Array.isArray(current.code.hist)){
+        var okh = current.code.hist.filter(function(h){ return h && typeof h.src === 'string'; });
+        if(okh.length !== current.code.hist.length){ current.code.hist = okh; save(); }
+      }
       var hs = current.code && current.code.hist ? current.code.hist.slice().reverse() : [];
       if(!hs.length) verBox.appendChild(el('div', 'proj-empty', 'No saved versions yet'));
       hs.forEach(function(h){
@@ -3835,6 +3937,13 @@ MStore.ready.then(function(){
     }
   }
   comp.addEventListener('input', function(){ sizeComposer(); syncSend(); });
+  /* the chat leaves room at its bottom for the floating composer, whatever height it grows to */
+  (function(){
+    var bar = $('composerBar'), lab = $('lab');
+    function fit(){ var h = bar.offsetHeight; if(h) lab.style.setProperty('--cbar', h + 'px'); }
+    if(window.ResizeObserver) new ResizeObserver(fit).observe(bar);
+    window.addEventListener('resize', fit); fit();
+  })();
 
   /* ---- connection chip: always says whether a model is really connected ---- */
   function paintConn(){
@@ -7926,7 +8035,7 @@ MStore.ready.then(function(){
   function kindLabel(k){ return (DOC_KINDS.filter(function(x){ return x[0] === k; })[0] || [0, 'Note'])[1]; }
   function fmtLabel(f){ return (DOC_FMTS.filter(function(x){ return x[0] === f; })[0] || [0, 'Markdown'])[1]; }
   function fmtExt(f){ return (DOC_FMTS.filter(function(x){ return x[0] === f; })[0] || [0, 0, 'md'])[2]; }
-  function pushHist(d){
+  function pushDocHist(d){
     if(!Array.isArray(d.hist)) d.hist = [];
     d.hist.unshift({ text:d.text, ts:d.mod, title:d.title });
     if(d.hist.length > 8) d.hist.length = 8;
@@ -7964,7 +8073,7 @@ MStore.ready.then(function(){
       var ds = docsOf(p), ex = ds.filter(function(d){ return sameG(d.title, title); })[0], now = Date.now();
       if(ex){
         if(!a.replace) return terr('A document with that title already exists. Set replace to true to update it, or choose another title.');
-        if(ex.text !== short(text, 60000)){ pushHist(ex); ex.approved = false; }
+        if(ex.text !== short(text, 60000)){ pushDocHist(ex); ex.approved = false; }
         ex.text = short(text, 60000); ex.mod = now;
         if(a.kind) ex.kind = docKind({ kind:String(a.kind).toLowerCase() });
         if(a.format) ex.format = docFmt({ format:String(a.format).toLowerCase() });
@@ -8034,7 +8143,7 @@ MStore.ready.then(function(){
         var title = ti.value.trim(), text = tx.value.trim(), now = Date.now();
         if(!title && !text){ UI.alert('Empty document', 'Add a title or some text.'); return; }
         if(d){
-          if(d.text !== text){ pushHist(d); d.approved = false; }
+          if(d.text !== text){ pushDocHist(d); d.approved = false; }
           d.title = title || short(text, 60); d.text = text; d.mod = now; d.kind = kp.value; d.format = fp.value;
         }else docsOf(p).push({ id:uid(), title:title || short(text, 60), text:text, ts:now, mod:now, kind:kp.value, format:fp.value, approved:false });
         save(); renderDocs();
@@ -8068,7 +8177,7 @@ MStore.ready.then(function(){
           var vv = await UI.sheet('Restore an earlier version', d.hist.map(function(h, i){ return { label:taskStamp(h.ts) + ' \u00b7 ' + short(h.text.replace(/\s+/g, ' '), 40), value:String(i) }; }));
           if(vv === null || vv === undefined) return;
           var h = d.hist[+vv]; if(!h) return;
-          pushHist(d); d.text = h.text; d.mod = Date.now(); d.approved = false; save(); renderDocs();
+          pushDocHist(d); d.text = h.text; d.mod = Date.now(); d.approved = false; save(); renderDocs();
         }
         else if(v === 'copy'){ var ok = await copyText(d.text); if(!ok) UI.alert('Could not copy', 'The browser did not allow it.'); }
         else if(v === 'export') exportDocRec(d);
