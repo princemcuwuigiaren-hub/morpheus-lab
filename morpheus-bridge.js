@@ -4,7 +4,7 @@
 
   Start it:   node morpheus-bridge.js
   It listens only on this phone (127.0.0.1), answers only the site(s) you allow,
-  and needs the token it prints. It can run only node, npm and npx, in a folder per project.
+  and needs the token it prints. It can run only node, npm, npx, python and pip, in a folder per project.
 
   Options:
     --origin https://your.site   allow another site (can be repeated)
@@ -22,7 +22,7 @@ var cp = require('child_process');
 
 var VERSION = '1.0.0';
 var DEFAULT_ORIGIN = '__ORIGIN__';
-var ALLOWED_CMDS = ['node', 'npm', 'npx'];
+var ALLOWED_CMDS = ['node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3'];
 var MAX_RUNS = 2;
 var MAX_OUT = 1500000;
 var MAX_BODY = 20 * 1024 * 1024;
@@ -153,7 +153,7 @@ function doRun(req, res, origin, body) {
   var cmd = String(body.cmd || '');
   var cargs = Array.isArray(body.args) ? body.args.map(String) : null;
   if (!proj) return send(res, 400, { ok: false, error: 'Bad project name.' }, origin);
-  if (ALLOWED_CMDS.indexOf(cmd) < 0) return send(res, 400, { ok: false, error: 'Only node, npm and npx can run here.' }, origin);
+  if (ALLOWED_CMDS.indexOf(cmd) < 0) return send(res, 400, { ok: false, error: 'Only node, npm, npx, python and pip can run here.' }, origin);
   if (!cargs || cargs.length > 60 || cargs.some(function (x) { return x.length > 4000 || x.indexOf('\0') >= 0; })) {
     return send(res, 400, { ok: false, error: 'Those arguments are not accepted.' }, origin);
   }
@@ -176,6 +176,9 @@ function doRun(req, res, origin, body) {
   env.npm_config_progress = 'false';
   env.npm_config_update_notifier = 'false';
   env.npm_config_fund = 'false';
+  env.PYTHONUNBUFFERED = '1';
+  env.PYTHONIOENCODING = 'utf-8';
+  env.PIP_DISABLE_PIP_VERSION_CHECK = '1';
   var id = crypto.randomBytes(6).toString('hex');
   var h = corsHeaders(origin);
   h['Content-Type'] = 'application/x-ndjson';
@@ -208,7 +211,8 @@ function doRun(req, res, origin, body) {
   child.stdout.on('data', feed('out'));
   child.stderr.on('data', feed('err'));
   child.on('error', function (e) {
-    var msg = e && e.code === 'ENOENT' ? cmd + ' was not found. In Termux run: pkg install nodejs' : (e && e.message) || 'The command failed to start.';
+    var hint = /^(python|pip)/.test(cmd) ? 'pkg install python' : 'pkg install nodejs';
+    var msg = e && e.code === 'ENOENT' ? cmd + ' was not found. In Termux run: ' + hint : (e && e.message) || 'The command failed to start.';
     line({ t: 'err', d: msg + '\n' });
   });
   child.on('close', function (code, signal) {

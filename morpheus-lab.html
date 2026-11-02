@@ -1763,7 +1763,7 @@ if __name__ == "__main__":
 
   Start it:   node morpheus-bridge.js
   It listens only on this phone (127.0.0.1), answers only the site(s) you allow,
-  and needs the token it prints. It can run only node, npm and npx, in a folder per project.
+  and needs the token it prints. It can run only node, npm, npx, python and pip, in a folder per project.
 
   Options:
     --origin https://your.site   allow another site (can be repeated)
@@ -1781,7 +1781,7 @@ var cp = require('child_process');
 
 var VERSION = '1.0.0';
 var DEFAULT_ORIGIN = '__ORIGIN__';
-var ALLOWED_CMDS = ['node', 'npm', 'npx'];
+var ALLOWED_CMDS = ['node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3'];
 var MAX_RUNS = 2;
 var MAX_OUT = 1500000;
 var MAX_BODY = 20 * 1024 * 1024;
@@ -1912,7 +1912,7 @@ function doRun(req, res, origin, body) {
   var cmd = String(body.cmd || '');
   var cargs = Array.isArray(body.args) ? body.args.map(String) : null;
   if (!proj) return send(res, 400, { ok: false, error: 'Bad project name.' }, origin);
-  if (ALLOWED_CMDS.indexOf(cmd) < 0) return send(res, 400, { ok: false, error: 'Only node, npm and npx can run here.' }, origin);
+  if (ALLOWED_CMDS.indexOf(cmd) < 0) return send(res, 400, { ok: false, error: 'Only node, npm, npx, python and pip can run here.' }, origin);
   if (!cargs || cargs.length > 60 || cargs.some(function (x) { return x.length > 4000 || x.indexOf('\0') >= 0; })) {
     return send(res, 400, { ok: false, error: 'Those arguments are not accepted.' }, origin);
   }
@@ -1935,6 +1935,9 @@ function doRun(req, res, origin, body) {
   env.npm_config_progress = 'false';
   env.npm_config_update_notifier = 'false';
   env.npm_config_fund = 'false';
+  env.PYTHONUNBUFFERED = '1';
+  env.PYTHONIOENCODING = 'utf-8';
+  env.PIP_DISABLE_PIP_VERSION_CHECK = '1';
   var id = crypto.randomBytes(6).toString('hex');
   var h = corsHeaders(origin);
   h['Content-Type'] = 'application/x-ndjson';
@@ -1967,7 +1970,8 @@ function doRun(req, res, origin, body) {
   child.stdout.on('data', feed('out'));
   child.stderr.on('data', feed('err'));
   child.on('error', function (e) {
-    var msg = e && e.code === 'ENOENT' ? cmd + ' was not found. In Termux run: pkg install nodejs' : (e && e.message) || 'The command failed to start.';
+    var hint = /^(python|pip)/.test(cmd) ? 'pkg install python' : 'pkg install nodejs';
+    var msg = e && e.code === 'ENOENT' ? cmd + ' was not found. In Termux run: ' + hint : (e && e.message) || 'The command failed to start.';
     line({ t: 'err', d: msg + '\n' });
   });
   child.on('close', function (code, signal) {
@@ -2539,9 +2543,10 @@ MStore.ready.then(function(){
     t = String(t || '').trim();
     if(!t || (RESUME_RE.test(t) && t.length < 40)) return null;
     var ty = typeOf(p), codeish = ty === 'app' || ty === 'module';
-    var codeWord = /\b(?:code|script|function|program|app|page|html|javascript|module|class|button|screen|css)\b/i.test(t);
+    var codeWord = /\b(?:code|script|function|program|app|page|html|javascript|module|class|button|screen|css|python|pytest|tests?|npm|node|sqlite|schema|bot)\b|\.py\b/i.test(t);
+    var tx = false; try{ tx = intgUp('termux'); }catch(e){}
     if(AUTO_BUILD.test(t) && (codeish || codeWord)) return 'build';
-    if(codeish && AUTO_TEST.test(t)) return 'test';
+    if((codeish || tx || codeWord) && AUTO_TEST.test(t)) return 'test';
     if(AUTO_PLAN.test(t) || (!codeish && AUTO_PLAN2.test(t))) return 'design';
     if(AUTO_RESEARCH.test(t)) return 'research';
     if(AUTO_IDEAS.test(t)) return 'discovery';
@@ -2558,7 +2563,9 @@ MStore.ready.then(function(){
     if(autoOn(p)){
       var ch = null;
       try{ ch = chatOf(p); }catch(e){}
-      return classifyAuto(p, ch ? lastUserText(ch) : '') || typeBase(p);
+      var cm = classifyAuto(p, ch ? lastUserText(ch) : '');
+      if(cm){ p.autoMode = cm; return cm; }
+      return p.autoMode || typeBase(p);
     }
     return MODE_SETS.hasOwnProperty(p.opMode) ? p.opMode : 'build';
   }
@@ -5132,6 +5139,15 @@ MStore.ready.then(function(){
     card:function(m, seg){ return slim('branch', seg.res || 'Looked at the sub-projects'); }
   });
   /* web search: a separate Google-grounded request, so it works with any tool-calling model */
+  function searchErr(e){
+    var m = String((e && e.message) || '');
+    if(e && e.status === 429){
+      if(/limit:\s*0/i.test(m)) return 'Google Search is not part of this API key\u2019s free allowance.';
+      if(e.daily) return 'The daily Google Search allowance for this API key is used up. It resets once a day.';
+      return 'Google Search is rate limited right now' + (e.retryMs ? '; try again in about ' + Math.ceil(e.retryMs / 1000) + ' seconds' : '') + '.';
+    }
+    return errText(e);
+  }
   async function searchWeb(q, sig){
     var ids = G.mode === 'fixed' ? [G.fixed.id] : (await readyIds()), last = null;
     for(var i = 0; i < Math.min(3, ids.length); i++){
@@ -5151,27 +5167,59 @@ MStore.ready.then(function(){
         });
         if(text) return { text:short(text, 3500), sources:src.slice(0, 6) };
         last = new Error('The search returned nothing.');
-      }catch(e){ if(e && e.aborted) throw e; last = e; }
+      }catch(e){
+        if(e && e.aborted) throw e;
+        last = e;
+        if(e && e.status === 429) break;
+      }
     }
     throw last || new Error('Search is not available.');
+  }
+  /* a backup that needs no key: Wikipedia summaries. It covers general facts, not recent or technical topics. */
+  async function wikiSearch(q){
+    var ctl = new AbortController(), timer = setTimeout(function(){ ctl.abort(); }, 12000);
+    try{
+      var r = await fetch('https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=' + encodeURIComponent(q) + '&srlimit=3&srprop=snippet&format=json&origin=*', { signal:ctl.signal });
+      if(!r.ok) throw new Error('Wikipedia answered ' + r.status + '.');
+      var j = await r.json(), hits = (j.query && j.query.search) || [], out = [], src = [];
+      for(var i = 0; i < hits.length; i++){
+        var t = String(hits[i].title).replace(/ /g, '_'), r2 = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(t), { signal:ctl.signal });
+        if(!r2.ok) continue;
+        var sm = await r2.json(); if(!sm.extract) continue;
+        out.push(sm.title + ': ' + sm.extract);
+        src.push({ title:sm.title + ' (Wikipedia)', url:(sm.content_urls && sm.content_urls.desktop && sm.content_urls.desktop.page) || ('https://en.wikipedia.org/wiki/' + encodeURIComponent(t)) });
+      }
+      if(!out.length) throw new Error('Wikipedia had nothing on that.');
+      return { text:short(out.join('\n\n'), 3500), sources:src };
+    }finally{ clearTimeout(timer); }
   }
   T('web_search', {
     icon:'compass', read:true,
     label:function(a){ return 'Search the web: ' + short(a.query || '', 40); },
     run:async function(p, a, seg){
+      var q = String(a.query || '').slice(0, 300), why = '';
       try{
-        var r = await searchWeb(String(a.query || '').slice(0, 300));
+        var r = await searchWeb(q);
         seg.data = { q:short(a.query || '', 120), sources:r.sources };
         return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
           result:{ answer:r.text, sources:r.sources, instruction:'Use this to answer, and name the source for each fact.' } };
       }catch(e){
-        var msg = 'Search did not work: ' + errText(e) + ' Answer from what you know and say it is unverified.';
+        if(e && e.aborted) throw e;
+        why = searchErr(e);
+      }
+      try{
+        var w = await wikiSearch(q);
+        seg.data = { q:short(a.query || '', 120), sources:w.sources, via:'Wikipedia' };
+        return { ok:true, res:'Searched \u00b7 Wikipedia only \u00b7 ' + w.sources.length + ' source' + (w.sources.length === 1 ? '' : 's'),
+          result:{ answer:w.text, sources:w.sources, note:'Google Search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
+      }catch(e2){
+        var msg = 'Search did not work: ' + why + ' The Wikipedia backup also found nothing (' + errText(e2) + '). Answer from what you know and say it is unverified.';
         return { ok:false, res:'Search did not work', result:{ error:msg } };
       }
     },
     card:function(m, seg){
       var d = seg.data || {}, srcs = d.sources || [];
-      var c = tcard('compass', 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's'), srcs.length ? 'ok' : 'warn']);
+      var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's'), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
       srcs.forEach(function(x){
         var a = el('a', 'hint', short(x.title, 60)); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block'; a.style.textDecoration = 'underline';
         c.body.appendChild(a);
@@ -5558,7 +5606,13 @@ MStore.ready.then(function(){
     icon:'play',
     label:function(){ return 'Run the page'; },
     preview:function(){ return el('div', 'txt', 'Runs the page for a few seconds out of sight and collects what it prints.'); },
-    pre:function(p){ return existingSrc(p) ? '' : 'There is no page to run yet.'; },
+    pre:function(p){
+      var src = existingSrc(p);
+      if(!src) return 'There is no page to run yet.';
+      if(/^\s*(?:def \w+\([^)]*\)\s*(?:->[^:]+)?:|async def |if __name__\s*==|from [\w.]+ import [\w*, ]+\s*$|elif .+:\s*$)/m.test(src) && !/\b(?:function|const|let|var)\b/.test(src))
+        return 'This looks like Python. The page sandbox runs only browser JavaScript, so it would fail with a syntax error. ' + (intgUp('termux') ? 'Use terminal_run with python instead.' : 'Python can run only through the Termux bridge, which is not connected.');
+      return '';
+    },
     run:async function(p, a, seg){
       var chk = a.check ? String(a.check).slice(0, 6000) : '';
       var lines = await runSandbox(existingSrc(p), chk ? 3500 : 2500, chk);
@@ -5930,6 +5984,7 @@ MStore.ready.then(function(){
      A small script (morpheus-bridge.js) listens only on this phone and runs only node, npm and npx.
      ===================================================================== */
   var TX_FALLBACK_ORIGIN = 'https://princemcuwuigiaren-hub.github.io';
+  var TX_CMDS = ['node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3'];
   function itx(){
     if(!G.integ || typeof G.integ !== 'object') G.integ = {};
     var b = G.integ.termux = G.integ.termux || {};
@@ -6015,6 +6070,15 @@ MStore.ready.then(function(){
     var c = p.code ? codeOf(p) : null;
     return { name:typeOf(p) === 'module' ? 'index.js' : 'index.html', text:c && typeof c.src === 'string' ? c.src : '' };
   }
+  /* the project's Test files (any text file) copied into the Termux folder, so Python or Node tests can run there */
+  async function txSendTests(p, names){
+    var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
+    rs = rs.filter(function(r){ return isTextFile(r) && (!names || !names.length || names.indexOf(r.name) >= 0); });
+    if(!rs.length) return { ok:false, error:'There are no text test files to send.' };
+    var files = [];
+    for(var i = 0; i < rs.length && i < 200; i++) files.push({ path:rs[i].name, text:await rs[i].blob.text() });
+    return txJson('/write', { project:txProject(p), files:files });
+  }
   function txTest(){
     var b = itx(), base = txBase();
     function done(o){ INT.st.termux = o; if(INT.repaintTx) INT.repaintTx(); if(INT.repaintPage) INT.repaintPage(); return o; }
@@ -6034,11 +6098,11 @@ MStore.ready.then(function(){
   function termuxCard(body){
     var b = itx();
     var c = el('div', 'tool on'), top = el('div', 'tool-top'), pill = el('span', 'spill', '');
-    top.appendChild(el('div', 'tool-name', 'Termux (Node.js and npm)')); top.appendChild(pill);
+    top.appendChild(el('div', 'tool-name', 'Termux (Node.js, npm, Python)')); top.appendChild(pill);
     var info = el('button', 'info', '?'); info.setAttribute('aria-label', 'About the Termux bridge');
     info.addEventListener('click', function(){ c.classList.toggle('open'); });
     top.appendChild(info); c.appendChild(top);
-    c.appendChild(el('div', 'tool-info', 'Runs node, npm and npx on this phone through Termux and brings the results back here. A small script in Termux listens only on this phone, accepts only this site, and needs the token it prints. It cannot sandbox the code you run: a script run through it can do anything Termux can, so approve each command the AI proposes.'));
+    c.appendChild(el('div', 'tool-info', 'Runs node, npm, npx, python and pip on this phone through Termux and brings the results back here. For Python, run pkg install python in Termux once. A small script in Termux listens only on this phone, accepts only this site, and needs the token it prints. It cannot sandbox the code you run: a script run through it can do anything Termux can, so approve each command the AI proposes.'));
     c.appendChild(el('div', 'label', 'Address'));
     var u = el('input', 'field'); u.value = b.url; u.autocapitalize = 'off'; u.spellcheck = false;
     u.addEventListener('input', function(){ b.url = u.value.trim(); saveG(); });
@@ -6056,7 +6120,7 @@ MStore.ready.then(function(){
     row.appendChild(mkBtn('ghost', 'Download script', '', txDownload));
     c.appendChild(row);
     var stat = el('div', 'hint', ''); c.appendChild(stat);
-    c.appendChild(el('div', 'tool-info', 'Setup: tap Copy setup command, open Termux and paste. The bridge prints a token. Paste the token above and tap Connect. The first time, Chrome may ask to allow access to devices on your local network: allow it. Keep Termux open while you use this.'));
+    c.appendChild(el('div', 'tool-info', 'Setup: tap Copy setup command, open Termux and paste. The bridge prints a token. Paste the token above and tap Connect. The first time, Chrome may ask to allow access to devices on your local network: allow it. Keep Termux open while you use this. For Python, run pkg install python in Termux once.'));
     var log = el('div', ''); c.appendChild(log); body.appendChild(c);
     function paint(){
       var s = INT.st.termux;
@@ -6096,7 +6160,7 @@ MStore.ready.then(function(){
     cmdIn.style.fontFamily = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
     body.appendChild(cmdIn);
     var chips = el('div', 'prow'); chips.style.marginTop = '10px';
-    ['node -v', 'npm -v', 'npm init -y', 'npm install', 'npm test', 'node index.js'].forEach(function(x){
+    ['node -v', 'npm -v', 'python -V', 'pip install ', 'npm install', 'node index.js', 'python main.py'].forEach(function(x){
       var b = el('button', 'ptool', x); b.addEventListener('mousedown', function(e){ e.preventDefault(); });
       b.addEventListener('click', function(){ cmdIn.value = x; });
       chips.appendChild(b);
@@ -6116,6 +6180,11 @@ MStore.ready.then(function(){
     btns.appendChild(runB); btns.appendChild(stopB);
     btns.appendChild(mkBtn('ghost', 'Clear', '', function(){ con.textContent = ''; }));
     btns.appendChild(mkBtn('ghost', 'Copy output', '', async function(){ var ok = await copyText(con.textContent); if(!ok) UI.alert('Could not copy', 'Long-press the output and choose copy.'); }));
+    btns.appendChild(mkBtn('ghost', 'Send test files', '', async function(){
+      var s0 = INT.st.termux; if(!s0 || !s0.ok){ UI.alert('Not connected', 'Start the bridge in Termux and connect it in Settings first.'); return; }
+      var w = await txSendTests(p); p.txUsed = true;
+      add(w.ok ? 'Sent ' + w.written.length + ' test file' + (w.written.length === 1 ? '' : 's') + '\n' : w.error + '\n', w.ok ? 'm' : 'e'); listFiles();
+    }));
     body.appendChild(btns);
     var con = el('div', 'clog'); con.style.cssText = 'margin-top:12px;max-height:50vh;min-height:140px;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text';
     body.appendChild(con);
@@ -6134,7 +6203,7 @@ MStore.ready.then(function(){
       var line = cmdIn.value.trim(); if(!line) return;
       var pr = txParse(line);
       if(!pr || !pr.cmd){ UI.alert('Check the command', 'A quote is not closed.'); return; }
-      if(['node', 'npm', 'npx'].indexOf(pr.cmd) < 0){ UI.alert('Only node, npm and npx', 'Start the command with node, npm or npx.'); return; }
+      if(TX_CMDS.indexOf(pr.cmd) < 0){ UI.alert('Only node, npm, npx, python and pip', 'Start the command with one of them.'); return; }
       p.txCmd = line; p.txUsed = true; save();
       running = true; paintBtns();
       add('$ ' + line + '\n', 'm');
@@ -6188,9 +6257,9 @@ MStore.ready.then(function(){
   var STRL = { type:'ARRAY', description:'Arguments, one per item, for example ["install","express"]', items:{ type:'STRING' } };
   var TX = [
     { id:'terminal_run', name:'Run node or npm', perm:'ask', always:true, testOk:true,
-      d:'Run node, npm or npx in this project\u2019s folder on the person\u2019s phone and get the output back. Give cmd as node, npm or npx, and args as a list. Write the files first with terminal_write or terminal_send_code. Nothing else can run.',
-      desc:'Runs node, npm or npx on the phone through Termux and returns the output. Each run is shown for approval.',
-      p:{ cmd:STR('node, npm or npx'), args:STRL, timeout_seconds:S('INTEGER', 'Default 120, at most 600') }, req:['cmd'] },
+      d:'Run node, npm, npx, python or pip in this project\u2019s folder on the person\u2019s phone (Termux) and get the real output and exit code back. Give cmd as one of them and args as a list, for example cmd python, args ["test_bot.py"]. Write the files first with terminal_write, terminal_send_code or terminal_send_test_files. Nothing else can run.',
+      desc:'Runs node, npm, npx, python or pip on the phone through Termux and returns the output. Each run is shown for approval.',
+      p:{ cmd:STR('node, npm, npx, python or pip'), args:STRL, timeout_seconds:S('INTEGER', 'Default 120, at most 600') }, req:['cmd'] },
     { id:'terminal_write', name:'Write files to Termux', perm:'ask', always:true,
       d:'Write one or more files into this project\u2019s folder in Termux, for example index.js or package.json. Paths are relative and stay inside the folder.',
       desc:'Writes files into this project\u2019s folder in Termux.',
@@ -6199,6 +6268,10 @@ MStore.ready.then(function(){
       d:'Copy the current page from code assembly into the Termux folder as index.js (module projects) or index.html.',
       desc:'Copies the current code assembly page into the Termux folder.',
       p:{ filename:STR('Optional file name') } },
+    { id:'terminal_send_test_files', name:'Send test files to Termux', perm:'ask',
+      d:'Copy the project\u2019s Test files (text files such as test scripts or fixtures) into the Termux folder, so they can be run there. Leave names empty to send all of them.',
+      desc:'Copies the project\u2019s text test files into the Termux folder.',
+      p:{ names:{ type:'ARRAY', description:'Optional file names; empty sends all', items:{ type:'STRING' } } } },
     { id:'terminal_read', name:'Read Termux files', perm:'allow', read:true, testOk:true,
       d:'List the files in this project\u2019s Termux folder, or read one of them. Leave path empty to list.',
       desc:'Lists and reads the files in this project\u2019s Termux folder. Only looks.',
@@ -6218,10 +6291,10 @@ MStore.ready.then(function(){
     preview:function(seg){ var a = seg.args || {}; return monoPre('$ ' + [a.cmd || ''].concat(Array.isArray(a.args) ? a.args : []).join(' ')); },
     run:function(p, a, seg){
       var cmd = String(a.cmd || '').trim(), cargs = Array.isArray(a.args) ? a.args.map(String) : [];
-      if(['node', 'npm', 'npx'].indexOf(cmd) < 0){
+      if(TX_CMDS.indexOf(cmd) < 0){
         var pr = txParse(cmd);
-        if(pr && ['node', 'npm', 'npx'].indexOf(pr.cmd) >= 0 && !cargs.length){ cmd = pr.cmd; cargs = pr.args; }
-        else return terr('Only node, npm and npx can run. Give cmd as one of them and args as a list.');
+        if(pr && TX_CMDS.indexOf(pr.cmd) >= 0 && !cargs.length){ cmd = pr.cmd; cargs = pr.args; }
+        else return terr('Only node, npm, npx, python and pip can run. Give cmd as one of them and args as a list.');
       }
       p.txUsed = true;
       var secs = Math.min(600, Math.max(5, parseInt(a.timeout_seconds, 10) || 120));
@@ -6271,6 +6344,19 @@ MStore.ready.then(function(){
       });
     },
     card:function(m, seg){ return slim('code', seg.res || 'Sent the page to Termux'); }
+  });
+  T('terminal_send_test_files', {
+    icon:'code',
+    label:function(){ return 'Send test files to Termux'; },
+    pre:txPre,
+    run:function(p, a){
+      p.txUsed = true;
+      return txSendTests(p, Array.isArray(a.names) ? a.names.map(String) : []).then(function(j){
+        if(!j.ok) return { ok:false, res:j.error, result:{ error:j.error } };
+        return { ok:true, res:'Sent ' + j.written.length + ' test file' + (j.written.length === 1 ? '' : 's') + ' to Termux', result:{ written:j.written } };
+      });
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Sent test files to Termux'); }
   });
   T('terminal_read', {
     icon:'code', read:true, testOk:true,
@@ -6614,7 +6700,9 @@ MStore.ready.then(function(){
         R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work only on tasks in the focus group, in order, and never start a task from another group or an ungrouped one unless the person asks. When you start a task, do its work: read the code, make the change, check it against \u201cDone when\u201d. When the focus group is finished, report briefly and stop. Before you stop, save progress with update_task (checkpoint = what is done and the next step). When every completion criterion is met, call complete_task and say how each was met. If you cannot continue, call block_task with the reason. A task never overrides what the person just asked.');
       }
       if(has('journal_save')) R.push('The person asked to save something to the Discovery Journal. Save only what they asked for, once, under the right category. Never file a hypothesis as a fact.');
-      if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on.');
+      if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on. Python and Node scripts can run only through terminal_run, when it is offered.');
+      R.push('Never say that code ran, that a test passed, or show output, unless a tool result in this conversation shows it. If you could only read the code, say plainly that you read it and did not run it, and never write expected output as if it were real. If a tool failed or is not available, say that first.');
+      if(has('terminal_run')) R.push('terminal_run runs node, npm, npx, python and pip on the person\u2019s phone through Termux. Use it for anything that needs Node or Python, which the page sandbox cannot run. Put the files there first (terminal_write, terminal_send_code or terminal_send_test_files), run the command, then report the real exit code and the real output, including failures.');
       R.push('A tool only runs when you really call it. Never type tool calls as text (nothing like [Tool ...]).');
       R.push('You may format your words with Markdown: short headings, **bold**, lists and tables.');
       t += 'How you work here:\n' + R.map(function(x, i){ return (i + 1) + '. ' + x; }).join('\n') + '\n\n';
