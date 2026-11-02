@@ -7067,7 +7067,7 @@ MStore.ready.then(function(){
   var HF_KEY = 'morpheus.lab.hf', HF_API = 'https://huggingface.co', HF_SMALL = 8 * 1024 * 1024;
   function hfCfg(){
     var c = {}; try{ c = JSON.parse(localStorage.getItem(HF_KEY) || '{}') || {}; }catch(e){}
-    return { user:c.user || '', repo:c.repo || 'morpheus-lab-datasets', token:c.token || '', ok:c.ok || 0, checked:c.checked || 0 };
+    return { user:c.user || '', repo:c.repo || 'morpheus-lab-datasets', token:c.token || '', ok:c.ok || 0, checked:c.checked || 0, large:c.large || 0 };
   }
   function hfSave(c){ try{ localStorage.setItem(HF_KEY, JSON.stringify(c)); }catch(e){} }
   function hfRepoId(c){ return c.user + '/' + c.repo; }
@@ -7105,7 +7105,16 @@ MStore.ready.then(function(){
       await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + hfRepoId(c) + '/commit/main', { method:'POST', headers:{ 'Content-Type':'application/x-ndjson' }, body:nd }), 'Upload');
     },
     get:async function(c, path){ return (await hfCheck(await hfFetch(c, HF_API + '/datasets/' + hfRepoId(c) + '/resolve/main/' + hfPath(path)), 'Download')).blob(); },
-    list:async function(c){ return (await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + hfRepoId(c) + '/tree/main?recursive=true'), 'Listing')).json(); },
+    list:async function(c){
+      var url = HF_API + '/api/datasets/' + hfRepoId(c) + '/tree/main?recursive=true', out = [];
+      for(var g = 0; url && g < 60; g++){
+        var r = await hfCheck(await hfFetch(c, url), 'Listing'), a = await r.json();
+        out = out.concat(a);
+        var ln = r.headers && r.headers.get ? r.headers.get('Link') : '', mm = ln && /<([^>]+)>;\s*rel="next"/.exec(ln);
+        url = mm ? mm[1] : '';
+      }
+      return out;
+    },
     del:async function(c, path){
       var nd = hfNdjson([{ key:'header', value:{ summary:'Remove ' + path } }, { key:'deletedFile', value:{ path:path } }]);
       await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + hfRepoId(c) + '/commit/main', { method:'POST', headers:{ 'Content-Type':'application/x-ndjson' }, body:nd }), 'Cleanup');
@@ -7134,6 +7143,213 @@ MStore.ready.then(function(){
       return { ok:false, step:cur, msg:m };
     }
   }
+
+  /* ---- large files: Git LFS upload in chunks, then one commit for everything ---- */
+  var HF_LFS = 'application/vnd.git-lfs+json';
+  function hfIsHF(u){ try{ return /(^|\.)huggingface\.co$/.test(new URL(u).hostname); }catch(e){ return false; } }
+  function hfWait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function hfB64(blob){ return new Promise(function(res, rej){ var fr = new FileReader(); fr.onload = function(){ res(String(fr.result).split(',')[1] || ''); }; fr.onerror = function(){ rej(fr.error); }; fr.readAsDataURL(blob); }); }
+  function hfPut(url, blob, headers, onProg, job){
+    return new Promise(function(res, rej){
+      var x = new XMLHttpRequest(); x.open('PUT', url);
+      Object.keys(headers || {}).forEach(function(k){ x.setRequestHeader(k, headers[k]); });
+      x.upload.onprogress = function(e){ if(onProg && e.lengthComputable) onProg(e.loaded); };
+      x.onload = function(){ if(x.status >= 200 && x.status < 300) res({ etag:x.getResponseHeader('ETag') || '' }); else rej(new Error('The storage server answered ' + x.status + '.')); };
+      x.onerror = function(){ rej(new TypeError('network')); };
+      x.onabort = function(){ rej(new Error('Stopped.')); };
+      if(job) job.abort = function(){ x.abort(); };
+      x.send(blob);
+    });
+  }
+  async function hfPutRetry(url, blob, headers, onProg, job){
+    var last = null;
+    for(var t = 0; t < 4; t++){
+      if(job && job.stop) throw new Error('Stopped.');
+      try{ return await hfPut(url, blob, headers, onProg, job); }
+      catch(e){ last = e; if(e && e.message === 'Stopped.') throw e; await hfWait(1500 * (t + 1)); }
+    }
+    throw last;
+  }
+  async function hfLfsPost(c, url, body, what){
+    var h = { Accept:HF_LFS, 'Content-Type':HF_LFS };
+    if(hfIsHF(url)) h.Authorization = 'Bearer ' + c.token;
+    return hfCheck(await fetch(url, { method:'POST', headers:h, body:JSON.stringify(body) }), what);
+  }
+  /* gets one file into the repository's storage; nothing is visible until hfCommit */
+  async function hfStage(c, path, blob, sha, onProg, job){
+    if(!sha) throw new Error('Checksums are not available in this browser, so uploads cannot be verified.');
+    var id = hfRepoId(c), sample = await hfB64(blob.slice(0, 512));
+    var pr = await (await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + id + '/preupload/main', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ files:[{ path:path, sample:sample, size:blob.size }] }) }), 'Preparing the upload')).json();
+    var f0 = pr.files && pr.files[0];
+    if(f0 && f0.shouldIgnore) throw new Error(path + ' is excluded by the repository rules.');
+    if(f0 && f0.uploadMode === 'regular'){
+      if(blob.size > HF_SMALL * 1.25) throw new Error(path + ' is too large to send in one piece.');
+      return { path:path, size:blob.size, sha:sha, mode:'regular', content:await hfB64(blob) };
+    }
+    var br = await hfLfsPost(c, HF_API + '/datasets/' + id + '.git/info/lfs/objects/batch', { operation:'upload', transfers:['basic', 'multipart'], hash_algo:'sha256', ref:{ name:'main' }, objects:[{ oid:sha, size:blob.size }] }, 'Starting the upload');
+    var o = ((await br.json()).objects || [])[0] || {};
+    if(o.error) throw new Error('Upload refused: ' + (o.error.message || o.error.code || 'unknown'));
+    var act = o.actions || {};
+    if(act.upload){
+      var up = act.upload, hd = up.header || {}, size = blob.size;
+      if(hd.chunk_size){
+        var cs = parseInt(hd.chunk_size, 10), keys = Object.keys(hd).filter(function(k){ return /^\d+$/.test(k); }).sort(), parts = [], done = 0;
+        for(var i = 0; i < keys.length; i++){
+          if(job && job.stop) throw new Error('Stopped.');
+          var part = blob.slice(i * cs, Math.min(size, (i + 1) * cs)), base = done;
+          var rr = await hfPutRetry(hd[keys[i]], part, null, function(l){ if(onProg) onProg(base + l, size); }, job);
+          if(!rr.etag) throw new Error('The browser could not read the receipt for an uploaded chunk, so the upload cannot be completed.');
+          parts.push({ partNumber:i + 1, etag:rr.etag }); done += part.size; if(onProg) onProg(done, size);
+        }
+        await hfLfsPost(c, up.href, { oid:sha, parts:parts }, 'Finishing the upload');
+      }else{
+        var hh = {}; Object.keys(hd).forEach(function(k){ if(k !== 'chunk_size' && !/^\d+$/.test(k)) hh[k] = hd[k]; });
+        await hfPutRetry(up.href, blob, hh, function(l){ if(onProg) onProg(l, size); }, job);
+      }
+    }
+    if(act.verify) await hfLfsPost(c, act.verify.href, { oid:sha, size:blob.size }, 'Verifying the upload');
+    if(onProg) onProg(blob.size, blob.size);
+    return { path:path, size:blob.size, sha:sha, mode:'lfs' };
+  }
+  async function hfCommit(c, staged, deletes, summary){
+    var lines = [{ key:'header', value:{ summary:summary || 'Upload' } }];
+    staged.forEach(function(x){ lines.push(x.mode === 'lfs' ? { key:'lfsFile', value:{ path:x.path, algo:'sha256', size:x.size, oid:x.sha } } : { key:'file', value:{ content:x.content, path:x.path, encoding:'base64' } }); });
+    (deletes || []).forEach(function(d){ lines.push({ key:'deletedFile', value:{ path:d } }); });
+    await hfCheck(await hfFetch(c, HF_API + '/api/datasets/' + hfRepoId(c) + '/commit/main', { method:'POST', headers:{ 'Content-Type':'application/x-ndjson' }, body:hfNdjson(lines) }), 'Saving the upload');
+  }
+  function hfNetMsg(e, what){
+    return e && e.name === 'TypeError' ? 'The browser could not reach ' + what + '. Check the connection. If it keeps happening, the browser is blocking uploads to it.' : (e && e.message) || 'Unknown error';
+  }
+  /* the large-file test: a 12 MB file through the same path datasets use */
+  async function hfLargeTest(c, step){
+    var name = 'morpheus-large-test.bin', cur = 'Prepare', job = { stop:false, abort:null };
+    try{
+      step(cur, 'run');
+      var chunks = [], x = 123456789;
+      for(var i = 0; i < 192; i++){ var u = new Uint8Array(65536); for(var j = 0; j < 65536; j++){ x ^= x << 13; x ^= x >>> 17; x ^= x << 5; u[j] = x & 255; } chunks.push(u); }
+      var blob = new Blob(chunks), sha = await sha256Of(blob);
+      if(!sha) throw new Error('Checksums are not available in this browser, so large uploads cannot be verified.');
+      step(cur, 'ok', '12 MB test file ready');
+      cur = 'Upload'; step(cur, 'run');
+      var st = await hfStage(c, name, blob, sha, function(l, t){ step('Upload', 'run', Math.round(l / t * 100) + '%'); }, job);
+      step(cur, 'ok', st.mode === 'lfs' ? 'Sent in chunks' : 'Sent in one piece');
+      cur = 'Commit'; step(cur, 'run'); await hfCommit(c, [st], [], 'Large upload test'); step(cur, 'ok', 'Saved to the repository');
+      cur = 'Download'; step(cur, 'run');
+      var back = await HFS.get(c, name);
+      if(back.size !== blob.size || (await sha256Of(back)) !== sha) throw new Error('The downloaded file does not match what was uploaded.');
+      step(cur, 'ok', 'Downloaded and matches');
+      cur = 'Cleanup'; step(cur, 'run'); await HFS.del(c, name); step(cur, 'ok', 'Test file removed');
+      return { ok:true };
+    }catch(e){ var m = hfNetMsg(e, 'the storage server'); step(cur, 'bad', m); return { ok:false, step:cur, msg:m }; }
+  }
+
+  /* ---- sending a dataset: text records as .jsonl shards, images as .tar shards, one manifest ---- */
+  function pad5(n){ return ('00000' + n).slice(-5); }
+  function tarHeader(name, size, ts){
+    var h = new Uint8Array(512), i;
+    function w(str, off, len){ for(var k = 0; k < str.length && k < len; k++) h[off + k] = str.charCodeAt(k) & 127; }
+    function oct(n, len){ var t = n.toString(8); while(t.length < len - 1) t = '0' + t; return t + '\0'; }
+    w(name, 0, 100); w(oct(420, 8), 100, 8); w(oct(0, 8), 108, 8); w(oct(0, 8), 116, 8); w(oct(size, 12), 124, 12); w(oct(Math.floor((ts || Date.now()) / 1000), 12), 136, 12);
+    for(i = 148; i < 156; i++) h[i] = 32;
+    h[156] = 48; w('ustar', 257, 5); w('00', 263, 2);
+    var sum = 0; for(i = 0; i < 512; i++) sum += h[i];
+    w(oct(sum, 7), 148, 7); h[155] = 32;
+    return h;
+  }
+  /* reads the next group of records after a given record id, up to a size budget */
+  function dsBatch(pid, after, maxChars){
+    return dsOpen().then(function(db){
+      return new Promise(function(res, rej){
+        var recs = [], chars = 0, lastIn = after, cur = db.transaction('items').objectStore('items').openCursor(after ? IDBKeyRange.lowerBound(after, true) : null);
+        cur.onsuccess = function(){
+          var c = cur.result;
+          if(!c) return res({ recs:recs, last:lastIn });
+          var r = c.value;
+          if(r.pid === pid){ recs.push(r); lastIn = c.key; chars += (r.text || '').length + (r.title || '').length + 90; if(chars >= maxChars) return res({ recs:recs, last:lastIn }); }
+          c['continue']();
+        };
+        cur.onerror = function(){ rej(cur.error); };
+      });
+    });
+  }
+  async function hfUploadDataset(p, say, job){
+    var c = hfCfg();
+    if(!c.user || !c.repo || !c.token) throw new Error('Set up Hugging Face in Settings first.');
+    var m = dsMetaOf(p), dir = slug(p.name), SH = 64 * 1024 * 1024, staged = [], shards = [], imageIndex = [], pend = [], missing = [], done = 0, total = 0, textRecs = 0;
+    var imgs = m.files.filter(function(f){ return f.kind === 'image'; });
+    total = dsStatOf(p).bytes + imgs.reduce(function(a, f){ return a + (f.bytes || 0); }, 0);
+    if(!total) throw new Error('There is nothing in this dataset to upload.');
+    say('Checking the repository...');
+    var me = (await HFS.who(c)).name, rp = await HFS.ensure(c, me);
+    if(!rp.priv) throw new Error('The repository is public. Make it private on Hugging Face first.');
+    async function stageOne(path, blob, kind, count){
+      if(job.stop) throw new Error('Stopped.');
+      var sha = await sha256Of(blob), base = done;
+      var sg = await hfStage(c, path, blob, sha, function(l){ say('Uploading ' + fmtBytes(Math.min(total, base + l)) + ' of about ' + fmtBytes(total) + ' \u00b7 ' + path.split('/').pop()); }, job);
+      done += blob.size; staged.push(sg); shards.push({ path:path, bytes:blob.size, sha256:sha, kind:kind, count:count });
+      return path;
+    }
+    var after = 0, n = 0;
+    for(;;){
+      var b = await dsBatch(p.id, after, SH);
+      if(!b.recs.length) break;
+      after = b.last; n++; textRecs += b.recs.length;
+      var lines = b.recs.map(function(r){ return JSON.stringify({ title:r.title, text:r.text, source:r.source || '', saved:new Date(r.ts).toISOString() }) + '\n'; });
+      await stageOne(dir + '/text-' + pad5(n) + '.jsonl', new Blob(lines, { type:'application/x-ndjson' }), 'text', b.recs.length);
+      if(b.recs.length < 1) break;
+    }
+    var tarParts = [], tarSize = 0, ti = 0, used = {};
+    async function flushTar(){
+      if(!pend.length) return;
+      tarParts.push(new Uint8Array(1024)); ti++;
+      var path = dir + '/images-' + pad5(ti) + '.tar';
+      await stageOne(path, new Blob(tarParts, { type:'application/x-tar' }), 'images', pend.length);
+      pend.forEach(function(x){ x.shard = path; imageIndex.push(x); });
+      tarParts = []; tarSize = 0; pend = [];
+    }
+    for(var k = 0; k < imgs.length; k++){
+      if(job.stop) throw new Error('Stopped.');
+      var f = imgs[k], rec = null;
+      try{ rec = await LOCAL.get(f.id); }catch(e){}
+      if(!rec || !rec.blob){ missing.push(f.name); continue; }
+      var nm = String(f.name || 'image').replace(/[^A-Za-z0-9._-]+/g, '_').slice(-90) || 'image';
+      if(used[nm]){ used[nm]++; nm = used[nm] + '-' + nm; } else used[nm] = 1;
+      var pad = (512 - rec.blob.size % 512) % 512;
+      tarParts.push(tarHeader(nm, rec.blob.size, f.ts), rec.blob); if(pad) tarParts.push(new Uint8Array(pad));
+      tarSize += 512 + rec.blob.size + pad;
+      pend.push({ name:f.name, entry:nm, sha256:f.sha || '', bytes:rec.blob.size });
+      if(tarSize >= SH) await flushTar();
+    }
+    await flushTar();
+    if(!shards.length) throw new Error('Nothing could be read from this dataset.');
+    var manifest = { app:'morpheus-lab', format:1, uploaded:new Date().toISOString(),
+      dataset:{ name:p.name, description:m.description, tags:m.tags, source:m.source, licence:m.licence, collected:m.collected, version:m.version, records:textRecs, images:imageIndex.length },
+      shards:shards, images:imageIndex, missing_images:missing,
+      files:m.files.map(function(x){ return { path:x.name, bytes:x.bytes, sha256:x.sha, format:x.format, kind:x.kind || 'text', records:x.records, added:new Date(x.ts).toISOString() }; }),
+      history:m.history.map(function(x){ return { version:x.version, ts:new Date(x.ts).toISOString(), note:x.note }; }) };
+    var mb = new Blob([JSON.stringify(manifest, null, 2)], { type:'application/json' }), mpath = dir + '/manifest.json';
+    var ms = await hfStage(c, mpath, mb, await sha256Of(mb), null, job);
+    staged.push(ms);
+    say('Saving to the repository...');
+    var keep = {}; staged.forEach(function(x){ keep[x.path] = 1; });
+    var before = await HFS.list(c);
+    var stale = before.filter(function(x){ return x.type === 'file' && x.path.indexOf(dir + '/') === 0 && !keep[x.path]; }).map(function(x){ return x.path; });
+    await hfCommit(c, staged, stale, 'Upload ' + p.name + ' version ' + m.version);
+    say('Verifying on Hugging Face...');
+    var after2 = await HFS.list(c), at = {}; after2.forEach(function(x){ at[x.path] = x; });
+    var bad = [];
+    for(var q = 0; q < staged.length; q++){
+      var sg = staged[q], e = at[sg.path];
+      if(!e){ bad.push(sg.path + ' (missing)'); continue; }
+      if(sg.mode === 'lfs'){ if(!(e.lfs && e.lfs.oid === sg.sha && (e.lfs.size === undefined || e.lfs.size === sg.size))) bad.push(sg.path + ' (does not match)'); }
+      else{ var back = await HFS.get(c, sg.path); if((await sha256Of(back)) !== sg.sha) bad.push(sg.path + ' (does not match)'); }
+    }
+    if(bad.length) throw new Error('The upload finished but these did not verify: ' + bad.slice(0, 4).join(', ') + '.');
+    m.remote = { repo:hfRepoId(c), dir:dir, ts:Date.now(), version:m.version, shards:shards };
+    save();
+    return { files:staged.length, bytes:done, missing:missing };
+  }
+
   function hfCard(body){
     var c = hfCfg();
     body.appendChild(el('div', 'group-h', 'Remote storage'));
@@ -7142,30 +7358,33 @@ MStore.ready.then(function(){
     var q = el('button', 'info', '?'); q.setAttribute('aria-label', 'About Hugging Face storage');
     q.addEventListener('click', function(){ card.classList.toggle('open'); });
     top.appendChild(q); card.appendChild(top);
-    card.appendChild(el('div', 'tool-info', 'A private dataset repository on Hugging Face, for datasets too big for this device. On Hugging Face, create a private dataset repository, then a fine-grained token with write access to that one repository only. The token stays on this device and is never included in backups.'));
+    card.appendChild(el('div', 'tool-info', 'A private dataset repository on Hugging Face, for datasets too big for this device. On Hugging Face, create a private dataset repository, then a fine-grained token with write access to that one repository only. The token stays on this device and is never included in backups. The large upload test sends a 12 MB file, so use Wi-Fi if your data is limited.'));
     function field(label, key, secret){
       card.appendChild(el('div', 'label', label));
       var i = el('input', 'field'); if(secret) i.type = 'password';
       i.value = c[key]; i.autocapitalize = 'off'; i.spellcheck = false;
-      i.addEventListener('input', function(){ c[key] = i.value.trim(); c.ok = 0; c.checked = 0; hfSave(c); paint(); });
+      i.addEventListener('input', function(){ c[key] = i.value.trim(); c.ok = 0; c.checked = 0; c.large = 0; hfSave(c); paint(); });
       card.appendChild(i);
     }
     field('Username or organization', 'user'); field('Repository name', 'repo'); field('Token', 'token', true);
-    var row = el('div', 'btnrow'), steps = el('div'), tb = mkBtn('solid', 'Test connection', '', async function(){
-      if(!c.user || !c.repo || !c.token){ UI.alert('Missing details', 'Fill in the username, repository name and token first.'); return; }
-      tb.disabled = true; steps.innerHTML = ''; var lines = {};
-      var r = await hfTest(c, function(label, st, msg){
+    var row = el('div', 'btnrow'), steps = el('div'), tb, lb;
+    function need(){ if(!c.user || !c.repo || !c.token){ UI.alert('Missing details', 'Fill in the username, repository name and token first.'); return false; } return true; }
+    async function run(fn, done){
+      tb.disabled = lb.disabled = true; steps.innerHTML = ''; var lines = {};
+      var r = await fn(c, function(label, st, msg){
         var ln = lines[label]; if(!ln){ ln = lines[label] = el('div', 'hint'); steps.appendChild(ln); }
-        ln.textContent = label + ' \u00b7 ' + (st === 'run' ? 'checking' : msg || st);
+        ln.textContent = label + ' \u00b7 ' + (st === 'run' ? (msg || 'checking') : msg || st);
       });
-      c.ok = r.ok ? Date.now() : 0; c.checked = Date.now(); hfSave(c); tb.disabled = false; paint();
-    });
-    row.appendChild(tb); card.appendChild(row); card.appendChild(steps);
+      done(r); c.checked = Date.now(); hfSave(c); tb.disabled = lb.disabled = false; paint();
+    }
+    tb = mkBtn('solid', 'Test connection', '', function(){ if(need()) run(hfTest, function(r){ c.ok = r.ok ? Date.now() : 0; if(!r.ok) c.large = 0; }); });
+    lb = mkBtn('ghost', 'Test large upload', '', function(){ if(need()) run(hfLargeTest, function(r){ c.large = r.ok ? Date.now() : 0; }); });
+    row.appendChild(tb); row.appendChild(lb); card.appendChild(row); card.appendChild(steps);
     var stat = el('div', 'hint', ''); card.appendChild(stat);
     function paint(){
       pill.className = 'spill ' + (c.ok ? 'ok' : c.checked ? 'bad' : 'warn');
       pill.textContent = c.ok ? 'Connected' : c.checked ? 'Failed' : 'Not checked';
-      stat.textContent = c.ok ? 'Last passed ' + taskStamp(c.ok) + '.' : c.checked ? 'Last test failed ' + taskStamp(c.checked) + '.' : '';
+      stat.textContent = (c.ok ? 'Connection passed ' + taskStamp(c.ok) + '. ' : c.checked ? 'Last test failed ' + taskStamp(c.checked) + '. ' : '') + (c.large ? 'Large upload passed ' + taskStamp(c.large) + '.' : '');
     }
     paint(); body.appendChild(card);
   }
@@ -7248,6 +7467,9 @@ MStore.ready.then(function(){
         var l = el('div', 'xsub', r[0]); l.style.marginTop = '10px'; dcard.appendChild(l);
         var v = el('div', '', r[1]); v.style.whiteSpace = 'pre-wrap'; dcard.appendChild(v);
       });
+      if(meta.remote){
+        var rl = el('div', 'xsub', 'On Hugging Face \u00b7 ' + meta.remote.repo + ' \u00b7 uploaded ' + taskStamp(meta.remote.ts) + ' \u00b7 version ' + meta.remote.version + (meta.remote.version !== meta.version ? ', changed since' : '')); rl.style.marginTop = '12px'; dcard.appendChild(rl);
+      }
       if(meta.tags.length){
         var tr = el('div'); tr.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:12px';
         meta.tags.forEach(function(t){ tr.appendChild(el('span', 'spill', t)); });
@@ -7334,7 +7556,7 @@ MStore.ready.then(function(){
     var more = el('button', 'dots'); more.innerHTML = ICON.dots; more.setAttribute('aria-label', 'Dataset options');
     more.addEventListener('click', async function(){
       var v = await UI.sheet('Dataset', [
-        { label:'Edit details', value:'edit' }, { label:'Version history', value:'hist' }, { label:'Export', value:'export' },
+        { label:'Edit details', value:'edit' }, { label:'Version history', value:'hist' }, { label:'Export', value:'export' }, { label:'Upload to Hugging Face', value:'hf' },
         { label:'Verify files', value:'verify' }, { label:'Remove duplicates', value:'dedupe' }, { label:'Delete dataset', value:'delete', danger:true }
       ]);
       if(v === 'edit') editDetails();
@@ -7342,6 +7564,26 @@ MStore.ready.then(function(){
         var h = meta.history;
         UI.alert('Version history', h.length ? h.slice(0, 12).map(function(x){ return 'v' + x.version + ' \u00b7 ' + taskStamp(x.ts) + ' \u00b7 ' + x.note; }).join('\n') : 'No changes recorded yet.');
       }else if(v === 'export') exportData(p);
+      else if(v === 'hf'){
+        var hc = hfCfg();
+        if(!hc.ok){ UI.alert('Hugging Face is not connected', 'Open Settings, fill in the Hugging Face card and run the connection test first.'); return; }
+        var imgB = meta.files.filter(function(x){ return x.kind === 'image'; }).reduce(function(a, x){ return a + (x.bytes || 0); }, 0), tot = dsStatOf(p).bytes + imgB;
+        if(!tot){ UI.alert('Nothing to upload', 'This dataset has no records or images yet.'); return; }
+        if(!(await UI.confirm('Upload to Hugging Face?', 'About ' + fmtBytes(tot) + ' goes to the private repository ' + hfRepoId(hc) + '. Keep this screen open until it finishes.', { confirmText:'Upload' }))) return;
+        var job = { stop:false, abort:null }, lock = null;
+        var stopB = mkBtn('ghost', 'Stop', '', function(){ job.stop = true; if(job.abort) job.abort(); });
+        if(prog.parentNode) prog.parentNode.insertBefore(stopB, prog.nextSibling);
+        try{ if(navigator.wakeLock) lock = await navigator.wakeLock.request('screen'); }catch(e){}
+        try{
+          var out = await hfUploadDataset(p, say, job);
+          say('Uploaded ' + out.files + ' file' + (out.files === 1 ? '' : 's') + ' (' + fmtBytes(out.bytes) + ') and checked them on Hugging Face.' + (out.missing.length ? ' ' + out.missing.length + ' saved image' + (out.missing.length === 1 ? ' was' : 's were') + ' missing on this device and skipped.' : ''));
+        }catch(e){
+          say((e && e.message === 'Stopped.' ? 'Upload stopped.' : 'Upload stopped: ' + hfNetMsg(e, 'Hugging Face')) + ' Nothing is lost. Run the upload again to continue; files already sent are not sent twice.');
+        }
+        if(stopB.parentNode) stopB.parentNode.removeChild(stopB);
+        try{ if(lock) lock.release(); }catch(e){}
+        paintDetails();
+      }
       else if(v === 'verify'){
         say('Checking saved originals...');
         var vr = await dsVerify(p);
