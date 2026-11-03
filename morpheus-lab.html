@@ -463,6 +463,8 @@ svg{display:block;pointer-events:none}
 .empty{margin:auto;text-align:center;color:var(--muted);font-size:15px;line-height:1.45;max-width:260px}
 .msg{display:flex;flex-direction:column;min-width:0}
 .msg.u{align-items:flex-end}
+.bubble.clamp{max-height:9.5em;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.bubmore{margin-top:4px;padding:4px 8px;border:0;background:none;color:var(--muted);font:inherit;font-size:13px}
 .bubble{
   max-width:86%;padding:12px 16px;border-radius:22px 22px 6px 22px;
   background:var(--ub-bg,var(--chip));color:var(--ub-text,var(--text));border:1px solid var(--ub-bg,var(--line-soft));
@@ -515,6 +517,15 @@ svg{display:block;pointer-events:none}
 /* CODE ASSEMBLY */
 #ide{flex:1;min-height:0;margin:10px 12px 0;overflow:auto;overscroll-behavior:contain;border:1px solid var(--edge);border-radius:18px;background:var(--panel)}
 #ide:focus-within{border-color:var(--focus)}
+#fileBar{flex:none;display:flex;align-items:center;gap:8px;margin:8px 12px 0}
+#fileTabs{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+#fileTabs::-webkit-scrollbar{display:none}
+.ftab{flex:none;display:flex;align-items:center;gap:7px;max-width:180px;padding:8px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--panel);color:var(--muted);font:inherit;font-size:13.5px;white-space:nowrap}
+.ftab.on{color:var(--text);border-color:var(--focus)}
+.ftab .fn{overflow:hidden;text-overflow:ellipsis}
+.ftab .fx{margin-left:2px;opacity:.6;font-size:15px;line-height:1}
+#filesBtn{width:40px;height:40px;flex:none}
+#filesBtn svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #ideIn{display:flex;width:max-content;min-width:100%;min-height:100%}
 #gutter{position:sticky;left:0;z-index:3;flex:none;background:var(--panel);border-right:1px solid var(--edge);padding:14px 10px 14px 14px}
 #lines,#hl,#hl code,#editor{font:14px/22px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-variant-ligatures:none;tab-size:2}
@@ -593,8 +604,16 @@ svg{display:block;pointer-events:none}
 .key.kdone{background:var(--inv);color:var(--inv-text);font:600 14px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
 /* tool cards in the chat */
-.mbody>.tact+.tact{margin-top:6px}
-.tact{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--edge);border-radius:14px;background:var(--panel);color:var(--muted);font-size:14px}
+.mbody>.tact+.tact{margin-top:0}
+.tact{display:flex;align-items:center;gap:10px;padding:6px 2px;border:0;border-radius:10px;background:none;color:var(--muted);font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.tact:active{opacity:.6}
+.tact .tic{display:flex;opacity:.8}
+.tact .dot{width:7px;height:7px}
+.ui-st{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-top:12px;border-radius:14px;background:var(--chip);font-size:15px;font-weight:600}
+.ui-st small{display:block;font-weight:400;font-size:13.5px;line-height:1.4;color:var(--muted);margin-top:2px}
+.ui-rows{margin-top:10px;max-height:calc(var(--app-h) - 380px);overflow-y:auto;overscroll-behavior:contain;padding:0 4px}
+.ui-rows .k{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:10px}
+.ui-rows .v{font-size:14.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
 .tic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .ttx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .spill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;flex:none;background:var(--chip);color:var(--muted)}
@@ -645,6 +664,17 @@ svg{display:block;pointer-events:none}
 
 /* + button, floating tool bar and tool mode on the composer */
 #composerBar{position:relative}
+#toBottom{position:absolute;right:16px;top:-54px;width:42px;height:42px;border-radius:50%;border:1px solid var(--edge);background:var(--panel);color:var(--text);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.4);opacity:0;transform:translateY(8px) scale(.9);pointer-events:none;transition:opacity .2s,transform .2s;z-index:5}
+#toBottom.show{opacity:1;transform:none;pointer-events:auto}
+#toBottom svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.term{margin:6px 0;border-radius:14px;background:#101013;border:1px solid rgba(255,255,255,.08);overflow:hidden;color:#e8e8ec}
+.term-h{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;background:rgba(255,255,255,.04);color:inherit;font:inherit;text-align:left}
+.term-cmd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.term-st{flex:none;font-size:12px;color:#9a9aa6}
+.term-out{margin:0;padding:10px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:11.5em;overflow:hidden;color:#cfcfd6}
+.term.open .term-out{max-height:60vh;overflow:auto}
+.term-more{display:block;width:100%;padding:6px;border:0;border-top:1px solid rgba(255,255,255,.06);background:none;color:#9a9aa6;font:inherit;font-size:12px}
+.term-none{padding:10px 12px;font-size:12.5px;color:#9a9aa6}
 .lrow{display:flex;align-items:center;gap:8px;min-width:0;flex:1;margin-right:10px}
 .lrow .conn{flex:0 1 auto;max-width:100%}
 .plus{width:36px;height:36px;border-radius:18px;flex:none;border:1px solid var(--line-soft);background:var(--chip);color:var(--text);display:flex;align-items:center;justify-content:center}
@@ -803,20 +833,20 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qwrap{display:flex;flex-direction:column;gap:22px;margin-top:4px}
 #home.typing .qwrap{display:none}
 .qhead{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 6px 12px}
-.qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 6px}
-.qtile{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;padding:2px 0;transition:transform .12s}
+.qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px}
+.qtile{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:2px 0;transition:transform .12s}
 .qtile:active{transform:scale(.94)}
-.qic{position:relative;width:58px;height:58px;border-radius:18px;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);transition:box-shadow .15s}
-.qic>svg{width:26px;height:26px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.qic{position:relative;width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);transition:box-shadow .15s}
+.qic>svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .qdot{position:absolute;top:7px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--tfg,var(--muted))}
-.qletter{font-size:24px;font-weight:600;letter-spacing:-.02em;line-height:1}
-.qbadge{position:absolute;right:-5px;bottom:-5px;width:22px;height:22px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--line-soft);color:var(--tfg,var(--muted))}
-.qbadge svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.qletter{font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1}
+.qbadge{position:absolute;right:-5px;bottom:-5px;width:19px;height:19px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:var(--bg);border:1px solid var(--line-soft);color:var(--tfg,var(--muted))}
+.qbadge svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .qtile.sel .qic{box-shadow:0 0 0 2px var(--text)}
 .qtile{position:relative}
 /* the glow underneath, so each tile seems to hover above it */
 .qtile::before{
-  content:'';position:absolute;left:50%;top:58px;width:54px;height:16px;margin-left:-27px;border-radius:50%;pointer-events:none;
+  content:'';position:absolute;left:50%;top:46px;width:42px;height:13px;margin-left:-21px;border-radius:50%;pointer-events:none;
   background:radial-gradient(ellipse at center,rgba(var(--neon,168,85,247),calc(1*var(--neon-a,1))),rgba(var(--neon,168,85,247),0) 75%);
   filter:blur(5px);animation:glowSway 4.2s ease-in-out infinite;
 }
@@ -827,7 +857,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes glowSway{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.82)}}
 @media (prefers-reduced-motion:reduce){.qic,.qtile::before,#home::after{animation:none}}
-.qlb{position:relative;font-size:13px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qlb{position:relative;font-size:12px;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .t-app{--tbg:var(--c-app-bg);--tfg:var(--c-app-fg)}
 .t-mod{--tbg:var(--c-mod-bg);--tfg:var(--c-mod-fg)}
 .t-ds{--tbg:var(--c-ds-bg);--tfg:var(--c-ds-fg)}
@@ -996,6 +1026,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
     <button class="crumb" id="crumb"></button>
     <div id="sheet"></div>
     <div id="composerBar">
+      <button id="toBottom" aria-label="Scroll to the latest message"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
       <input type="file" id="filePick" multiple hidden>
       <input type="file" id="imgPick" accept="image/png,image/jpeg,image/webp" multiple hidden>
       <div id="plusBar" aria-label="Tools and modes">
@@ -1060,6 +1091,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg>
       </button>
     </div>
+    <div id="fileBar"><div id="fileTabs"></div><button class="chip" id="filesBtn" aria-label="Project files"><svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2z"/></svg></button></div>
     <div id="ide">
       <div id="ideIn">
         <div id="gutter"><pre id="lines">1</pre></div>
@@ -1790,7 +1822,7 @@ var path = require('path');
 var crypto = require('crypto');
 var cp = require('child_process');
 
-var VERSION = '1.0.0';
+var VERSION = '1.1.0';
 var DEFAULT_ORIGIN = '__ORIGIN__';
 var ALLOWED_CMDS = ['node', 'npm', 'npx', 'python', 'python3', 'pip', 'pip3'];
 var MAX_RUNS = 2;
@@ -2072,10 +2104,16 @@ var server = http.createServer(function (req, res) {
     if (!st.isFile()) return send(res, 400, { ok: false, error: 'That is not a file.' }, origin);
     var fd = fs.openSync(full, 'r'), buf = Buffer.alloc(Math.min(st.size, 1000000));
     fs.readSync(fd, buf, 0, buf.length, 0); fs.closeSync(fd);
-    return send(res, 200, { ok: true, text: buf.toString('utf8'), size: st.size, truncated: st.size > buf.length }, origin);
+    var hash = '';
+    if (st.size <= 20000000) {
+      var whole = fs.readFileSync(full, 'utf8'), hh = 5381;
+      for (var hi = 0; hi < whole.length; hi++) hh = ((hh << 5) + hh + whole.charCodeAt(hi)) | 0;
+      hash = (hh >>> 0).toString(36) + ':' + whole.length;
+    }
+    return send(res, 200, { ok: true, text: buf.toString('utf8'), size: st.size, truncated: st.size > buf.length, hash: hash }, origin);
   }
 
-  if (req.method === 'POST' && (route === '/write' || route === '/run' || route === '/kill' || route === '/reset')) {
+  if (req.method === 'POST' && (route === '/write' || route === '/run' || route === '/kill' || route === '/reset' || route === '/remove')) {
     return readJson(req, function (body) {
       if (!body) return send(res, 400, { ok: false, error: 'The request was not understood.' }, origin);
       if (route === '/run') return doRun(req, res, origin, body);
@@ -2093,6 +2131,16 @@ var server = http.createServer(function (req, res) {
         try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { return send(res, 500, { ok: false, error: e.message }, origin); }
         logLine('reset [' + proj + ']');
         return send(res, 200, { ok: true }, origin);
+      }
+      if (route === '/remove') {
+        var rmList = Array.isArray(body.paths) ? body.paths.slice(0, 200) : [], removed = [], rmDir = projDirOf(proj);
+        for (var ri = 0; ri < rmList.length; ri++) {
+          var rmT = safeJoin(rmDir, rmList[ri]);
+          if (!rmT) continue;
+          try { if (fs.statSync(rmT).isFile()) { fs.unlinkSync(rmT); removed.push(String(rmList[ri])); } } catch (e) {}
+        }
+        logLine('remove [' + proj + ']  ' + removed.join(', ').slice(0, 160));
+        return send(res, 200, { ok: true, removed: removed }, origin);
       }
       var files = Array.isArray(body.files) ? body.files : null;
       if (!files || !files.length || files.length > 500) return send(res, 400, { ok: false, error: 'Send between 1 and 500 files.' }, origin);
@@ -2421,6 +2469,18 @@ MStore.ready.then(function(){
           setTimeout(function(){ f.focus(); f.select(); }, 220);
         }, 'dialog', null);
       },
+      info: function(title, st, rows){
+        return open(function(c, done){
+          c.appendChild(el('div', 'ui-title', title));
+          var b = el('div', 'ui-st'); b.appendChild(el('span', 'dot ' + st.k));
+          var t = el('div'); t.appendChild(document.createTextNode(st.label)); t.appendChild(el('small', '', st.desc)); b.appendChild(t);
+          c.appendChild(b);
+          var box = el('div', 'ui-rows');
+          (rows || []).forEach(function(x){ if(x[1] == null || x[1] === '') return; box.appendChild(el('div', 'k', x[0])); box.appendChild(el('div', 'v', String(x[1]))); });
+          if(box.children.length) c.appendChild(box);
+          actions(c, [{text:'Close', cls:'ui-ok', value:true}], done);
+        }, 'dialog', true).then(function(){});
+      },
       sheet: function(title, items){
         return open(function(c, done){
           c.appendChild(el('div', 'ui-title', title));
@@ -2446,6 +2506,8 @@ MStore.ready.then(function(){
   var TOOLS = [
     {id:'create_subproject', group:'Projects', name:'Create sub-project', perm:'ask',
      desc:'Starts a sub-project under this project so a direction can be explored and deliberated on its own.'},
+    {id:'read_related', group:'Projects', name:'Read connected project', perm:'allow',
+     desc:'Lets the AI read the main project, a sub-project or a sibling (its type, description, code and documents) so work in one can build on another.'},
     {id:'list_subprojects', group:'Projects', name:'List sub-projects', perm:'allow',
      desc:'Lets the AI see which sub-projects exist and where each one stands.'},
     {id:'delete_subproject', group:'Projects', name:'Delete sub-project', perm:'ask',
@@ -2534,7 +2596,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'list_subprojects', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
   var MODE_SETS = {
     discovery:M_READ,
     research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc']),
@@ -2557,6 +2619,7 @@ MStore.ready.then(function(){
     var codeWord = /\b(?:code|script|function|program|app|page|html|javascript|module|class|button|screen|css|python|pytest|tests?|npm|node|sqlite|schema|bot)\b|\.py\b/i.test(t);
     var tx = false; try{ tx = intgUp('termux'); }catch(e){}
     if(AUTO_BUILD.test(t) && (codeish || codeWord)) return 'build';
+    if((codeish || tx || codeWord) && /\b(?:try (?:it |that |this )?again|retry|re-?run|execute|run (?:it|them|that|this|the|my|a)\b|run\b.*\b(?:tests?|script|file|command)s?)\b/i.test(t)) return 'test';
     if((codeish || tx || codeWord) && AUTO_TEST.test(t)) return 'test';
     if(AUTO_PLAN.test(t) || (!codeish && AUTO_PLAN2.test(t))) return 'design';
     if(AUTO_RESEARCH.test(t)) return 'research';
@@ -2616,7 +2679,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -3342,7 +3405,7 @@ MStore.ready.then(function(){
   $('sideBackdrop').addEventListener('click', closeSide);
   /* ---- swipe from the left edge to draw a sidebar out; drag it back to close. The buttons still work. ---- */
   (function(){
-    var EDGE = 36, st = null, bd = $('sideBackdrop');
+    var EDGE = 96, st = null, bd = $('sideBackdrop');
     function shown(id){ var b = $(id); return !!b && b.getClientRects().length > 0; }
     function target(){
       if($('home').classList.contains('active')) return { el:$('homeSidebar'), prep:function(){ renderProjects(); } };
@@ -3487,9 +3550,9 @@ MStore.ready.then(function(){
     if(par){ cb.textContent = '\u2039  Back to ' + par.name; cb.classList.add('show'); } else cb.classList.remove('show');
   }
   async function addSub(){
-    var v = await UI.prompt('New sub-project', { confirmText:'Create', maxLength:40 });
+    var v = await UI.prompt('New sub-project', { confirmText:'Create', maxLength:40, message:'A sub-project is a connected workspace inside this one, and it can be a different type. Use it for a part that needs its own kind of work: a Module this App uses, a Spec to plan before building, a Dataset to feed it, or a safe place to try a different idea. It can read this project, and this project can read it.' });
     if(!v || !current) return;
-    var ty = await askType();
+    var ty = await askType('What type is the sub-project?');
     if(!ty || !current) return;
     var np = { id:uid(), name:v, created:Date.now(), parent:current.id, type:ty, opMode:TYPE_MODE[ty], opAuto:true };
     toolState(np); projects.push(np); save(); renderSide();
@@ -3601,7 +3664,7 @@ MStore.ready.then(function(){
   });
 
   /* ---- home: projects sidebar with a menu on every project ---- */
-  function openProject(p){ current = p; toolState(current); enterLab(); }
+  function openProject(p){ if(current && current !== p && typeof draftSave === 'function') draftSave(); current = p; toolState(current); enterLab(); if(typeof draftRestore === 'function') draftRestore(); }
   async function projectMenu(p){
     var act = await UI.sheet(p.name, [
       { label:'Edit', value:'edit', icon:ICON.pencil },
@@ -3717,8 +3780,8 @@ MStore.ready.then(function(){
   }
   /* right after a project is made: say what you want, and the AI starts on it */
   async function askBrief(p){
-    var ty = typeOf(p), qs = { app:'What should it do?', module:'What should this part of the AI do?', dataset:'What data do you need?', spec:'What are you designing?' };
-    var v = await UI.prompt(qs[ty], ty === 'app' ? { multi:true, maxLength:600, placeholder:'Describe what you want', confirmText:'Build', cancelText:'Skip' } : { multi:true, maxLength:600, confirmText:'Start', cancelText:'Skip' });
+    var ty = typeOf(p), qs = { app:'What should it do?', module:'What should this piece of code do?', dataset:'What data do you need?', spec:'What are you designing?' };
+    var v = await UI.prompt(qs[ty], ty === 'app' ? { multi:true, maxLength:6000, placeholder:'Describe what you want', confirmText:'Build', cancelText:'Skip' } : { multi:true, maxLength:6000, confirmText:'Start', cancelText:'Skip' });
     if(!v || projects.indexOf(p) < 0) return;
     p.desc = v;
     var ch = chatOf(p);
@@ -4255,15 +4318,17 @@ MStore.ready.then(function(){
 
     body.appendChild(el('div', 'label', 'Description'));
     var dsc = el('textarea', 'field');
-    dsc.maxLength = 600; dsc.value = current.desc || '';
+    dsc.maxLength = 6000; dsc.value = current.desc || '';
     dsc.placeholder = 'About this project';
+    dsc.style.minHeight = '150px';
     function commitDesc(){ var v = dsc.value.trim(); if(v){ current.desc = v; } else { delete current.desc; } save(); }
     dsc.addEventListener('change', commitDesc);
     dsc.addEventListener('blur', commitDesc);
     body.appendChild(dsc);
 
     body.appendChild(el('div', 'label', 'Project type'));
-    body.appendChild(typeChips(function(){ return typeOf(current); }, function(v){ current.type = v; save(); }));
+    body.appendChild(typeChips(function(){ return typeOf(current); }, function(v){ current.type = v; current.opMode = TYPE_MODE[v]; current.opAuto = true; save(); }));
+    body.appendChild(el('div', 'hint', 'You can change this any time. To work in another type without losing this one, start a sub-project from the sidebar and pick the type there.'));
     body.appendChild(el('div', 'label', 'Export'));
     var exr = el('div', 'prow');
     exr.appendChild(mkBtn('ghost', 'Memory', '', function(){ exportMix('memory-' + current.name, notesMd(current), null); }));
@@ -4283,7 +4348,7 @@ MStore.ready.then(function(){
         var card = el('div', 'tool on'), top = el('div', 'tool-top');
         top.appendChild(el('div', 'tool-name', n.title));
         var dl = el('button', 'cp'); dl.innerHTML = ICON.trash; dl.setAttribute('aria-label', 'Delete note');
-        dl.addEventListener('click', function(){ current.notes = current.notes.filter(function(x){ return x !== n; }); save(); paintMem(); });
+        dl.addEventListener('click', async function(){ if(!(await UI.confirm('Delete this note?', '\u201c' + short(n.title || 'Note', 60) + '\u201d is removed from project memory.', { confirmText:'Delete', danger:true }))) return; current.notes = current.notes.filter(function(x){ return x !== n; }); save(); paintMem(); });
         top.appendChild(dl); card.appendChild(top);
         var tx = el('div', 'txt', n.text); tx.style.marginTop = '8px'; tx.style.color = 'var(--muted)'; card.appendChild(tx);
         memBox.appendChild(card);
@@ -4291,7 +4356,7 @@ MStore.ready.then(function(){
     }
     paintMem();
     var nt = el('input', 'field'); nt.placeholder = 'Title'; nt.maxLength = 60; nt.style.marginTop = '10px';
-    var nx = el('textarea', 'field'); nx.placeholder = 'Note'; nx.maxLength = 600; nx.style.marginTop = '8px';
+    var nx = el('textarea', 'field'); nx.placeholder = 'Note'; nx.maxLength = 3000; nx.style.marginTop = '8px';
     var addN = el('button', 'btn solid', 'Add to memory'); addN.style.marginTop = '10px';
     addN.addEventListener('click', function(){
       var title = nt.value.trim(), text = nx.value.trim();
@@ -4375,7 +4440,44 @@ MStore.ready.then(function(){
       send.setAttribute('aria-label', stop ? 'Stop' : 'Send');
     }
   }
-  comp.addEventListener('input', function(){ sizeComposer(); syncSend(); });
+  /* what is typed in the composer is kept per project, so leaving the app or the project does not lose it */
+  (function(){
+    var box = $('sheet'), btn = $('toBottom'), last = 0, idle = 0;
+    function far(){ return box.scrollHeight - box.scrollTop - box.clientHeight > 160; }
+    function show(on){ btn.classList.toggle('show', !!on); }
+    box.addEventListener('scroll', function(){
+      var t = box.scrollTop, up = t < last - 2, down = t > last + 2; last = t;
+      clearTimeout(idle);
+      if(!far()){ show(false); return; }
+      if(up) show(false);
+      else if(down) show(true);
+      idle = setTimeout(function(){ if(far()) show(true); }, 1400);
+    }, { passive:true });
+    btn.addEventListener('pointerdown', function(e){ e.preventDefault(); });
+    btn.addEventListener('click', function(){ box.scrollTo({ top:box.scrollHeight, behavior:'smooth' }); show(false); });
+  })();
+  var DKEY = 'morpheus.lab.drafts', dTimer = 0;
+  function draftsGet(){ try{ return JSON.parse(localStorage.getItem(DKEY) || '{}') || {}; }catch(e){ return {}; } }
+  function draftSave(){
+    clearTimeout(dTimer);
+    if(!current || mode === 'inspect') return;
+    try{
+      var d = draftsGet(), v = comp.value;
+      if(v.trim()) d[current.id] = { t:v, ts:Date.now() }; else delete d[current.id];
+      var ks = Object.keys(d);
+      if(ks.length > 40) ks.sort(function(a, b){ return d[a].ts - d[b].ts; }).slice(0, ks.length - 40).forEach(function(k){ delete d[k]; });
+      localStorage.setItem(DKEY, JSON.stringify(d));
+    }catch(e){}
+  }
+  function draftRestore(){
+    if(mode === 'inspect') return;
+    var d = draftsGet(), x = current && d[current.id];
+    comp.value = x && x.t ? x.t : '';
+    sizeComposer(); syncSend();
+  }
+  comp.addEventListener('input', function(){ sizeComposer(); syncSend(); clearTimeout(dTimer); dTimer = setTimeout(draftSave, 400); });
+  window.addEventListener('pagehide', draftSave);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) draftSave(); });
   /* the chat leaves room at its bottom for the floating composer, whatever height it grows to */
   (function(){
     var bar = $('composerBar'), lab = $('lab');
@@ -4838,7 +4940,15 @@ MStore.ready.then(function(){
         if(m.imgSkip) w.appendChild(el('div', 'imgnote', 'Images not sent to the model'));
       }
       if(m.kind === 'inspect') w.appendChild(inspBubble(m));
-      else if(m.t) w.appendChild(el('div', 'bubble', m.t));
+      else if(m.t){
+        var bb = el('div', 'bubble', m.t);
+        if(m.t.length > 900){
+          bb.classList.add('clamp');
+          var tg = el('button', 'bubmore', 'Show more');
+          tg.addEventListener('click', function(){ var c = bb.classList.toggle('clamp'); tg.textContent = c ? 'Show more' : 'Show less'; });
+          w.appendChild(bb); w.appendChild(tg);
+        }else w.appendChild(bb);
+      }
     }
     else{
       var body = el('div', 'mbody');
@@ -5171,7 +5281,7 @@ MStore.ready.then(function(){
     label:function(a){ return 'Create sub-project \u201c' + short(a.name || 'New direction', 30) + '\u201d'; },
     preview:function(seg){ return el('div', 'txt', (seg.args || {}).description || ''); },
     run:function(p, a, seg){
-      var np = { id:uid(), name:short(a.name || 'Sub-project', 40), created:Date.now(), parent:p.id, desc:short(a.description || a.brief || '', 600) };
+      var np = { id:uid(), name:short(a.name || 'Sub-project', 40), created:Date.now(), parent:p.id, desc:short(a.description || a.brief || '', 6000) };
       np.type = ['app', 'module', 'dataset', 'spec'].indexOf(a.kind) >= 0 ? a.kind : 'app'; np.opMode = TYPE_MODE[np.type];
       toolState(np); projects.push(np); save(); renderSide();
       seg.data = { id:np.id, name:np.name, desc:np.desc };
@@ -5273,7 +5383,7 @@ MStore.ready.then(function(){
           result:{ answer:w.text, sources:w.sources, note:'Google Search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
       }catch(e2){
         var msg = 'Search did not work: ' + why + ' The Wikipedia backup also found nothing (' + errText(e2) + '). Answer from what you know and say it is unverified.';
-        return { ok:false, res:'Search did not work', result:{ error:msg } };
+        return { ok:false, res:'Search did not work: ' + short(why, 120), result:{ error:msg } };
       }
     },
     card:function(m, seg){
@@ -5290,6 +5400,27 @@ MStore.ready.then(function(){
     var q = String(name || '').trim().toLowerCase();
     return projects.filter(function(x){ return x.parent === p.id && x.name.toLowerCase() === q; })[0];
   }
+  function relatedOf(p){
+    var out = projects.filter(function(x){ return x.parent === p.id; });
+    var par = parentOf(p);
+    if(par){ out.unshift(par); projects.forEach(function(x){ if(x.parent === par.id && x.id !== p.id) out.push(x); }); }
+    return out;
+  }
+  T('read_related', {
+    icon:'branch', read:true,
+    label:function(a){ return 'Read ' + short(a.name || 'a connected project', 30); },
+    run:function(p, a){
+      var rel = relatedOf(p), q = String(a.name || '').trim().toLowerCase();
+      if(!q) return { ok:true, res:'Looked at connected projects', result:{ connected:rel.map(function(x){ return { name:x.name, type:typeOf(x), relation:x.id === p.parent ? 'main project' : x.parent === p.id ? 'sub-project' : 'sibling', description:x.desc || '' }; }) } };
+      var t = rel.filter(function(x){ return x.name.toLowerCase() === q; })[0];
+      if(!t) return terr('No connected project has that name. Call read_related with no name to see them.');
+      var src = existingSrc(t), docs = docsOf(t);
+      return { ok:true, res:'Read ' + short(t.name, 40), result:{ name:t.name, type:typeOf(t), description:t.desc || '',
+        code:src ? short(src, 20000) : '', code_truncated:src.length > 20000,
+        documents:docs.slice(0, 12).map(function(d){ return { title:d.title, text:short(d.text, 3000) }; }) } };
+    },
+    card:function(m, seg){ return slim('branch', seg.res || 'Read a connected project'); }
+  });
   T('delete_subproject', {
     icon:'trash',
     label:function(a){ return 'Delete sub-project \u201c' + short(a.name || '', 30) + '\u201d'; },
@@ -5661,6 +5792,7 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){ return slim('code', seg.res || 'Read the page code'); }
   });
+  function isPyLike(src){ src = String(src || ''); return /^\s*(?:def \w+\([^)]*\)\s*(?:->[^:]+)?:|async def |if __name__\s*==|from [\w.]+ import [\w*, ]+\s*$|elif .+:\s*$|import (?:asyncio|os|sys|re|json|logging|sqlite3|aiosqlite|tempfile|unittest|pytest)\b[^;{]*$)/m.test(src) && !/\b(?:function|const|let|var)\b/.test(src); }
   T('run_sandbox', {
     icon:'play',
     label:function(){ return 'Run the page'; },
@@ -5668,7 +5800,7 @@ MStore.ready.then(function(){
     pre:function(p){
       var src = existingSrc(p);
       if(!src) return 'There is no page to run yet.';
-      if(/^\s*(?:def \w+\([^)]*\)\s*(?:->[^:]+)?:|async def |if __name__\s*==|from [\w.]+ import [\w*, ]+\s*$|elif .+:\s*$)/m.test(src) && !/\b(?:function|const|let|var)\b/.test(src))
+      if(isPyLike(src))
         return 'This looks like Python. The page sandbox runs only browser JavaScript, so it would fail with a syntax error. ' + (intgUp('termux') ? 'Use terminal_run with python instead.' : 'Python can run only through the Termux bridge, which is not connected.');
       return '';
     },
@@ -5798,6 +5930,7 @@ MStore.ready.then(function(){
   var DECL = {
     create_subproject:{ d:'Start a sub-project to explore one direction on its own.', p:{ name:STR('Short name'), description:STR('What this direction should explore'), kind:STR('app, module, dataset or spec. Default app') }, req:['name', 'description'] },
     list_subprojects:{ d:'List the sub-projects of this project and where each one stands.' },
+    read_related:{ d:'Read a connected project (the main project, a sub-project or a sibling): its type, description, code and documents. Call with no name to list them.', p:{ name:STR('Exact project name. Leave empty to list the connected projects') } },
     delete_subproject:{ d:'Delete a sub-project of this project by its exact name.', p:{ name:STR('Exact sub-project name') }, req:['name'] },
     write_note:{ d:'Save a note to project memory so an idea or decision outlives the chat.', p:{ title:STR('Short title'), text:STR('The note') }, req:['title', 'text'] },
     read_notes:{ d:'Read the notes saved in project memory.' },
@@ -6359,20 +6492,40 @@ MStore.ready.then(function(){
       var secs = Math.min(600, Math.max(5, parseInt(a.timeout_seconds, 10) || 120));
       return txRun(txProject(p), cmd, cargs, null, new AbortController(), secs * 1000).then(function(r){
         var out = txTail(r.out), line = [cmd].concat(cargs).join(' ');
-        seg.out = short(out, 1500);
-        if(r.error && r.code === null) return { ok:false, res:r.error, result:{ error:r.error, output:out } };
+        seg.out = out.length > 4000 ? '[earlier output cut]\n' + out.slice(-4000) : out;
+        seg.cmd = line; seg.secs = Math.round(r.ms / 100) / 10; seg.code = r.code; seg.timedOut = !!r.timedOut; seg.sig = r.signal || '';
+        if(r.error && r.code === null){ seg.code = null; return { ok:false, res:'Did not run: ' + r.error, result:{ state:'did_not_run', error:r.error, output:out, note:'The command did not execute to completion. Do not claim any result.' } }; }
         var ok = r.code === 0;
-        return { ok:ok, res:(ok ? 'Ran ' : 'Failed: ') + short(line, 60) + ' \u00b7 exit ' + r.code + ' \u00b7 ' + (r.ms / 1000).toFixed(1) + ' s',
-          result:{ exit_code:r.code, timed_out:r.timedOut, output_cut:r.truncated, seconds:Math.round(r.ms / 100) / 10, output:out } };
+        var state = r.timedOut ? 'timed_out' : ok ? 'completed_ok' : 'completed_with_error';
+        var why = r.timedOut ? 'timed out after ' + Math.round(r.ms / 1000) + ' s and was stopped' : 'exit ' + r.code + (r.signal ? ' (' + r.signal + ')' : '') + ' \u00b7 ' + (r.ms / 1000).toFixed(1) + ' s';
+        return { ok:ok, res:(ok ? 'Ran ' : 'Failed: ') + short(line, 60) + ' \u00b7 ' + why,
+          result:{ unsynced_files:unsyncedNames(p), state:state, exit_code:r.code, signal:r.signal || '', timed_out:r.timedOut, output_cut:r.truncated, seconds:Math.round(r.ms / 100) / 10, output:out,
+            note: r.timedOut ? 'The command ran but never finished, so it was stopped. A script that waits for input, a network call or a bot loop will do this. Report that it timed out; it did not pass or fail its checks.' : ok ? 'This is the real output of a command that ran on the phone.' : 'The command ran and exited with an error. Read the output to see why.' } };
       });
     },
     card:function(m, seg){
-      if(!seg.out) return slim('code', seg.res || 'Ran a command', seg.st === 'fail' ? 'bad' : undefined);
-      var c = tcard('code', seg.res || 'Ran a command', '', null);
-      c.body.appendChild(monoPre(seg.out));
-      return c.root;
+      if(seg.cmd == null) return slim('code', seg.res || 'Ran a command', seg.st === 'fail' ? 'bad' : undefined);
+      return termBlock(seg);
     }
   });
+  /* a command's result as a small terminal: the command, how it ended, and the real output */
+  function termBlock(seg){
+    var w = el('div', 'term'), h = el('button', 'term-h'), ok = seg.st === 'ok';
+    h.appendChild(el('span', 'dot ' + (ok ? 'ok' : 'bad')));
+    h.appendChild(el('span', 'term-cmd', '$ ' + (seg.cmd || '')));
+    var st = seg.timedOut ? 'timed out \u00b7 ' + Math.round(seg.secs || 0) + ' s' : (seg.code == null ? 'did not run' : 'exit ' + seg.code + ' \u00b7 ' + (seg.secs || 0) + ' s');
+    h.appendChild(el('span', 'term-st', st));
+    w.appendChild(h);
+    var out = String(seg.out || '').replace(/\s+$/, '');
+    if(!out){ w.appendChild(el('div', 'term-none', 'No output')); return w; }
+    var pre = el('pre', 'term-out', out); w.appendChild(pre);
+    if(out.split('\n').length > 8 || out.length > 600){
+      var mb = el('button', 'term-more', 'Show all');
+      mb.addEventListener('click', function(){ var o = w.classList.toggle('open'); mb.textContent = o ? 'Show less' : 'Show all'; });
+      w.appendChild(mb);
+    }
+    return w;
+  }
   T('terminal_write', {
     icon:'code', always:true,
     label:function(a){ var n = Array.isArray(a.files) ? a.files.length : 0; return 'Write ' + n + ' file' + (n === 1 ? '' : 's') + ' to Termux'; },
@@ -6384,7 +6537,8 @@ MStore.ready.then(function(){
       p.txUsed = true;
       return txJson('/write', { project:txProject(p), files:files }).then(function(j){
         if(!j.ok) return { ok:false, res:j.error, result:{ error:j.error } };
-        return { ok:true, res:'Wrote ' + j.written.length + ' file' + (j.written.length === 1 ? '' : 's') + ' to Termux', result:{ written:j.written } };
+        files.forEach(function(x){ noteTx(p, x.path, x.text); }); save();
+        return { ok:true, res:'Wrote ' + j.written.length + ' file' + (j.written.length === 1 ? '' : 's') + ' to Termux', result:{ written:j.written, note:'These files are now in Termux only. Use write_file to keep a project copy, or they will not appear in the project files.' } };
       });
     },
     card:function(m, seg){ return slim('code', seg.res || 'Wrote files to Termux'); }
@@ -6399,6 +6553,7 @@ MStore.ready.then(function(){
       p.txUsed = true;
       return txJson('/write', { project:txProject(p), files:[{ path:name, text:f.text }] }).then(function(j){
         if(!j.ok) return { ok:false, res:j.error, result:{ error:j.error } };
+        p.mainTx = { name:name, hash:hashText(f.text), ts:Date.now() }; noteTx(p, name, f.text); save();
         return { ok:true, res:'Sent ' + name + ' to Termux', result:{ written:j.written } };
       });
     },
@@ -6436,6 +6591,257 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){ return slim('code', seg.res || 'Looked at the Termux files'); }
   });
+
+  /* =====================================================================
+     PROJECT FILES: a real list of files (stored by path) next to the main page in code assembly.
+     Termux is a separate copy; each file remembers what was last sent there.
+     ===================================================================== */
+  function hashText(t){ t = String(t == null ? '' : t); var h = 5381; for(var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36) + ':' + t.length; }
+  function filesOf(p){ if(!Array.isArray(p.files)) p.files = []; return p.files; }
+  function normPath(x){
+    x = String(x == null ? '' : x).replace(/\\/g, '/').replace(/^(?:\.?\/)+/, '').trim();
+    if(!x || x.length > 120 || /(^|\/)\.\.?(\/|$)/.test(x) || /[\u0000<>:"|?*]/.test(x) || /\/$/.test(x)) return '';
+    return x;
+  }
+  function findFile(p, path){ var q = normPath(path).toLowerCase(); return q ? filesOf(p).filter(function(f){ return f.path.toLowerCase() === q; })[0] : null; }
+  function mainFileName(p){ return txCodeFile(p).name; }
+  function isMainPath(p, path){ var q = normPath(path).toLowerCase(); return !!q && (q === mainFileName(p).toLowerCase() || q === 'main'); }
+  function langOfPath(x){ var m = /\.([A-Za-z0-9]+)$/.exec(x || ''); return m ? m[1].toLowerCase() : 'txt'; }
+  function fileSync(f){ return !f.tx ? 'not_in_termux' : f.tx.hash === hashText(f.text) ? 'in_sync' : 'changed_here'; }
+  function mainSync(p){ var t = txCodeFile(p).text; return !p.mainTx ? 'not_in_termux' : p.mainTx.hash === hashText(t) ? 'in_sync' : 'changed_here'; }
+  function syncWord(k){ return k === 'in_sync' ? 'in sync with Termux' : k === 'changed_here' ? 'changed here since it was sent to Termux' : 'not in Termux yet'; }
+  function termuxOnly(p){
+    var seen = p.txSeen || {}, have = {};
+    filesOf(p).forEach(function(f){ have[f.path] = 1; });
+    return Object.keys(seen).filter(function(k){ return !have[k] && !(p.mainTx && p.mainTx.name === k); }).map(function(k){ return { path:k, note:'Written straight to Termux. It is not stored in the project files.' }; });
+  }
+  function noteTx(p, path, text){
+    var h = hashText(text), f = findFile(p, path);
+    if(!p.txSeen) p.txSeen = {};
+    p.txSeen[path] = { hash:h, ts:Date.now() };
+    if(f && f.text === String(text)) f.tx = { hash:h, ts:Date.now() };
+    if(p.mainTx && p.mainTx.name === path) p.mainTx.hash = h;
+  }
+  function fileInfo(f){ return { path:f.path, lines:String(f.text).split('\n').length, bytes:f.text.length, sync:fileSync(f) }; }
+  function unsyncedNames(p){
+    var o = filesOf(p).filter(function(f){ return fileSync(f) === 'changed_here'; }).map(function(f){ return f.path; });
+    if(p.mainTx && mainSync(p) === 'changed_here') o.push(p.mainTx.name + ' (main page)');
+    return o;
+  }
+  var FILE_TOOLS = [
+    { id:'list_files', name:'List project files', perm:'allow', read:true,
+      d:'List the project’s files: the main page in code assembly, the project files, and anything that exists only in Termux, each with its sync status. Call this before you work with files or run anything in Termux.',
+      desc:'Shows every file in the project and whether it matches the Termux copy.' },
+    { id:'read_file', name:'Read project file', perm:'allow', read:true,
+      d:'Read one project file by path, or the main page by its name. Optional from_line and to_line.',
+      desc:'Reads one project file.',
+      p:{ path:STR('File path, for example database.py or tests/test_db.py'), from_line:{ type:'INTEGER' }, to_line:{ type:'INTEGER' } }, req:['path'] },
+    { id:'write_file', name:'Write project file', perm:'ask',
+      d:'Create a project file or replace its whole content. This changes the project only. It does not touch Termux; use sync_to_termux for that. The main page is changed with the code tools, not here.',
+      desc:'Creates or replaces a project file. Does not touch Termux.',
+      p:{ path:STR('File path, for example database.py'), content:STR('The full content of the file') }, req:['path', 'content'] },
+    { id:'edit_file', name:'Edit project file', perm:'ask',
+      d:'Change a project file. Either replace one exact piece of text (find and replace; find must match exactly once unless all is true), or replace whole lines (from_line, to_line and new_text, using line numbers from read_file; empty new_text deletes them).',
+      desc:'Changes a project file by exact text or by line numbers.',
+      p:{ path:STR('File path'), find:STR('Exact text to replace'), replace:STR('New text'), all:{ type:'BOOLEAN', description:'Replace every match' },
+        from_line:{ type:'INTEGER', description:'First line to replace' }, to_line:{ type:'INTEGER', description:'Last line to replace; default is from_line' }, new_text:STR('Text that replaces those lines') }, req:['path'] },
+    { id:'delete_file', name:'Delete project file', perm:'ask',
+      d:'Delete a project file by path. Set also_termux to true to delete the copy in Termux too. Otherwise the Termux copy stays.',
+      desc:'Deletes a project file, and optionally its Termux copy.',
+      p:{ path:STR('File path'), also_termux:{ type:'BOOLEAN', description:'Also delete the copy in Termux' } }, req:['path'] },
+    { id:'sync_to_termux', name:'Send files to Termux', perm:'ask', tx:true,
+      d:'Copy project files into this project’s Termux folder under the same paths. Leave paths empty to send every file that is new or changed. Set include_main to also send the main page.',
+      desc:'Copies project files into the Termux folder and remembers what was sent.',
+      p:{ paths:{ type:'ARRAY', items:{ type:'STRING' }, description:'Optional paths; empty sends all new or changed files' }, include_main:{ type:'BOOLEAN' } } },
+    { id:'check_sync', name:'Check Termux matches', perm:'allow', read:true, tx:true,
+      d:'Read the project files back from Termux and report which ones match the project versions, differ, or are missing. Use it before you say a test ran on the reviewed code.',
+      desc:'Compares the project files with what is really in Termux. Only looks.' }
+  ];
+  FILE_TOOLS.forEach(function(A){
+    TOOLS.push({ id:A.id, group:'Files', name:A.name, perm:A.perm, desc:A.desc });
+    DECL[A.id] = { d:A.d, p:A.p, req:A.req };
+    if(A.tx) INTG[A.id] = 'termux';
+  });
+  T('list_files', {
+    icon:'note', read:true, testOk:true,
+    label:function(){ return 'Look at the project files'; },
+    run:function(p){
+      var fs = filesOf(p), m = txCodeFile(p), tx = intgUp('termux');
+      return { ok:true, res:'Looked at ' + (fs.length + 1) + ' file' + (fs.length ? 's' : ''), result:{
+        main_page:{ name:m.name, lines:String(m.text).split('\n').length, sync:mainSync(p), where:'code assembly' },
+        project_files:fs.map(fileInfo), termux_only:termuxOnly(p), termux_connected:tx,
+        unsynced:unsyncedNames(p),
+        note:'sync is what was last sent from here. Use check_sync to confirm what Termux really holds.' } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Looked at the project files'); }
+  });
+  T('read_file', {
+    icon:'note', read:true, testOk:true,
+    label:function(a){ return 'Read ' + short(a.path || 'a file', 40); },
+    pre:function(p, a){ return (isMainPath(p, a.path) || findFile(p, a.path)) ? '' : 'There is no project file with that path. Call list_files to see them.'; },
+    run:function(p, a){
+      var main = isMainPath(p, a.path), f = main ? null : findFile(p, a.path), text = main ? txCodeFile(p).text : f.text;
+      var lines = String(text).split('\n'), n = lines.length, from = Math.max(1, parseInt(a.from_line, 10) || 1), to = Math.min(n, parseInt(a.to_line, 10) || Math.min(n, from + 399));
+      var out = lines.slice(from - 1, to).map(function(l, i){ return (from + i) + '  ' + l; }).join('\n');
+      if(out.length > 30000) out = out.slice(0, 30000) + '\n[cut]';
+      return { ok:true, res:'Read ' + (main ? mainFileName(p) : f.path) + ' (lines ' + from + '-' + to + ' of ' + n + ')', result:{ path:main ? mainFileName(p) : f.path, where:main ? 'code assembly' : 'project files', total_lines:n, from_line:from, to_line:to, text:out } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Read a file'); }
+  });
+  T('write_file', {
+    icon:'code',
+    label:function(a){ return 'Write ' + short(a.path || 'a file', 40); },
+    preview:function(seg){ var a = seg.args || {}; return monoPre(short(a.path || '', 80) + '\n' + short(a.content || '', 400)); },
+    pre:function(p, a){
+      var path = normPath(a.path);
+      if(!path) return 'That path is not allowed. Use a relative path such as database.py or tests/test_db.py.';
+      if(isMainPath(p, path)) return 'That is the main page in code assembly. Change it with the code tools (edit_lines, edit_brick, add_brick), or pick another file name.';
+      if(typeof a.content !== 'string') return 'Give the full content of the file.';
+      if(a.content.length > 400000) return 'That file is too large for the project.';
+      if(!findFile(p, path) && filesOf(p).length >= 60) return 'The project already has 60 files.';
+      return '';
+    },
+    run:function(p, a, seg){
+      var path = normPath(a.path), f = findFile(p, path), created = !f;
+      if(created){ f = { path:path, text:'', lang:langOfPath(path), ts:Date.now() }; filesOf(p).push(f); }
+      f.text = a.content; f.mod = Date.now(); delete f.truncated;
+      save(); if(INT.repaintFiles) INT.repaintFiles();
+      var st = fileSync(f);
+      return { ok:true, res:(created ? 'Created ' : 'Saved ') + path, result:{ path:path, created:created, lines:f.text.split('\n').length, sync:st,
+        note:'Saved in the project files only. ' + (st === 'in_sync' ? 'Termux already has this exact version.' : 'Termux does not have this version yet. Use sync_to_termux to send it.') } };
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Wrote a file'); }
+  });
+  T('edit_file', {
+    icon:'code',
+    label:function(a){ return 'Edit ' + short(a.path || 'a file', 40); },
+    pre:function(p, a){
+      if(isMainPath(p, a.path)) return 'That is the main page in code assembly. Change it with the code tools.';
+      var f = findFile(p, a.path); if(!f) return 'There is no project file with that path. Call list_files.';
+      if(a.from_line != null && a.from_line !== ''){ var n0 = f.text.split('\n').length; return (parseInt(a.from_line, 10) >= 1 && parseInt(a.from_line, 10) <= n0 && typeof a.new_text === 'string') ? '' : 'Give from_line between 1 and ' + n0 + ' and new_text.'; }
+      if(!a.find) return 'Give the exact text to find, or from_line, to_line and new_text.';
+      return '';
+    },
+    run:function(p, a){
+      var f = findFile(p, a.path);
+      if(a.from_line != null && a.from_line !== ''){
+        var ls = f.text.split('\n'), s0 = parseInt(a.from_line, 10), e0 = Math.min(ls.length, Math.max(s0, parseInt(a.to_line, 10) || s0));
+        var repl = a.new_text === '' ? [] : String(a.new_text).split('\n');
+        ls.splice.apply(ls, [s0 - 1, e0 - s0 + 1].concat(repl));
+        f.text = ls.join('\n'); f.mod = Date.now(); save(); if(INT.repaintFiles) INT.repaintFiles();
+        return { ok:true, res:'Edited ' + f.path + ' (lines ' + s0 + '-' + e0 + ')', result:{ path:f.path, replaced_lines:e0 - s0 + 1, total_lines:ls.length, sync:fileSync(f), note:'Line numbers after this edit have shifted. Read the file again before another line edit.' } };
+      }
+      var parts = f.text.split(String(a.find)), n = parts.length - 1;
+      if(n === 0) return terr('That text was not found in ' + f.path + '. Read the file again and copy the exact text.');
+      if(n > 1 && !a.all) return terr('That text appears ' + n + ' times in ' + f.path + '. Include more surrounding text, or set all to true.');
+      f.text = parts.join(String(a.replace == null ? '' : a.replace)); f.mod = Date.now();
+      save(); if(INT.repaintFiles) INT.repaintFiles();
+      return { ok:true, res:'Edited ' + f.path + (n > 1 ? ' (' + n + ' places)' : ''), result:{ path:f.path, replaced:n, sync:fileSync(f), note:'Project copy changed. Termux is not updated until sync_to_termux.' } };
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Edited a file'); }
+  });
+  T('delete_file', {
+    icon:'trash',
+    label:function(a){ return 'Delete ' + short(a.path || 'a file', 40); },
+    pre:function(p, a){ return findFile(p, a.path) ? '' : 'There is no project file with that path. Call list_files.'; },
+    run:async function(p, a){
+      var f = findFile(p, a.path), tx = false; try{ tx = intgUp('termux'); }catch(e){}
+      p.files = filesOf(p).filter(function(x){ return x !== f; });
+      if(p.txSeen) delete p.txSeen[f.path];
+      save(); if(INT.repaintFiles) INT.repaintFiles();
+      var gone = 'Removed from the project. Any copy in Termux is still there.';
+      if(a.also_termux){
+        if(!tx) gone = 'Removed from the project. Termux is not connected, so its copy is still there.';
+        else{
+          var j = await txJson('/remove', { project:txProject(p), paths:[f.path] }, 20000).then(function(x){ return x; });
+          gone = j && j.ok ? (j.removed && j.removed.length ? 'Removed from the project and from Termux.' : 'Removed from the project. It was not in Termux.') : 'Removed from the project. Termux copy NOT removed: ' + ((j && j.error) || 'the bridge is older and cannot delete files, update it') + '.';
+        }
+      }
+      return { ok:true, res:'Deleted ' + f.path, result:{ path:f.path, note:gone } };
+    },
+    card:function(m, seg){ return slim('trash', seg.res || 'Deleted a file'); }
+  });
+  T('sync_to_termux', {
+    icon:'code',
+    label:function(a){ var n = Array.isArray(a.paths) ? a.paths.length : 0; return n ? 'Send ' + n + ' file' + (n === 1 ? '' : 's') + ' to Termux' : 'Send changed files to Termux'; },
+    pre:txPre,
+    preview:function(seg){ var a = seg.args || {}; return monoPre((Array.isArray(a.paths) && a.paths.length ? a.paths.join('\n') : 'All new or changed files') + (a.include_main ? '\n+ main page' : '')); },
+    run:function(p, a){
+      var want = Array.isArray(a.paths) ? a.paths.map(normPath).filter(Boolean) : [], send = [], missing = [];
+      if(want.length) want.forEach(function(w){ var f = findFile(p, w); if(f) send.push(f); else missing.push(w); });
+      else send = filesOf(p).filter(function(f){ return fileSync(f) !== 'in_sync'; });
+      var files = send.map(function(f){ return { path:f.path, text:f.text }; }), mt = null;
+      if(a.include_main){ mt = txCodeFile(p); if(mt.text.trim()) files.push({ path:mt.name, text:mt.text }); }
+      if(!files.length) return { ok:true, res:'Nothing to send', result:{ sent:[], missing:missing, note:'Every project file already matches what was last sent to Termux.' } };
+      p.txUsed = true;
+      return txJson('/write', { project:txProject(p), files:files }).then(function(j){
+        if(!j.ok) return { ok:false, res:j.error, result:{ error:j.error } };
+        files.forEach(function(x){ noteTx(p, x.path, x.text); });
+        if(mt && mt.text.trim()) p.mainTx = { name:mt.name, hash:hashText(mt.text), ts:Date.now() };
+        save(); if(INT.repaintFiles) INT.repaintFiles();
+        return { ok:true, res:'Sent ' + files.length + ' file' + (files.length === 1 ? '' : 's') + ' to Termux', result:{ sent:files.map(function(x){ return x.path; }), missing:missing, note:'Sent. Run check_sync if you need proof the copies match.' } };
+      });
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Sent files to Termux'); }
+  });
+  T('check_sync', {
+    icon:'code', read:true, testOk:true,
+    label:function(){ return 'Check Termux matches the project'; },
+    pre:txPre,
+    run:async function(p){
+      var proj = txProject(p), rows = [], fs = filesOf(p).slice(0, 60);
+      var items = fs.map(function(f){ return { path:f.path, text:f.text, f:f }; });
+      var m = txCodeFile(p); if(p.mainTx && m.text.trim()) items.push({ path:p.mainTx.name, text:m.text, main:true });
+      for(var i = 0; i < items.length; i++){
+        var it = items[i], j = await txJson('/read?project=' + encodeURIComponent(proj) + '&path=' + encodeURIComponent(it.path));
+        if(!j.ok){ rows.push({ path:it.path, state:/not found|no such|ENOENT/i.test(j.error || '') ? 'missing_in_termux' : 'could_not_check', detail:j.error }); continue; }
+        if(j.truncated && !j.hash){ rows.push({ path:it.path, state:'too_large_to_compare', detail:'The Termux bridge is older and cannot hash large files. Update the bridge to compare them.' }); continue; }
+        var same = j.hash ? j.hash === hashText(it.text) : hashText(j.text) === hashText(it.text);
+        rows.push({ path:it.path, state:same ? 'matches' : 'differs' });
+        if(same){ if(it.f) it.f.tx = { hash:hashText(it.text), ts:Date.now() }; else if(it.main) p.mainTx = { name:it.path, hash:hashText(it.text), ts:Date.now() }; }
+      }
+      save(); if(INT.repaintFiles) INT.repaintFiles();
+      var bad = rows.filter(function(r){ return r.state !== 'matches'; });
+      return { ok:true, res:bad.length ? bad.length + ' of ' + rows.length + ' differ or are missing' : 'All ' + rows.length + ' match', result:{ files:rows, termux_only:termuxOnly(p), all_match:!bad.length,
+        note:bad.length ? 'Do not say tests ran on the reviewed code until these are sent with sync_to_termux.' : 'Termux holds exactly the project versions.' } };
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Checked Termux', /differ|missing/.test(seg.res || '') ? 'warn' : undefined); }
+  });
+
+
+  /* ask the person one short question, with choices they can tap */
+  TOOLS.push({ id:'ask_user', group:'Projects', name:'Ask you a question', perm:'allow',
+    desc:'Lets the AI stop and ask you one short question with tappable choices when it is unsure what you want.' });
+  DECL.ask_user = { d:'Ask the person one short question with 2 to 4 choices, then wait. Use it when the request is unclear in a way that changes what you would do, or before something big or hard to undo. Not for things you can look up or decide yourself.',
+    p:{ question:STR('One clear question'), options:LIST('2 to 4 short choices') }, req:['question'] };
+  T('ask_user', {
+    icon:'note', read:true, testOk:true,
+    label:function(a){ return 'Ask: ' + short(a.question || '', 50); },
+    pre:function(p, a){ return String(a.question || '').trim() ? '' : 'Give the question to ask.'; },
+    run:function(p, a, seg){
+      var opts = (Array.isArray(a.options) ? a.options : []).map(function(x){ return short(String(x), 80); }).filter(Boolean).slice(0, 4);
+      seg.args = Object.assign({}, a, { options:opts });
+      return new Promise(function(res){
+        waiters[seg.id] = function(v){
+          delete waiters[seg.id];
+          if(typeof v !== 'string' && v && v.ans != null) res({ ok:true, res:'Asked · ' + short(v.ans, 60), result:{ answer:v.ans, note:'This is the person’s answer. Carry on with it.' } });
+          else res({ ok:true, res:'Question skipped', result:{ answer:null, note:'The person did not answer. Do not guess; say what you still need.' } });
+        };
+      });
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Asked a question'); }
+  });
+  function askUserCard(seg){
+    var a = seg.args || {}, c = tcard('note', short(a.question || '', 300), 'Pick one, or type your own answer', ['Your turn', 'warn']);
+    function answer(v){
+      Array.prototype.forEach.call(c.row.children, function(b){ b.disabled = true; });
+      var w = waiters[seg.id]; if(w) w({ ans:v });
+    }
+    (Array.isArray(a.options) ? a.options : []).forEach(function(o){ c.row.appendChild(mkBtn('ghost', o, '', function(){ answer(o); })); });
+    c.row.appendChild(mkBtn('ghost', 'Something else', '', function(){ answer('None of these. I will type my own answer.'); try{ comp.focus(); }catch(e){} }));
+    return c.root;
+  }
+
   if(itx().token) setTimeout(txTest, 900);
 
   function offeredTools(p, ov, intent, gate){
@@ -6472,10 +6878,32 @@ MStore.ready.then(function(){
     if(IMPL[k]) return k;
     return TOOL_ALIAS[k] && IMPL[TOOL_ALIAS[k]] ? TOOL_ALIAS[k] : n;
   }
+  var ST_INFO = {
+    ok:{ k:'ok', label:'Done', desc:'This step finished and any change it made is saved.' },
+    run:{ k:'busy', label:'Working', desc:'This step is running right now.' },
+    ask:{ k:'warn', label:'Needs your OK', desc:'Nothing happens until you approve it.' },
+    denied:{ k:'bad', label:'Not done', desc:'It was declined, or it is not allowed in this mode.' },
+    undone:{ k:'warn', label:'Undone', desc:'The change was done, then you rolled it back.' },
+    fail:{ k:'bad', label:'Failed', desc:'This step hit a problem. The AI can see the reason and try another way.' }
+  };
   function toolCard(m, seg){
+    var node = toolCard0(m, seg);
+    if(node && node.classList && node.classList.contains('tact') && !node.__tap){
+      node.__tap = 1;
+      node.addEventListener('click', function(){
+        var I = IMPL[seg.name], a = seg.args || {}, label = I ? I.label(a) : seg.name;
+        var st = ST_INFO[seg.st] || ST_INFO.ok, args = [];
+        try{ Object.keys(a).forEach(function(k){ var v = a[k]; args.push(k + ': ' + (typeof v === 'string' ? short(v, 160) : short(JSON.stringify(v), 160))); }); }catch(_){}
+        UI.info(label, st, [['Tool', seg.name], ['Details', args.join('\n')], ['Result', seg.res ? short(seg.res, 400) : ''], ['Output', seg.out ? short(seg.out, 1500) : '']]);
+      });
+    }
+    return node;
+  }
+  function toolCard0(m, seg){
     var I = IMPL[seg.name], a = seg.args || {};
     if(!I) return slim('code', 'That action is not available here', 'warn');
     var label = I.label(a);
+    if(seg.name === 'ask_user' && seg.st === 'run' && busy && pending === current) return askUserCard(seg);
     if(seg.st === 'run') return (busy && pending === current) ? slim(I.icon, 'Working: ' + lc(label), 'warn') : slim(I.icon, 'Interrupted: ' + lc(label), 'warn');
     if(seg.st === 'ask'){
       if(!waiters[seg.id]) return slim(I.icon, 'No answer: ' + lc(label), 'warn');
@@ -6484,8 +6912,8 @@ MStore.ready.then(function(){
     if(seg.st === 'denied') return slim(I.icon, 'Declined \u00b7 ' + label, 'bad');
     if(seg.st === 'undone') return slim(I.icon, 'Undone \u00b7 ' + label, 'warn');
     if(seg.st === 'fail'){
-      var f = tcard(I.icon, 'Could not ' + lc(label), seg.res || '', ['Failed', 'bad']);
-      return f.root;
+      if(seg.cmd != null && I.card) return I.card(m, seg);
+      return slim(I.icon, 'Could not ' + lc(label), 'bad');
     }
     return I.card(m, seg);
   }
@@ -6725,7 +7153,7 @@ MStore.ready.then(function(){
     var parent = p.parent && projects.filter(function(x){ return x.id === p.parent; })[0];
     var t = 'You are the assistant inside a workspace app where people build all sorts of projects. You are working on the project "' + p.name + '"' + (parent ? ' (a sub-project of "' + parent.name + '")' : '') + '.\n';
     if(p.desc) t += 'What the person says this project is about: ' + p.desc + '\n';
-    if(parent && parent.desc) t += 'The main project is about: ' + parent.desc + '\n';
+    if(parent) t += 'The main project is a ' + typeName(typeOf(parent)) + (parent.desc ? ' about: ' + parent.desc : '') + '. It is connected to this one: use read_related to read its files when you need them.\n';
     t += 'The person is not a programmer. Use plain, friendly language, keep replies short, and never explain code line by line.\n\n';
     var mo = opModeOf(p), canWrite = !!ov || mo === 'build', talk = intent === 'talk';
     t += modeText(mo, ov) + '\n\n';
@@ -6746,7 +7174,7 @@ MStore.ready.then(function(){
       }else if(has('run_sandbox')){
         R.push('You can call run_sandbox and read_sandbox_output to run the page and read its console. analyze_code checks the page, or code you pass in, for mistakes.');
       }
-      if(has('create_subproject')) R.push('Sub-projects are separate workspaces with their own chats and code. Use create_subproject for a mock or test app, an experiment, or a direction that must not touch the main page, and never build test apps inside the main page. You cannot edit a sub-project from here; its card has an Open button for the person.');
+      if(has('create_subproject')) R.push('Sub-projects are connected workspaces inside this project, each with its own chats, code and type (app, module, dataset or spec). Use create_subproject when part of the work needs a different type or must stay apart: a module this project will use, a spec to plan first, a dataset to gather material, or a test or experiment that must not touch the main page. Never build test apps inside the main page. Use read_related to look at the main project or a sub-project before you build on it. You cannot edit another project from here; its card has an Open button for the person.');
       if(has('web_search')) R.push('Use web_search for facts that may have changed, for sources, and whenever you are not sure. Say what the search found and name the source. Do not rely on memory for current facts.');
       if(has('propose_direction') || has('deliberate')){
         R.push((has('propose_direction') ? 'For a big or uncertain piece of work, call propose_direction first and wait for the answer. ' : '') +
@@ -6762,6 +7190,38 @@ MStore.ready.then(function(){
       if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on. Python and Node scripts can run only through terminal_run, when it is offered.');
       R.push('Never say that code ran, that a test passed, or show output, unless a tool result in this conversation shows it. If you could only read the code, say plainly that you read it and did not run it, and never write expected output as if it were real. If a tool failed or is not available, say that first.');
       if(has('terminal_run')) R.push('terminal_run runs node, npm, npx, python and pip on the person\u2019s phone through Termux. Use it for anything that needs Node or Python, which the page sandbox cannot run. Put the files there first (terminal_write, terminal_send_code or terminal_send_test_files), run the command, then report the real exit code and the real output, including failures.');
+      var GUIDE = {
+        read_assembly:'to see the code and line numbers before changing it. Not to re-read something you just read.',
+        edit_lines:'for small, exact changes by line number. Not for new pages.',
+        edit_brick:'to replace one short exact piece of text. Not when you can name the lines, use edit_lines then.',
+        add_brick:'to add a new piece. Not to rewrite what exists.',
+        remove_brick:'only to delete a piece the person wants gone.',
+        run_sandbox:'to run the page with a check script after a change. Not on a project with no code yet.',
+        analyze_code:'to find mistakes in code. Not as proof that it works.',
+        web_search:'for current facts and sources. Not for things you can answer from the conversation.',
+        write_doc:'for plans, specs and reports the person will read or edit. Not for chat replies.',
+        read_doc:'before you change or build on a document. list_docs first if you do not know its name.',
+        add_task:'to break a big goal into steps. Not for one small change.',
+        start_task:'once, before you begin a task. update_task saves a checkpoint after real progress, never as a way to answer.',
+        complete_task:'only when the checks pass; the person confirms it.',
+        dataset_add:'to save something you actually found, with its source. Not for guesses.',
+        write_note:'only when the person asks you to remember something.',
+        create_subproject:'when part of the work needs another type or must stay apart. Not for small edits.',
+        ask_user:'when the request is unclear in a way that changes what you would do, or before something big or hard to undo. One question, 2 to 4 choices. Not for things you can look up or decide yourself.',
+        list_files:'before you work with files or run anything in Termux, to see what exists and what is out of sync.',
+        write_file:'to create or replace a project file. It never touches Termux; follow with sync_to_termux.',
+        sync_to_termux:'to copy project files to Termux before running them. Not after every edit, only before a run.',
+        check_sync:'to prove Termux holds the reviewed versions before you report a test result.',
+        read_related:'to look at the main project or a sub-project before building on it.',
+        propose_direction:'before a big or uncertain build. Not for small requests.'
+      };
+      var gl = Object.keys(GUIDE).filter(function(k){ return has(k); }).map(function(k){ return k + ': ' + GUIDE[k]; });
+      if(gl.length) R.push('When to use each tool: ' + gl.join(' ') + ' Pick the one tool that fits, and never call the same tool with the same input twice.');
+      R.push('Ways of working. To explore or answer: read what is there, then reply in words. To plan: talk it through, then write it down (document or tasks). To build: read first, make one small change, check it, then tell the person. To fix: reproduce or read the problem, change the smallest thing, check again. After a step really finishes (an install that worked, a file saved, a test that ran), update the task checkpoint to the next pending action, not the one just done. Saving notes or task checkpoints is bookkeeping, never the answer: after it, either do the real work or reply in words. If the person says continue, carry on with the real work from where it stopped.');
+      if(has('list_files')) R.push('Files live in three places and you must keep them straight: (1) the main page in code assembly, changed with the code tools; (2) the project files, changed with write_file and edit_file; (3) Termux, a separate copy on the phone. write_file never touches Termux. terminal_write puts a file in Termux only, so it will not be a project file. Send project files with sync_to_termux, and check_sync shows what Termux really holds. If a run result lists unsynced_files, the run used older copies: say so.');
+      R.push('Use tools whenever the answer depends on something real: read a file before you describe or change it, run something before you say it works, search before you state a current fact. Never answer from memory or guess what a file holds. If you are truly unsure what the person wants and the answer would change what you do, ask one short question instead of guessing' + (has('ask_user') ? ' (call ask_user so they can tap a choice)' : '') + '. If it is clear, just do it.');
+      R.push('Never use web_search to find out how to run a command or to work around a missing tool. If a tool you need is not loaded, say which mode or setting it needs and stop. A tool result with state timed_out, did_not_run or completed_with_error is not a pass: report exactly that state, the exit code and what the output says.');
+      R.push('Results come in four kinds and you must label them: ran (a tool result shows it ran, with its exit code), read (you looked at the code), inferred (you worked it out), and example (made up to illustrate). Never present read, inferred or example results as ran.');
       R.push('A tool only runs when you really call it. Never type tool calls as text (nothing like [Tool ...]).');
       R.push('You may format your words with Markdown: short headings, **bold**, lists and tables.');
       t += 'How you work here:\n' + R.map(function(x, i){ return (i + 1) + '. ' + x; }).join('\n') + '\n\n';
@@ -6830,6 +7290,7 @@ MStore.ready.then(function(){
     if(stopCtl) stopCtl.abort();
     Object.keys(waiters).forEach(function(k){ try{ waiters[k]('no'); }catch(e){} });
   }
+  var CLAIM = /\b(?:i(?:'ve| have)?\s+(?:just\s+|now\s+)?(?:read|checked|ran|run|tested|verified|looked at|inspected|updated|saved|created|wrote|fixed|changed|added|installed|sent)|(?:all )?(?:the )?(?:tests?|checks?) (?:have )?(?:passed|succeeded))\b/i;
   var ANNOUNCE = /\b(i will|i'll|i am (?:about|going) to|i'm (?:about|going) to|let me|let's|now i|i can now|going to|about to|next,? i)\b/i;
   /* a turn that stopped at the step limit leaves a checkpoint on the active task, so the next turn resumes from it */
   function pauseAtCheckpoint(p, m){
@@ -6856,8 +7317,9 @@ MStore.ready.then(function(){
     syncSend(); paintConn();
     function draw(keep){ if(current === p && currentView === 'lab' && chatOf(p) === ch) renderThread(keep); }
     var m = null, ctx = { autoAll:false }, useTools = true, live = null, raf = 0, lastSave = 0, nudges = 0, force = false, verifies = 0;
-    var intent = intentOf(ch), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {};
-    var DEDUP = { read_assembly:1, journal_save:1, add_task:1, write_note:1, list_tasks:1, read_task:1, get_active_task:1, list_subprojects:1, read_notes:1, web_search:1, start_task:1, create_subproject:1, read_sandbox_output:1 };
+    var intent = intentOf(ch), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {}, bookRounds = 0;
+    var BOOK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, journal_save:1, write_note:1, read_notes:1, add_task:1 };
+    var DEDUP = { read_assembly:1, journal_save:1, add_task:1, write_note:1, list_tasks:1, read_task:1, get_active_task:1, list_subprojects:1, read_related:1, read_notes:1, web_search:1, start_task:1, create_subproject:1, read_sandbox_output:1 };
     /* the words appear as they are written; only the live paragraph is repainted */
     function paintLive(){
       if(raf || !live) return;
@@ -6965,6 +7427,12 @@ MStore.ready.then(function(){
             contents.push({ role:'user', parts:[{ text:'Go ahead and do it now. Call the tool you just described, without describing it again.' }] });
             continue;
           }
+          if(offered.length && nudges < 2 && text && CLAIM.test(text) && !m.segs.some(function(x){ return x.k === 'tool'; })){
+            nudges++;
+            contents.push({ role:'model', parts:parts });
+            contents.push({ role:'user', parts:[{ text:'No tool ran in this turn, but you said you did something. If you really need to do it, call the tool now. If you did not do it, say so plainly and do not claim a result.' }] });
+            continue;
+          }
           break;
         }
         contents.push({ role:'model', parts:parts });
@@ -7002,6 +7470,12 @@ MStore.ready.then(function(){
           }
         }
         if(!follow) break;
+        /* only bookkeeping and no words: the model is looping on checkpoints. Stop and make it answer. */
+        if(!text.trim() && segsNow.length && segsNow.every(function(sg){ return BOOK[sg.name]; })){
+          bookRounds++;
+          if(bookRounds >= 2){ lastRoundText = ''; break; }
+          results[results.length - 1].functionResponse.response = Object.assign({}, results[results.length - 1].functionResponse.response, { instruction:'Task notes are saved. Do not call any more task or note tools this turn. Either do the actual work with a code or file tool now, or answer the person in words.' });
+        }else bookRounds = 0;
         if(step === 5) capped = true;
         contents.push({ role:'user', parts:results });
       }
@@ -7078,10 +7552,11 @@ MStore.ready.then(function(){
     ch.msgs.push(um);
     if(ch.title === NEW_CHAT && !ch.named) ch.title = titleFrom(ch.msgs);
     save(); renderSide(); paintOpMode();
-    comp.value = ''; sizeComposer(); syncSend();
+    comp.value = ''; sizeComposer(); syncSend(); draftSave();
     if(busy){ queued = { p:current, ch:ch }; renderThread(); }
     else respond(current);
   }
+  send.addEventListener('click', function(){ try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} });
   send.addEventListener('click', sendMsg);
   send.addEventListener('pointerdown', function(e){ e.preventDefault(); });
   document.addEventListener('visibilitychange', function(){ if(document.hidden){ flushCode(); save(); MStore.flush(); } });
@@ -7228,8 +7703,9 @@ MStore.ready.then(function(){
     if(!f){ prevOpen = ''; return; }
     host.appendChild(filePreview(f.name, function(){ return f.full || f.text; }, [addToDatasetBtn(f.name, function(){ return f.full || f.text; })]));
   }
+  var FILE_MAX = 5000000; /* kept on this device; the AI is sent the first 40,000 characters of each file */
   function attachText(name, text){
-    var full = text.slice(0, 400000);
+    var full = text.slice(0, FILE_MAX);
     attached.push({ id:uid(), name:name, size:text.length, lines:full.split('\n').length, text:full.slice(0, 40000), full:full, truncated:full.length > 40000 });
     if(attached.length > 6) attached.length = 6;
     paintAttach(); sizeComposer(); syncSend();
@@ -7238,11 +7714,24 @@ MStore.ready.then(function(){
   comp.addEventListener('paste', function(e){
     if(mode === 'inspect') return;
     var t = ''; try{ t = (e.clipboardData || window.clipboardData).getData('text') || ''; }catch(er){}
-    if(t.length < 4000) return;
+    if(t.length < 3000) return;
     e.preventDefault();
-    if(attached.length >= 6){ UI.alert('Too many attachments', 'Send these first, or remove one.'); return; }
-    attachText('pasted-text-' + (++pasteN) + '.txt', t);
-    if(t.length > 400000) UI.alert('Pasted text was cut', 'Only the first 400,000 characters were kept.');
+    var words = t.trim().split(/\s+/).length;
+    UI.sheet('Long text (' + words.toLocaleString() + ' words)', [
+      { label:'Paste as text (long messages fold up in the chat)', value:'text' },
+      { label:'Attach as a .txt file', value:'file' }
+    ]).then(function(v){
+      if(v === 'text'){
+        var a0 = comp.selectionStart == null ? comp.value.length : comp.selectionStart, b0 = comp.selectionEnd == null ? a0 : comp.selectionEnd;
+        comp.value = comp.value.slice(0, a0) + t + comp.value.slice(b0);
+        try{ comp.selectionStart = comp.selectionEnd = a0 + t.length; }catch(_){}
+        sizeComposer(); syncSend();
+      }else if(v === 'file'){
+        if(attached.length >= 6){ UI.alert('Too many attachments', 'Send these first, or remove one.'); return; }
+        attachText('pasted-text-' + (++pasteN) + '.txt', t);
+        if(t.length > FILE_MAX) UI.alert('Pasted text was cut', 'Only the first 5,000,000 characters were kept.');
+      }
+    });
   });
   function paintAttach(){
     var row = $('attachRow'); row.innerHTML = '';
@@ -7260,10 +7749,10 @@ MStore.ready.then(function(){
     var files = Array.prototype.slice.call(list || []), got = [], skipped = 0;
     for(var i = 0; i < files.length; i++){
       var f = files[i];
-      if(f.size > 400000 || (!TEXT_EXT.test(f.name) && !/^text\//.test(f.type || ''))){ skipped++; continue; }
+      if(f.size > FILE_MAX || (!TEXT_EXT.test(f.name) && !/^text\//.test(f.type || ''))){ skipped++; continue; }
       try{ got.push({ name:f.name, size:f.size, text:await readFile(f) }); }catch(e){ skipped++; }
     }
-    if(!got.length){ UI.alert('Could not attach', 'Pick text or code files such as .html, .js, .py, .json, .csv or .md (up to 400 KB each).'); return; }
+    if(!got.length){ UI.alert('Could not attach', 'Pick text or code files such as .html, .js, .py, .json, .csv or .md (up to 5 MB each).'); return; }
     if(mode === 'inspect'){
       var mg = mergeFiles(got), text = mg.text.slice(0, 120000);
       importBuf = { text:text, names:got.map(function(g){ return g.name; }).join(', '), lines:text.split('\n').length,
@@ -7272,12 +7761,12 @@ MStore.ready.then(function(){
       return;
     }
     got.forEach(function(g){
-      g.id = uid(); g.full = g.text.slice(0, 400000); g.lines = g.full.split('\n').length;
+      g.id = uid(); g.full = g.text.slice(0, FILE_MAX); g.lines = g.full.split('\n').length;
       g.truncated = g.full.length > 40000; g.text = g.full.slice(0, 40000);
       attached.push(g);
     });
     if(attached.length > 6) attached.length = 6;
-    if(skipped) UI.alert('Some files were skipped', skipped + ' file' + (skipped === 1 ? ' was' : 's were') + ' not text or code, or were over 400 KB.');
+    if(skipped) UI.alert('Some files were skipped', skipped + ' file' + (skipped === 1 ? ' was' : 's were') + ' not text or code, or were over 5 MB.');
     paintAttach(); sizeComposer(); syncSend(); comp.focus();
   }
   function pickFiles(){ var fp = $('filePick'); fp.value = ''; fp.click(); }
@@ -7494,7 +7983,8 @@ MStore.ready.then(function(){
     info.addEventListener('click', function(){ card.classList.toggle('open'); });
     top.appendChild(info);
     var del = el('button', 'cp'); del.innerHTML = ICON.trash; del.setAttribute('aria-label', 'Delete task');
-    del.addEventListener('click', function(){
+    del.addEventListener('click', async function(){
+      if(!(await UI.confirm('Delete this task?', '\u201c' + short(t.title || t.text || 'Task', 80) + '\u201d is removed. Tasks that wait on it stop waiting.', { confirmText:'Delete', danger:true }))) return;
       current.tasks = current.tasks.filter(function(x){ return x !== t; });
       current.tasks.forEach(function(x){ x.deps = (x.deps || []).filter(function(d){ return d !== t.id; }); });
       deactivate(current, t); save(); renderNotebook();
@@ -8643,7 +9133,7 @@ MStore.ready.then(function(){
     function editDetails(){
       dcard.innerHTML = '';
       var ds = el('textarea', 'field'), tg = el('input', 'field'), so = el('input', 'field'), li = el('input', 'field'), co = el('input', 'field');
-      ds.rows = 3; ds.maxLength = 600; ds.value = meta.description; ds.style.resize = 'none';
+      ds.rows = 3; ds.maxLength = 6000; ds.value = meta.description; ds.style.resize = 'none';
       tg.value = meta.tags.join(', '); tg.placeholder = 'research, chemistry, lab'; so.value = meta.source; so.maxLength = 300;
       li.value = meta.licence; li.maxLength = 120; co.value = meta.collected; co.placeholder = 'YYYY-MM-DD'; co.maxLength = 20;
       [['Description', ds], ['Tags (separate with commas)', tg], ['Source', so], ['Licence', li], ['Collected on', co]].forEach(function(x){
@@ -9256,18 +9746,19 @@ MStore.ready.then(function(){
      PROJECT TYPES: what a project is for decides what the AI makes and how it is run
      ===================================================================== */
   var PTYPES = [
-    ['module', 'Module', 'Plain code for the AI itself, with no screen. It runs in a test harness that shows what it prints.'],
-    ['dataset', 'Dataset', 'Data and information gathered in advance. Import files, save findings, search, export.'],
-    ['spec', 'Spec', 'Written designs and documents. No code.'],
-    ['app', 'App', 'A web page you look at and use.']
+    ['app', 'App', 'Something with a screen that you look at and tap: a page, a tool, a game, a website. Use it when the result is something people open and use.'],
+    ['module', 'Module', 'Code with no screen: functions, logic, calculations, game systems, utilities, scripts. Use it for a piece you want to build and test on its own, which an App can use later. It runs in a test view that shows what it prints.'],
+    ['dataset', 'Dataset', 'A collection of information: facts, records, notes and files gathered on a topic. Use it when you need material before you build, or data to keep, search and export.'],
+    ['spec', 'Spec', 'Written plans and documents: ideas, designs, rules, outlines, requirements. No code. Use it when you are still working out what you want.']
   ];
   var TYPE_MODE = { module:'discovery', dataset:'research', spec:'design', app:'build' };
   function typeOf(p){ return p && ['app', 'module', 'dataset', 'spec'].indexOf(p.type) >= 0 ? p.type : 'app'; }
   function typeText(p){
     var ty = typeOf(p);
-    if(ty === 'module') return 'PROJECT TYPE: Module. This project is plain JavaScript that is part of an AI\u2019s body. It is not an app and has no screen. The code is one plain script (no HTML, no import or export, no buttons, forms or styling): write functions and classes, and define them with const, class or function at the top level so they can be called. The lab runs it in a test harness that shows what it prints. Never build an app or a page here; if a visual app is wanted, suggest a sub-project of kind app.';
-    if(ty === 'dataset') return 'PROJECT TYPE: Dataset. This project gathers data and information in advance for an AI that will be trained elsewhere. Your job is finding, collecting and organizing material: use web_search for facts, then save each useful piece with dataset_add (a clean excerpt or a summary in your own words, with its source). One topic per record. Never save something you did not find. Do not build apps or write code here unless the person asks for a script.';
-    if(ty === 'spec') return 'PROJECT TYPE: Spec. This project is for written designs and documents. Write them with write_doc so the person can read, edit and export them. Do not write code or build apps here unless the person asks.';
+    var sw = ' The person can change the project type in Project settings at any time, and can start a sub-project of another type. If the work clearly belongs in a different type, say so in one sentence instead of forcing it.';
+    if(ty === 'module') return 'PROJECT TYPE: Module. This project is code with no screen: functions, classes and logic that do one job and can be tested on their own. The code is one plain script (no HTML, no import or export, no buttons, forms or styling): define things with const, class or function at the top level so they can be called. The lab runs it in a test view that shows what it prints. Do not build a page here; if a visual app is wanted, suggest a sub-project of type App.' + sw;
+    if(ty === 'dataset') return 'PROJECT TYPE: Dataset. This project gathers information on a topic. Your job is finding, collecting and organizing material: use web_search for facts, then save each useful piece with dataset_add (a clean excerpt or a summary in your own words, with its source). One topic per record. Never save something you did not find. Do not build apps or write code here unless the person asks for a script.' + sw;
+    if(ty === 'spec') return 'PROJECT TYPE: Spec. This project is for written plans and documents. Write them with write_doc so the person can read, edit and export them. Do not write code or build apps here unless the person asks.' + sw;
     return '';
   }
   /* a module has no page, so it is run inside a small harness that shows what it prints */
@@ -9279,9 +9770,9 @@ MStore.ready.then(function(){
     return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style></head><body><h1>Module output</h1><div id="out"></div><script>' + cap + '<\/script><script>\n' +
       String(src).replace(/<\/script/gi, '<\\/script') + '\n<\/script></body></html>';
   }
-  var TYPE_BLURB = { module:'code for the AI, no screen', dataset:'gather data and information', spec:'written designs and documents', app:'a page you use' };
-  function askType(){
-    return UI.sheet('What kind of project?', PTYPES.map(function(x){ return { label:x[1] + ' \u00b7 ' + TYPE_BLURB[x[0]], value:x[0] }; }));
+  var TYPE_BLURB = { module:'code with no screen', dataset:'collected information', spec:'plans and documents', app:'a screen you use' };
+  function askType(title){
+    return UI.sheet(title || 'What kind of project?', PTYPES.map(function(x){ return { label:x[1] + ' \u00b7 ' + TYPE_BLURB[x[0]], value:x[0] }; }));
   }
   function typeChips(get, set){
     var wrap = el('div'), row = el('div', 'prow'), hint = el('div', 'hint'), btns = [];
@@ -9831,18 +10322,143 @@ MStore.ready.then(function(){
     if(top - 14 < ide.scrollTop) ide.scrollTop = Math.max(0, top - 14);
     else if(bottom > ide.scrollTop + ide.clientHeight) ide.scrollTop = bottom - ide.clientHeight;
   }
+  /* which file the editor shows: the main page (code assembly) or one of the project files */
+  var activeFile = '', edProj = '', openTabs = [];
+  function activeObj(){ return activeFile && current ? findFile(current, activeFile) : null; }
+  function edText(){ var f = activeObj(); return f ? f.text : codeOf(current).src; }
+  function saveEd(){
+    if(!current) return;
+    var f = activeObj();
+    if(f){ f.text = ed.value; f.mod = Date.now(); } else codeOf(current).src = ed.value;
+  }
+  function edDot(k){ return k === 'in_sync' ? 'ok' : k === 'changed_here' ? 'warn' : ''; }
+  function paintFileBar(){
+    var host = $('fileTabs'); if(!host || !current) return;
+    host.innerHTML = '';
+    var showSync = false; try{ showSync = intgUp('termux') || !!current.txUsed; }catch(e){}
+    function tab(path, label, sync, isMain){
+      var b = el('button', 'ftab' + ((activeFile || '') === path ? ' on' : ''));
+      if(showSync && sync) b.appendChild(el('span', 'dot ' + edDot(sync)));
+      b.appendChild(el('span', 'fn', label));
+      if(!isMain){
+        var x = el('span', 'fx', '\u00d7');
+        x.addEventListener('click', function(e){ e.stopPropagation(); closeTab(path); });
+        b.appendChild(x);
+      }
+      var hold = 0, held = false;
+      b.addEventListener('pointerdown', function(){ held = false; clearTimeout(hold); if(!isMain) hold = setTimeout(function(){ held = true; fileMenu(path); }, 550); });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(function(ev){ b.addEventListener(ev, function(){ clearTimeout(hold); }); });
+      b.addEventListener('click', function(){ if(held) return; openFile(path); });
+      host.appendChild(b);
+      return b;
+    }
+    tab('', mainFileName(current), mainSync(current), true);
+    openTabs = openTabs.filter(function(x){ return !!findFile(current, x); });
+    openTabs.forEach(function(x){ var f = findFile(current, x); tab(x, x, fileSync(f), false); });
+    var on = host.querySelector('.ftab.on'); if(on && on.scrollIntoView) try{ on.scrollIntoView({ inline:'nearest', block:'nearest' }); }catch(e){}
+  }
+  INT.repaintFiles = function(){ try{ paintFileBar(); }catch(e){} };
+  function openFile(path){
+    if(!current) return;
+    saveEd(); flushCode();
+    if(path && !findFile(current, path)) path = '';
+    activeFile = path;
+    if(path && openTabs.indexOf(path) < 0) openTabs.push(path);
+    renderCode();
+  }
+  function closeTab(path){
+    openTabs = openTabs.filter(function(x){ return x !== path; });
+    if(activeFile === path){ saveEd(); activeFile = ''; renderCode(); } else paintFileBar();
+  }
+  async function newFile(){
+    var v = await UI.prompt('New file', { message:'A name or path, for example database.py or tests/test_db.py.', confirmText:'Create', maxLength:120 });
+    if(!v || !current) return;
+    var path = normPath(v);
+    if(!path){ UI.alert('Not a valid name', 'Use a relative path such as database.py or tests/test_db.py.'); return; }
+    if(isMainPath(current, path) || findFile(current, path)){ UI.alert('Already exists', path + ' is already in this project.'); return; }
+    if(filesOf(current).length >= 60){ UI.alert('Too many files', 'A project can hold 60 files.'); return; }
+    filesOf(current).push({ path:path, text:'', lang:langOfPath(path), ts:Date.now() });
+    save(); openFile(path);
+  }
+  async function fileMenu(path){
+    var f = findFile(current, path); if(!f) return;
+    var tx = false; try{ tx = intgUp('termux'); }catch(e){}
+    var opts = [{ label:'Rename', value:'rename' }];
+    if(tx) opts.push({ label:'Send to Termux', value:'send' });
+    opts.push({ label:'Delete', value:'del', danger:true });
+    var v = await UI.sheet(path, opts);
+    if(v === 'rename'){
+      var nn = await UI.prompt('Rename file', { value:path, maxLength:120, confirmText:'Rename' });
+      var np = normPath(nn);
+      if(!nn) return;
+      if(!np || isMainPath(current, np) || (findFile(current, np) && findFile(current, np) !== f)){ UI.alert('Could not rename', 'That name is not valid or is already used.'); return; }
+      openTabs = openTabs.map(function(x){ return x === path ? np : x; });
+      if(activeFile === path) activeFile = np;
+      f.path = np; f.lang = langOfPath(np); delete f.tx; save(); paintFileBar();
+    }else if(v === 'send'){
+      var j = await txJson('/write', { project:txProject(current), files:[{ path:f.path, text:f.text }] });
+      if(j.ok){ noteTx(current, f.path, f.text); save(); paintFileBar(); } else UI.alert('Could not send', j.error || 'The bridge did not accept it.');
+    }else if(v === 'del'){
+      var txUp = false; try{ txUp = intgUp('termux'); }catch(e){}
+      var how = 'proj';
+      if(txUp && current.txSeen && current.txSeen[path]){
+        how = await UI.sheet('Delete ' + path, [{ label:'Delete from the project only', value:'proj', danger:true }, { label:'Delete from the project and Termux', value:'both', danger:true }]);
+        if(!how) return;
+      }
+      if(!(await UI.confirm('Delete ' + path + '?', how === 'both' ? 'It is removed from the project and from Termux.' : 'It is removed from the project.' + (current.txSeen && current.txSeen[path] ? ' The copy in Termux stays there.' : ''), { confirmText:'Delete', danger:true }))) return;
+      var msg = '';
+      if(how === 'both'){
+        var jr = await txJson('/remove', { project:txProject(current), paths:[path] }, 20000);
+        if(!jr || !jr.ok) msg = 'The project copy was deleted, but the Termux copy was not: ' + ((jr && jr.error) || 'your bridge is older and cannot delete files, update it') + '.';
+      }
+      if(current.txSeen) delete current.txSeen[path];
+      current.files = filesOf(current).filter(function(x){ return x !== f; });
+      closeTab(path); save(); paintFileBar();
+      if(msg) UI.alert('Partly done', msg);
+    }
+  }
+  async function filesSheet(){
+    if(!current) return;
+    var showSync = false; try{ showSync = intgUp('termux') || !!current.txUsed; }catch(e){}
+    function lab(name, k){ return name + (showSync && k ? '  \u00b7  ' + (k === 'in_sync' ? 'in Termux' : k === 'changed_here' ? 'changed' : 'not sent') : ''); }
+    var items = [{ label:lab(mainFileName(current) + ' (main page)', mainSync(current)), value:'::main', selected:!activeFile }];
+    filesOf(current).forEach(function(f){ items.push({ label:lab(f.path, fileSync(f)), value:f.path, selected:activeFile === f.path }); });
+    items.push({ label:'+ New file', value:'::new' });
+    var tx = false; try{ tx = intgUp('termux'); }catch(e){}
+    if(tx && unsyncedNames(current).length) items.push({ label:'Send changed files to Termux', value:'::sync' });
+    var v = await UI.sheet('Project files', items);
+    if(v == null) return;
+    if(v === '::new') return newFile();
+    if(v === '::main') return openFile('');
+    if(v === '::sync'){
+      saveEd(); flushCode();
+      var send = filesOf(current).filter(function(f){ return fileSync(f) !== 'in_sync'; }).map(function(f){ return { path:f.path, text:f.text }; });
+      var mt = txCodeFile(current);
+      if(current.mainTx && mainSync(current) === 'changed_here' && mt.text.trim()) send.push({ path:mt.name, text:mt.text });
+      var j = await txJson('/write', { project:txProject(current), files:send });
+      if(j.ok){ send.forEach(function(x){ noteTx(current, x.path, x.text); }); if(current.mainTx && send.some(function(x){ return x.path === current.mainTx.name; })) current.mainTx.hash = hashText(mt.text); save(); paintFileBar(); }
+      else UI.alert('Could not send', j.error || 'The bridge did not accept it.');
+      return;
+    }
+    openFile(v);
+  }
+  $('filesBtn').addEventListener('click', filesSheet);
   function renderCode(){
+    if(current && edProj !== current.id){ edProj = current.id; activeFile = ''; openTabs = []; }
+    if(activeFile && !activeObj()) activeFile = '';
     var c = codeOf(current);
     $('runBtn').innerHTML = ICON.play + '<span class="lbl">Run</span>';
     $('exportBtn').innerHTML = ICON.download + '<span class="lbl">Export</span>';
     $('copyAllBtn').innerHTML = ICON.copy + '<span class="lbl">Copy</span>';
-    ed.value = c.src;
+    ed.value = edText();
+    paintFileBar();
     paintEditor();
     ide.scrollTop = 0; ide.scrollLeft = 0;
   }
   ed.addEventListener('input', function(){
-    codeOf(current).src = ed.value;
+    saveEd();
     paintEditor(); revealCaret();
+    if(activeFile) paintFileBar();
     clearTimeout(saveT); saveT = setTimeout(function(){ saveT = 0; save(); }, 400);
   });
   function insertAt(text, caretOffset){
@@ -10051,8 +10667,35 @@ MStore.ready.then(function(){
     paintNet();
     $('preview').classList.add('show');
   }
+  async function runInTermux(p, path, text, cmd){
+    var w = await txJson('/write', { project:txProject(p), files:[{ path:path, text:text }] });
+    if(!w.ok){ UI.alert('Could not send the file', w.error || 'The bridge did not accept it.'); return; }
+    p.txUsed = true; noteTx(p, path, text); save(); paintFileBar();
+    UI.alert('Running in Termux', cmd + ' ' + path + ' is running. This can take a moment.');
+    var r = await txRun(txProject(p), cmd, [path], null, new AbortController(), 120000);
+    var out = txTail(r.out).trim();
+    var st = r.error && r.code === null ? { k:'bad', label:'Did not run', desc:r.error }
+      : r.timedOut ? { k:'bad', label:'Timed out', desc:'It was still running after 120 s and was stopped.' }
+      : r.code === 0 ? { k:'ok', label:'Finished, exit 0', desc:'It ran to the end without an error.' }
+      : { k:'bad', label:'Exited with code ' + r.code, desc:'It ran, then stopped with an error. The output below says why.' };
+    UI.info(cmd + ' ' + path, st, [['Time', (r.ms / 1000).toFixed(1) + ' s'], ['Output', out || 'No output']]);
+  }
   function runCode(){
-    var c = codeOf(current); c.src = ed.value; flushCode(); save();
+    var c = codeOf(current); saveEd(); flushCode(); save();
+    var tx = false; try{ tx = intgUp('termux'); }catch(e){}
+    var f = activeObj();
+    if(f){
+      var ext = langOfPath(f.path), cmd = ext === 'py' ? 'python' : /^(?:js|mjs|cjs)$/.test(ext) ? 'node' : '';
+      if(!cmd){ UI.alert('Cannot run this file', 'Run works on the main page, and on .py and .js files through Termux.'); return; }
+      if(!tx){ UI.alert('Termux is not connected', 'Connect Termux under Settings, Integrations, and Run will run this file there.'); return; }
+      runInTermux(current, f.path, f.text, cmd);
+      return;
+    }
+    if(isPyLike(c.src)){
+      if(!tx){ UI.alert('This is Python', 'The preview only runs browser code, so Python cannot run here. Connect Termux under Settings, Integrations, and this button will run it there.'); return; }
+      runInTermux(current, 'main.py', c.src, 'python');
+      return;
+    }
     openPreview(c.src);
   }
   function closePreview(){
@@ -10066,8 +10709,8 @@ MStore.ready.then(function(){
     setTimeout(function(){ l.textContent = old; }, 1400);
   }
   function currentDoc(){
-    var c = codeOf(current); c.src = ed.value; save();
-    return c.src;
+    saveEd(); save();
+    return edText();
   }
   $('runBtn').addEventListener('click', runCode);
   $('previewRerun').addEventListener('click', function(){ openPreview(lastPreview); });
@@ -10102,7 +10745,8 @@ MStore.ready.then(function(){
     return f;
   }
   $('exportBtn').addEventListener('click', function(){
-    if(typeOf(current) === 'module') saveBlob(slug(current.name) + '.js', new Blob([currentDoc()], { type:'text/javascript' }));
+    if(activeObj()) saveBlob(activeFile.split('/').pop(), new Blob([currentDoc()], { type:'text/plain' }));
+    else if(typeOf(current) === 'module') saveBlob(slug(current.name) + '.js', new Blob([currentDoc()], { type:'text/javascript' }));
     else downloadSrc(current.name, currentDoc());
     flash($('exportBtn'), 'Exported');
   });
