@@ -605,6 +605,19 @@ svg{display:block;pointer-events:none}
 
 /* tool cards in the chat */
 .mbody>.tact+.tact{margin-top:0}
+.bubble.md{white-space:normal}
+.bubble.md>*+*{margin-top:8px}
+.ui-rows .v.md{white-space:normal}
+.ui-rows .v.md>*+*{margin-top:8px}
+.tgroup{display:flex;flex-direction:column}
+.tghead{width:100%;text-align:left;font:inherit;font-size:14px}
+.tgics{display:flex;align-items:center;gap:6px;flex:none}
+.tgmore{font-size:12px;opacity:.8}
+.tgchev{display:flex;flex:none;opacity:.85;transition:transform .15s}
+.tgchev svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.tgroup.open .tgchev{transform:rotate(90deg)}
+.tgbody{display:none;flex-direction:column;margin:2px 0 2px 8px;padding-left:10px;border-left:2px solid var(--line-soft)}
+.tgroup.open .tgbody{display:flex}
 .tact{display:flex;align-items:center;gap:10px;padding:6px 2px;border:0;border-radius:10px;background:none;color:var(--muted);font-size:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .tact:active{opacity:.6}
 .tact .tic{display:flex;opacity:.8}
@@ -2476,7 +2489,13 @@ MStore.ready.then(function(){
           var t = el('div'); t.appendChild(document.createTextNode(st.label)); t.appendChild(el('small', '', st.desc)); b.appendChild(t);
           c.appendChild(b);
           var box = el('div', 'ui-rows');
-          (rows || []).forEach(function(x){ if(x[1] == null || x[1] === '') return; box.appendChild(el('div', 'k', x[0])); box.appendChild(el('div', 'v', String(x[1]))); });
+          (rows || []).forEach(function(x){
+            if(x[1] == null || x[1] === '') return;
+            box.appendChild(el('div', 'k', x[0]));
+            var v = el('div', 'v' + (x[2] ? ' md' : ''));
+            if(x[2]) fillRich(v, String(x[1]), null); else v.textContent = String(x[1]);
+            box.appendChild(v);
+          });
           if(box.children.length) c.appendChild(box);
           actions(c, [{text:'Close', cls:'ui-ok', value:true}], done);
         }, 'dialog', true).then(function(){});
@@ -2535,8 +2554,10 @@ MStore.ready.then(function(){
      desc:'Changes a task and saves progress notes and checkpoints so work can resume later.'},
     {id:'block_task', group:'Tasks', name:'Block task', perm:'allow',
      desc:'Marks a task as blocked and records why.'},
+    {id:'fail_task', group:'Tasks', name:'Mark task failed', perm:'allow',
+     desc:'Marks a task as tried but not passed, with the reason. Different from blocked, which means it cannot continue.'},
     {id:'complete_task', group:'Tasks', name:'Complete task', perm:'allow',
-     desc:'Lets the AI mark a task as done. Set it to Ask if you want to confirm each one.'},
+     desc:'Lets the AI mark a task as done, only after work was recorded on it and its Done when was checked. Set it to Ask to confirm each one; a task marked Needs my OK always asks.'},
 
     {id:'add_brick', group:'Code', name:'Add code brick', perm:'ask',
      desc:'Adds a new brick to code assembly. The AI proposes it, and the lab applies it only if this tool permits.'},
@@ -2581,7 +2602,15 @@ MStore.ready.then(function(){
     {id:'journal_save', group:'Journal', name:'Save to journal', perm:'ask',
      desc:'Proposes a Discovery Journal entry. Nothing is saved until you approve it.'},
     {id:'journal_list', group:'Journal', name:'Read journal', perm:'allow',
-     desc:'Lets the AI read Discovery Journal entries.'}
+     desc:'Lets the AI read Discovery Journal entries.'},
+    {id:'capture_idea', group:'Journal', name:'Capture idea', perm:'allow',
+     desc:'Discovery mode only. Saves an idea straight to the Discovery Journal.'},
+    {id:'park_question', group:'Journal', name:'Park question', perm:'allow',
+     desc:'Discovery mode only. Saves an open question to the journal so it is not lost.'},
+    {id:'save_finding', group:'Journal', name:'Save finding', perm:'allow',
+     desc:'Research mode only. Records a finding with its source and how sure the AI is.'},
+    {id:'log_decision', group:'Journal', name:'Log decision', perm:'allow',
+     desc:'Design mode only. Records what was chosen, why, and what was rejected.'}
   ];
   var PERMS = [['allow','Allow'],['ask','Ask'],['deny','Deny']];
 
@@ -2597,11 +2626,16 @@ MStore.ready.then(function(){
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
   var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  /* while a group is in focus or a task is active, the status tools stay loaded whatever mode Auto picks, so work is never left half-recorded */
+  var TASK_KEEP = ['start_task', 'update_task', 'block_task', 'fail_task', 'complete_task'];
+  function taskKeep(p, id){ return TASK_KEEP.indexOf(id) >= 0 && !!(p && (focusGroup(p) || activeTask(p))); }
+  /* each of these exists in exactly one mode; the shared toolset is untouched */
+  var MODE_ONLY = { capture_idea:'discovery', park_question:'discovery', save_finding:'research', log_decision:'design' };
   var MODE_SETS = {
-    discovery:M_READ,
-    research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc']),
-    design:M_READ.concat(['analyze_code', 'propose_direction', 'add_task', 'update_task', 'start_task', 'block_task', 'complete_task', 'write_doc']),
-    test:M_READ.concat(['analyze_code', 'run_sandbox', 'update_task', 'start_task', 'block_task', 'complete_task']),
+    discovery:M_READ.concat(['capture_idea', 'park_question']),
+    research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc', 'save_finding']),
+    design:M_READ.concat(['analyze_code', 'propose_direction', 'add_task', 'update_task', 'start_task', 'block_task', 'fail_task', 'complete_task', 'write_doc', 'log_decision']),
+    test:M_READ.concat(['analyze_code', 'run_sandbox', 'update_task', 'start_task', 'block_task', 'fail_task', 'complete_task']),
     build:null
   };
   /* ---- automatic mode: the lab picks the mode from what the person says and the kind of project ---- */
@@ -2679,13 +2713,13 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['capture_idea', 'park_question', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
     TOOLS.forEach(function(t){
       if(!IMPL[t.id] || !DECL[t.id] || !st[t.id].enabled || st[t.id].perm === 'deny' || (INTG[t.id] && !intgUp(INTG[t.id]))) return;
-      var ok = !set || (INTG[t.id] ? (mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk)) : set.indexOf(t.id) >= 0);
+      var ok = (!MODE_ONLY[t.id] || mo === MODE_ONLY[t.id]) && (!set || (INTG[t.id] ? (mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk)) : (set.indexOf(t.id) >= 0 || taskKeep(p, t.id))));
       if((typeOf(p) === 'dataset' || typeOf(p) === 'spec') && t.group === 'Code' && !(gate && gate.code)) ok = false;
       (ok ? can : cannot).push(t.name.toLowerCase());
     });
@@ -2774,13 +2808,13 @@ MStore.ready.then(function(){
     return true;
   }
   function tasksOf(p){ taskMigrate(p); return p.tasks; }
-  function setStatus(t, s){ t.status = s; t.done = s === 'completed'; t.mod = Date.now(); if(s !== 'blocked') t.blockReason = ''; }
+  function setStatus(t, s){ t.status = s; t.done = s === 'completed'; t.mod = Date.now(); if(s !== 'blocked' && s !== 'failed') t.blockReason = ''; }
   function newTask(p, o){
     var ts = tasksOf(p), n = 0, now = Date.now(), title = short(o.title || o.text || 'Task', 200);
     ts.forEach(function(t){ if(t.seq > n) n = t.seq; });
     var t = { id:uid(), v:2, seq:n + 1, title:title, text:title, desc:short(o.desc || '', 1200), status:'pending', done:false,
       priority:['low', 'normal', 'high'].indexOf(o.priority) >= 0 ? o.priority : 'normal', deps:[], notes:[],
-      criteria:short(o.criteria || '', 800), checkpoint:null, blockReason:'', plan:o.plan || o.group || '', group:short(o.group || o.plan || '', 80), ts:now, mod:now };
+      criteria:short(o.criteria || '', 800), checkpoint:null, blockReason:'', plan:o.plan || o.group || '', group:short(o.group || o.plan || '', 80), doc:o.doc || '', approval:!!o.approval, attempts:0, ts:now, mod:now };
     ts.push(t);
     return t;
   }
@@ -2849,19 +2883,71 @@ MStore.ready.then(function(){
     if(t.status === 'completed') return 'That task is already completed.';
     var w = unmetDeps(p, t);
     if(w.length) return 'It waits on: ' + w.map(function(x){ return '#' + x.seq + ' ' + x.title; }).join(', ') + '.';
+    var was = t.status === 'active';
     tasksOf(p).forEach(function(x){ if(x !== t && x.status === 'active') setStatus(x, 'pending'); });
     setStatus(t, 'active'); p.activeTask = t.id;
+    /* starting is an attempt, nothing more: work and completion are recorded separately */
+    if(!was){ t.attempts = (t.attempts || 0) + 1; t.startedAt = Date.now(); t.workAt = 0; t.did = []; }
     return '';
+  }
+  /* progress is kept in three separate places on purpose: a task is done, a group is done, the project is done */
+  function tally(ts){
+    var o = { n:ts.length, done:0, active:0, blocked:0, failed:0 };
+    ts.forEach(function(t){ if(t.status === 'completed') o.done++; else if(t.status === 'active') o.active++; else if(t.status === 'blocked') o.blocked++; else if(t.status === 'failed') o.failed++; });
+    return o;
+  }
+  function tallyText(o){ return o.done + ' of ' + o.n + ' done' + (o.blocked ? ' \u00b7 ' + o.blocked + ' blocked' : '') + (o.failed ? ' \u00b7 ' + o.failed + ' failed' : ''); }
+  function projectProgress(p){
+    var gs = groupsOf(p), t = tally(tasksOf(p));
+    var gd = gs.filter(function(g){ return g.tasks.every(function(x){ return x.status === 'completed'; }); }).length;
+    return 'Project: ' + (gs.length ? gd + ' of ' + gs.length + ' group' + (gs.length === 1 ? '' : 's') + ' done \u00b7 ' : '') + t.done + ' of ' + t.n + ' task' + (t.n === 1 ? '' : 's') + ' done';
+  }
+  /* tasks earlier in the same group that can run now and are not finished: they must go first */
+  function earlierOpen(p, t){
+    var g = gOf(t);
+    if(!String(g).trim()) return [];
+    return tasksOf(p).filter(function(x){
+      return x !== t && sameG(gOf(x), g) && (x.seq || 0) < (t.seq || 0) && (x.status === 'pending' || x.status === 'active') && !unmetDeps(p, x).length;
+    }).sort(bySeq);
+  }
+  function runnableIn(p, g, except){
+    return tasksOf(p).filter(function(x){ return x !== except && sameG(gOf(x), g) && x.status === 'pending' && !unmetDeps(p, x).length; }).sort(bySeq);
+  }
+  /* what the model is told after a task stops: carry on with independent work only if there is some, otherwise ask */
+  function stopAdvice(p, t, word){
+    var nx = String(gOf(t)).trim() ? runnableIn(p, gOf(t), t) : [];
+    var o = 'Task #' + t.seq + ' is now ' + word + ', so its group is not finished. ';
+    if(nx.length) o += 'These tasks in the group do not wait on it: ' + nx.slice(0, 4).map(function(x){ return '#' + x.seq + ' ' + short(x.title, 40); }).join(', ') + '. You may carry on with the next one in order, but tell the person plainly that #' + t.seq + ' is ' + word + ' and why.';
+    else o += 'Nothing else can run without it. Stop here: tell the person what happened and what you need, and use ask_user if they must choose.';
+    return o;
+  }
+  var NOWORK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, add_task:1, block_task:1, fail_task:1, complete_task:1, ask_user:1, read_notes:1, write_note:1, journal_list:1 };
+  /* a real tool result while a task is active is the only thing that counts as work on it */
+  function noteWork(p, sg){
+    var t = activeTask(p);
+    if(!t || !IMPL[sg.name] || NOWORK[sg.name]) return;
+    t.workAt = Date.now();
+    var lb = ''; try{ lb = IMPL[sg.name].label(sg.args || {}); }catch(e){ lb = sg.name; }
+    t.did = (t.did || []).concat([short(lb, 80)]).slice(-10);
+  }
+  function lastUserTextOf(p){ try{ return lastUserText(chatOf(p)); }catch(e){ return ''; } }
+  function lastUserTs(p){
+    var ch = null; try{ ch = chatOf(p); }catch(e){}
+    var ms = ch ? ch.msgs : [];
+    for(var i = ms.length - 1; i >= 0; i--){ if(ms[i].r === 'u') return ms[i].ts || 0; }
+    return 0;
   }
   function taskBrief(p, t){
     var w = unmetDeps(p, t).map(function(x){ return '#' + x.seq; });
-    return { ref:t.seq, title:t.title, group:gOf(t) || undefined, status:t.status, priority:t.priority, waiting_on:w.length ? w : undefined };
+    return { ref:t.seq, title:t.title, group:gOf(t) || undefined, status:t.status, priority:t.priority, waiting_on:w.length ? w : undefined, needs_person_approval:t.approval ? true : undefined, attempts:t.attempts || undefined };
   }
   function taskFull(p, t){
     var o = taskBrief(p, t);
     o.description = t.desc || ''; o.completion_criteria = t.criteria || ''; o.plan = t.plan || '';
-    if(t.blockReason) o.blocked_because = t.blockReason;
+    if(t.blockReason) o[t.status === 'failed' ? 'failed_because' : 'blocked_because'] = t.blockReason;
     if(t.checkpoint) o.last_checkpoint = t.checkpoint.t;
+    if(t.did && t.did.length) o.work_done_so_far = t.did;
+    if(t.doc){ var dd = (p.docs || []).filter(function(x){ return x.id === t.doc; })[0]; if(dd) o.from_document = dd.title; }
     o.notes = (t.notes || []).slice(-8).map(function(n){ return n.t; });
     return o;
   }
@@ -2870,7 +2956,10 @@ MStore.ready.then(function(){
     var L = ['Status: ' + t.status + (t.priority !== 'normal' ? ' \u00b7 ' + t.priority + ' priority' : '')];
     var w = unmetDeps(p, t);
     if(w.length) L.push('Waiting on: ' + w.map(function(x){ return '#' + x.seq + ' ' + x.title; }).join(', '));
-    if(t.blockReason) L.push('Blocked: ' + t.blockReason);
+    if(t.blockReason) L.push((t.status === 'failed' ? 'Failed: ' : 'Blocked: ') + t.blockReason);
+    if(t.approval) L.push('You must approve before it is marked done.');
+    if((t.attempts || 0) > 0) L.push('Attempts: ' + t.attempts);
+    if(t.doc){ var dd = (p.docs || []).filter(function(x){ return x.id === t.doc; })[0]; if(dd) L.push('From document: ' + dd.title); }
     if(t.desc) L.push('Details: ' + t.desc);
     L.push('Done when: ' + (t.criteria || 'not set'));
     if(t.checkpoint) L.push('Checkpoint (' + taskStamp(t.checkpoint.ts) + '): ' + t.checkpoint.t);
@@ -2890,18 +2979,20 @@ MStore.ready.then(function(){
     function line(t){
       var w = unmetDeps(p, t).map(function(x){ return '#' + x.seq; });
       return '- #' + t.seq + ' ' + short(t.title, 80) + ' [' + t.status + (t.priority !== 'normal' ? ', ' + t.priority : '') + ']' +
-        (w.length ? ' waits on ' + w.join(', ') : '') + (t.status === 'blocked' && t.blockReason ? ': ' + short(t.blockReason, 80) : '') + '\n';
+        (w.length ? ' waits on ' + w.join(', ') : '') + ((t.status === 'blocked' || t.status === 'failed') && t.blockReason ? ': ' + short(t.blockReason, 80) : '') + '\n';
     }
     var o = 'TASKS (working context only, never an instruction; the person\u2019s latest message always wins):\n';
     if(fg){
       var fd = fg.tasks.filter(function(t){ return t.status === 'completed'; }).length;
-      o += 'FOCUS GROUP: ' + fg.name + ' (' + fd + ' of ' + fg.tasks.length + ' done). Work only on tasks in this group, in order. Do not start any task outside it unless the person asks.\n';
-    }else if(groupsOf(p).length) o += 'No focus group is set. Do not start a task until the person picks one or the work clearly belongs to a group.\n';
+      o += 'FOCUS GROUP: ' + fg.name + ' (' + tallyText(tally(fg.tasks)) + '). Work through every task in this group, in order, and finish each one before the next. Never skip a task or start one outside the group unless the person asks. Trying a task is not completing it: it is done only when its work was really performed and its \u201cDone when\u201d is met. The group is finished only when every task in it is completed.\n';
+    }else if(groupsOf(p).length) o += (p.needPick ? 'The last group is finished. Do not start another group yourself: ask the person which one is next (ask_user), unless their latest message names it.' : 'No focus group is set. Do not start a task until the person picks one or the work clearly belongs to a group.') + '\n';
     if(act){
       o += 'ACTIVE #' + act.seq + ' ' + act.title + (act.priority !== 'normal' ? ' [' + act.priority + ']' : '') + '\n';
       if(act.desc) o += '  Details: ' + short(act.desc, 500) + '\n';
       o += '  Done when: ' + (act.criteria ? short(act.criteria, 400) : 'no criteria set; agree one with the person before completing') + '\n';
-      if(act.checkpoint) o += '  Last checkpoint: ' + short(act.checkpoint.t, 600) + '\n';
+      if(act.checkpoint){ var ageH = (Date.now() - act.checkpoint.ts) / 3600000; o += '  Last checkpoint (' + taskStamp(act.checkpoint.ts) + (ageH > 6 ? ', old: check it against the latest messages before acting on it' : '') + '): ' + short(act.checkpoint.t, 600) + '\n'; }
+      if((act.attempts || 0) > 1) o += '  This is attempt ' + act.attempts + '.\n';
+      if(act.approval) o += '  The person must approve before this is marked done.\n';
       (act.notes || []).slice(-3).forEach(function(n){ o += '  Note: ' + short(n.t, 200) + '\n'; });
     }else o += 'No task is active.\n';
     var inG = fg ? fg.tasks.filter(function(t){ return t !== act && t.status !== 'completed'; }) : [];
@@ -2915,7 +3006,7 @@ MStore.ready.then(function(){
     var loose = rest.filter(function(t){ return !gOf(t); });
     if(loose.length){ o += (fg ? 'Ungrouped tasks (not part of this work):\n' : 'Tasks:\n'); loose.slice(0, 10).forEach(function(t){ o += line(t); }); if(loose.length > 10) o += '- and ' + (loose.length - 10) + ' more (list_tasks shows all)\n'; }
     if(!fg && !loose.length && rest.length) rest.slice(0, 10).forEach(function(t){ o += line(t); });
-    if(done.length) o += 'Completed: ' + done.length + ' (latest: ' + done.slice(-3).map(function(t){ return short(t.title, 40); }).join('; ') + ')\n';
+    o += projectProgress(p) + (done.length ? ' (latest done: ' + done.slice(-3).map(function(t){ return short(t.title, 40); }).join('; ') + ')' : '') + '\n';
     return o + '\n';
 
   }
@@ -3904,6 +3995,40 @@ MStore.ready.then(function(){
     conn.appendChild(kr);
     body.appendChild(conn);
 
+    /* web search: one tap tells whether search works with this key */
+    var sc = el('div', 'tool on');
+    var stp = el('div', 'tool-top');
+    stp.appendChild(el('div', 'tool-name', 'Web search'));
+    var sinfo = el('button', 'info', '?');
+    sinfo.addEventListener('click', function(){ sc.classList.toggle('open'); });
+    stp.appendChild(sinfo);
+    sc.appendChild(stp);
+    sc.appendChild(el('div', 'tool-info', 'The AI searches with Google Search through your Gemini key, using a model that supports it. The test runs one real search and shows which model answered, or why it failed.'));
+    var srow = el('div', 'btnrow'), sbtn = el('button', 'btn solid', 'Test search');
+    srow.appendChild(sbtn);
+    sc.appendChild(srow);
+    var sres = el('div', 'status'); sres.style.whiteSpace = 'pre-line';
+    sc.appendChild(sres);
+    sbtn.addEventListener('click', async function(){
+      if(!G.key){ UI.alert('API key needed', 'Paste your Gemini API key first.'); return; }
+      sbtn.disabled = true; sres.className = 'status'; sres.textContent = 'Testing...';
+      try{
+        var r = await testSearch(), L = [];
+        L.push(r.ok ? (r.grounded ? 'Search works.' : 'The model answered but returned no sources, so it may not have searched.') : 'Search is not available.');
+        L.push('Provider: ' + r.provider);
+        if(r.model) L.push('Model ' + (r.ok ? 'tested' : 'last tried') + ': ' + r.model);
+        if(r.ok){
+          L.push('Sources found: ' + r.sources + ' \u00b7 ' + (r.ms / 1000).toFixed(1) + 's');
+          var bad = r.tried.filter(function(t){ return !t.ok; });
+          if(bad.length) L.push('Skipped: ' + bad.map(function(t){ return t.id + ' (' + t.why + ')'; }).join('; '));
+        }else L.push('Reason: ' + r.why);
+        sres.className = 'status ' + (r.ok && r.grounded ? 'ok' : 'bad'); sres.textContent = L.join('\n');
+      }catch(e){
+        sres.className = 'status bad'; sres.textContent = 'Search is not available.\nReason: ' + errText(e);
+      }finally{ sbtn.disabled = false; }
+    });
+    body.appendChild(sc);
+
     /* mode */
     body.appendChild(el('div', 'group-h', 'Model'));
     var mc = el('div', 'tool on');
@@ -4246,6 +4371,7 @@ MStore.ready.then(function(){
     var subs = projects.filter(function(x){ return x.parent === current.id; });
     var openN = tasks.filter(function(t){ return t.status !== 'completed'; }).length, act = activeTask(current);
     body.appendChild(el('div', 'summary', openN + ' open task' + (openN === 1 ? '' : 's') + (act ? ' \u00b7 working on #' + act.seq : '')));
+    if(tasks.length){ var pg = el('div', 'xsub', projectProgress(current)); pg.style.marginTop = '4px'; body.appendChild(pg); }
     var ex1 = el('div', 'prow'); ex1.style.marginTop = '10px';
     ex1.appendChild(mkBtn('ghost', 'Export', '', function(){ exportTasks(current); }));
     body.appendChild(ex1);
@@ -4914,6 +5040,30 @@ MStore.ready.then(function(){
     w.addEventListener('pointermove', function(e){ if(t && (Math.abs(e.clientX - x) > 10 || Math.abs(e.clientY - y) > 10)) clear(); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(function(ev){ w.addEventListener(ev, clear); });
   }
+  /* two or more quiet actions in a row become one line: their icons, the first action's words, and an arrow to open them */
+  var groupOpen = new WeakMap();
+  function toolGroup(run){
+    var first = run[0].sg, wrap = el('div', 'tgroup'), head = el('button', 'tact tghead'), ics = el('span', 'tgics'), kinds = {};
+    run.slice(0, 4).forEach(function(r){
+      var ic = r.node.querySelector('.tic');
+      if(ic){ var c = el('span', 'tic'); c.innerHTML = ic.innerHTML; ics.appendChild(c); }
+    });
+    if(run.length > 4) ics.appendChild(el('span', 'tgmore', '+' + (run.length - 4)));
+    run.forEach(function(r){ var d = r.node.querySelector('.dot'); if(d) String(d.className).split(/\s+/).forEach(function(k){ kinds[k] = 1; }); });
+    var kind = kinds.busy ? 'busy' : kinds.bad ? 'bad' : kinds.warn ? 'warn' : 'ok';
+    var lb = run[0].node.querySelector('.ttx');
+    var chev = el('span', 'tgchev'); chev.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>';
+    head.appendChild(ics);
+    head.appendChild(el('span', 'ttx', (lb ? lb.textContent : 'Actions') + ' \u2026'));
+    head.appendChild(el('span', 'dot ' + kind));
+    head.appendChild(chev);
+    var gb = el('div', 'tgbody');
+    run.forEach(function(r){ gb.appendChild(r.node); });
+    if(groupOpen.get(first)) wrap.classList.add('open');
+    head.addEventListener('click', function(){ var o = wrap.classList.toggle('open'); groupOpen.set(first, o); });
+    wrap.appendChild(head); wrap.appendChild(gb);
+    return wrap;
+  }
   function msgNode(m){
     var w = el('div', 'msg ' + (m.r === 'u' ? 'u' : 'm'));
     if(m.r === 'u'){
@@ -4941,7 +5091,8 @@ MStore.ready.then(function(){
       }
       if(m.kind === 'inspect') w.appendChild(inspBubble(m));
       else if(m.t){
-        var bb = el('div', 'bubble', m.t);
+        var bb = el('div', 'bubble md');
+        fillRich(bb, m.t, null);
         if(m.t.length > 900){
           bb.classList.add('clamp');
           var tg = el('button', 'bubmore', 'Show more');
@@ -4953,14 +5104,26 @@ MStore.ready.then(function(){
     else{
       var body = el('div', 'mbody');
       if(m.segs){
+        var run = [];
+        var flush = function(){
+          if(run.length > 1) body.appendChild(toolGroup(run));
+          else if(run.length) body.appendChild(run[0].node);
+          run = [];
+        };
         m.segs.forEach(function(sg, si){
           if(sg.k === 't'){
+            flush();
             if(sg.live){ var hl = el('div', 'mlive'); liveEls.set(sg, hl); fillRich(hl, cleanModelText(sg.t), m, si); body.appendChild(hl); }
             else fillRich(body, cleanModelText(sg.t), m, si);
           }
-          else if(sg.k === 'insp') body.appendChild(inspCard(m, sg));
-          else body.appendChild(toolCard(m, sg));
+          else if(sg.k === 'insp'){ flush(); body.appendChild(inspCard(m, sg)); }
+          else{
+            var nd = toolCard(m, sg);
+            if(nd && nd.classList && nd.classList.contains('tact')) run.push({ sg:sg, node:nd });
+            else{ flush(); body.appendChild(nd); }
+          }
         });
+        flush();
       }else fillRich(body, cleanModelText(m.t), m);
       w.appendChild(body);
     }
@@ -5005,22 +5168,30 @@ MStore.ready.then(function(){
     save(); renderSide(); renderThread();
     comp.value = m.t || ''; paintAttach(); sizeComposer(); syncSend(); comp.focus();
   }
-  function renderThread(keep){
-    var box = $('sheet'), top = box.scrollTop;
-    box.innerHTML = '';
-    if(!current) return;
-    var msgs = chatOf(current).msgs;
+  /* inc = true while the AI is answering: finished messages keep their elements, and only the live one is rebuilt.
+     Everything else (switching chats, retry, edit, the end of a turn) still rebuilds the whole thread. */
+  var nodeCache = new WeakMap();
+  function renderThread(keep, inc){
+    var box = $('sheet'), top = box.scrollTop, stick = box.scrollHeight - top - box.clientHeight < 90;
+    if(!current){ box.innerHTML = ''; return; }
+    var msgs = chatOf(current).msgs, desired = [];
     var waiting = busy && pending === chatOf(current);
-    if(!msgs.length && !waiting) box.appendChild(el('div', 'empty', 'Ask your assistant anything about this project.'));
-    var nodes = msgs.map(function(m){ var n = msgNode(m); box.appendChild(n); return n; });
     var lastM = msgs[msgs.length - 1];
+    if(!msgs.length && !waiting) desired.push(el('div', 'empty', 'Ask your assistant anything about this project.'));
+    var nodes = msgs.map(function(m){
+      var n = (inc && m !== lastM) ? nodeCache.get(m) : null;
+      if(n){ Array.prototype.slice.call(n.querySelectorAll('.xtra')).forEach(function(x){ x.parentNode.removeChild(x); }); }
+      else{ n = msgNode(m); nodeCache.set(m, n); }
+      desired.push(n);
+      return n;
+    });
     if(!busy && lastM){
       var lastU = -1;
       msgs.forEach(function(m, i){ if(m.r === 'u') lastU = i; });
       if(lastU >= 0 && msgs[lastU].kind !== 'inspect'){
         var et = nodes[lastU].querySelector('.mtools');
         if(et){
-          var eb = el('button', 'cp mcopy'); eb.setAttribute('aria-label', 'Edit message');
+          var eb = el('button', 'cp mcopy xtra'); eb.setAttribute('aria-label', 'Edit message');
           eb.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
           eb.addEventListener('click', function(){ closeCopy(); editLast(lastU); });
           et.insertBefore(eb, et.children[1] || null);
@@ -5029,7 +5200,7 @@ MStore.ready.then(function(){
       if(lastM.r === 'm' && lastU >= 0){
         var rt2 = nodes[msgs.length - 1].querySelector('.mtools');
         if(rt2){
-          var rb2 = el('button', 'cp mcopy'); rb2.setAttribute('aria-label', 'Retry reply');
+          var rb2 = el('button', 'cp mcopy xtra'); rb2.setAttribute('aria-label', 'Retry reply');
           rb2.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/></svg>';
           rb2.addEventListener('click', function(){ closeCopy(); retryLast(); });
           rt2.insertBefore(rb2, rt2.children[1] || null);
@@ -5040,7 +5211,7 @@ MStore.ready.then(function(){
     if(waiting && !streaming){
       var t = el('div', 'msg m'), d = el('div', 'think');
       d.innerHTML = '<i></i><i></i><i></i>';
-      t.appendChild(d); box.appendChild(t);
+      t.appendChild(d); desired.push(t);
     }
     var shownErr = (lastErr && lastErr.proj === current && lastErr.chat === chatOf(current)) ? lastErr : ((chatOf(current).cut && !busy) ? { text:'The last reply was cut off.' } : null);
     if(shownErr){
@@ -5053,9 +5224,19 @@ MStore.ready.then(function(){
       var sb = el('button', 'btn ghost sm', 'Settings');
       sb.addEventListener('click', function(){ openSettings('lab'); });
       row.appendChild(rb); row.appendChild(sb);
-      w.appendChild(row); box.appendChild(w);
+      w.appendChild(row); desired.push(w);
     }
-    requestAnimationFrame(function(){ box.scrollTop = keep ? top : box.scrollHeight; });
+    if(inc){
+      var keepSet = new Set(desired);
+      Array.prototype.slice.call(box.children).forEach(function(c){ if(!keepSet.has(c)) box.removeChild(c); });
+      var ref = box.firstChild;
+      desired.forEach(function(n){ if(n === ref) ref = ref.nextSibling; else box.insertBefore(n, ref); });
+      if(stick) requestAnimationFrame(function(){ box.scrollTop = box.scrollHeight; });
+    }else{
+      box.innerHTML = '';
+      desired.forEach(function(n){ box.appendChild(n); });
+      requestAnimationFrame(function(){ box.scrollTop = keep ? top : box.scrollHeight; });
+    }
   }
 
   /* =====================================================================
@@ -5310,6 +5491,7 @@ MStore.ready.then(function(){
   /* web search: a separate Google-grounded request, so it works with any tool-calling model */
   function searchErr(e){
     var m = String((e && e.message) || '');
+    if(e && e.summary) return m;
     if(e && e.status === 429){
       if(/limit:\s*0/i.test(m)) return 'Google Search is not part of this API key\u2019s free allowance.';
       if(e.daily) return 'The daily Google Search allowance for this API key is used up. It resets once a day.';
@@ -5317,9 +5499,23 @@ MStore.ready.then(function(){
     }
     return errText(e);
   }
-  async function searchWeb(q, sig){
-    var ids = G.mode === 'fixed' ? [G.fixed.id] : (await readyIds()), last = null;
-    for(var i = 0; i < Math.min(3, ids.length); i++){
+  /* only Gemini text models can use Google Search grounding; Gemma, image, audio and embedding models cannot */
+  function searchCapable(id){ return /gemini/i.test(id) && !/embed|image|tts|audio|live|imagen|veo|aqa|robotics|computer-use|learnlm/i.test(id); }
+  function searchRank(id){ return id === G.prefer ? -1 : /lite/i.test(id) ? 2 : /pro/i.test(id) ? 1 : /flash/i.test(id) ? 0 : 3; }
+  async function searchCandidates(){
+    var base = G.mode === 'fixed'
+      ? (G.fixed.id ? [G.fixed.id] : []).concat(G.pool.filter(function(x){ return x !== G.fixed.id && !cooling(x); }))
+      : await readyIds();
+    var ok = base.filter(searchCapable).map(function(id, i){ return { id:id, i:i }; });
+    if(!ok.length) throw new Error('None of the models available can use Google Search (' + (base.join(', ') || 'no models found') + '). Connect a Gemini model in Settings.');
+    ok.sort(function(x, y){ return (searchRank(x.id) - searchRank(y.id)) || (x.i - y.i); });
+    return ok.slice(0, 3).map(function(x){ return x.id; });
+  }
+  /* trace (optional) collects one entry per model tried: { id, ok, why } */
+  async function searchWeb(q, sig, trace){
+    var ids = await searchCandidates(), last = null;
+    trace = trace || [];
+    for(var i = 0; i < ids.length; i++){
       try{
         var j = await enqueue(function(){
           return fetchJson(API + 'models/' + encodeURIComponent(ids[i]) + ':generateContent', {
@@ -5334,15 +5530,35 @@ MStore.ready.then(function(){
         (gm.groundingChunks || []).forEach(function(c){
           var w = c.web; if(w && w.uri && !seen[w.uri]){ seen[w.uri] = 1; src.push({ title:w.title || w.uri, url:w.uri }); }
         });
-        if(text) return { text:short(text, 3500), sources:src.slice(0, 6) };
+        if(text){ trace.push({ id:ids[i], ok:true }); return { text:short(text, 3500), sources:src.slice(0, 6), model:ids[i] }; }
         last = new Error('The search returned nothing.');
+        trace.push({ id:ids[i], ok:false, why:'it returned nothing' });
       }catch(e){
         if(e && e.aborted) throw e;
         last = e;
-        if(e && e.status === 429) break;
+        trace.push({ id:ids[i], ok:false, why:searchErr(e) });
+        /* a bad key fails every model the same way; a quota or support problem can be different per model */
+        if(e && (e.status === 401 || e.status === 403 || /api key not valid|API_KEY_INVALID/i.test(String(e.message || '')))) break;
       }
     }
-    throw last || new Error('Search is not available.');
+    var fail = new Error('Tried ' + trace.length + ' model' + (trace.length === 1 ? '' : 's') + ': ' +
+      trace.map(function(t){ return t.id + ' (' + t.why + ')'; }).join('; ') + '.');
+    fail.summary = true; fail.cause = last;
+    throw fail;
+  }
+  /* one real search that reports whether search works, which model answered, and why it failed if it did not */
+  async function testSearch(){
+    var t0 = Date.now(), trace = [], out = { ok:false, grounded:false, provider:'Google Search through the Gemini API', model:'', sources:0, ms:0, why:'', tried:trace };
+    if(!G.key){ out.why = 'No API key is saved.'; return out; }
+    try{
+      var r = await searchWeb('What is the latest stable version of Node.js?', null, trace);
+      out.ok = true; out.model = r.model; out.sources = r.sources.length; out.grounded = r.sources.length > 0;
+    }catch(e){
+      out.why = searchErr(e);
+      out.model = trace.length ? trace[trace.length - 1].id : '';
+    }
+    out.ms = Date.now() - t0;
+    return out;
   }
   /* a backup that needs no key: Wikipedia summaries. It covers general facts, not recent or technical topics. */
   async function wikiSearch(q){
@@ -5369,9 +5585,9 @@ MStore.ready.then(function(){
       var q = String(a.query || '').slice(0, 300), why = '';
       try{
         var r = await searchWeb(q);
-        seg.data = { q:short(a.query || '', 120), sources:r.sources };
+        seg.data = { q:short(a.query || '', 120), sources:r.sources, model:r.model };
         return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
-          result:{ answer:r.text, sources:r.sources, instruction:'Use this to answer, and name the source for each fact.' } };
+          result:{ answer:r.text, sources:r.sources, model:r.model, instruction:'Use this to answer, and name the source for each fact.' + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
       }catch(e){
         if(e && e.aborted) throw e;
         why = searchErr(e);
@@ -5551,17 +5767,31 @@ MStore.ready.then(function(){
   T('add_task', {
     icon:'task',
     label:function(a){ return 'Add task: ' + short(a.text || '', 40); },
-    preview:function(seg){ return el('div', 'txt', (seg.args || {}).text || ''); },
+    /* adding to a group that has already started is widening its scope: it always asks, even when the tool is set to allow */
+    force:function(p, a){
+      var g = String(a.group || '').trim();
+      if(!g) return false;
+      var grp = groupsOf(p).filter(function(x){ return sameG(x.name, g); })[0];
+      return !!grp && grp.tasks.some(function(t){ return t.status !== 'pending'; });
+    },
+    preview:function(seg){
+      var a = seg.args || {}, w = el('div');
+      w.appendChild(el('div', 'txt', a.text || ''));
+      if(a.group && current && IMPL.add_task.force(current, a)) w.appendChild(el('div', 'txt', 'This adds to \u201c' + short(a.group, 40) + '\u201d, which has already started.'));
+      return w;
+    },
     run:function(p, a, seg){
       var same = tasksOf(p).filter(function(x){ return x.status !== 'completed' && sameG(x.title, a.text) && sameG(gOf(x), a.group || ''); })[0];
       if(same) return terr('Task #' + same.seq + ' already has that title. Do not add it again.');
       var had = !!focusGroup(p);
-      var t = newTask(p, { title:a.text, desc:a.description, priority:a.priority, criteria:a.criteria, group:a.group });
+      var dd = a.doc ? findDoc(p, a.doc) : null;
+      if(a.doc && !dd) return terr('No single document matches \u201c' + short(a.doc, 40) + '\u201d. Use list_docs.');
+      var t = newTask(p, { title:a.text, desc:a.description, priority:a.priority, criteria:a.criteria, group:a.group, doc:dd ? dd.id : '', approval:a.needs_approval === true });
       if(a.depends_on && a.depends_on.length){
         var e = setDeps(p, t, a.depends_on.map(String));
         if(e){ p.tasks.splice(p.tasks.indexOf(t), 1); return terr(e); }
       }
-      if(gOf(t) && !had){
+      if(gOf(t) && !had && !p.needPick){
         p.focusGroup = gOf(t);
         var oa = activeTask(p);
         if(oa && !sameG(gOf(oa), gOf(t))){ setStatus(oa, 'pending'); deactivate(p, oa); }
@@ -5584,7 +5814,7 @@ MStore.ready.then(function(){
     label:function(){ return 'Read the task list'; },
     run:function(p, a){
       var ts = tasksOf(p).filter(function(t){ return (!a.status || t.status === a.status) && (!a.group || sameG(gOf(t), a.group)); }).sort(bySeq), act = activeTask(p);
-      return { ok:true, res:'Read tasks (' + ts.length + ')', result:{ active:act ? act.seq : null, focus_group:(focusGroup(p) || {}).name || null, tasks:ts.map(function(t){ return taskBrief(p, t); }) } };
+      return { ok:true, res:'Read tasks (' + ts.length + ')', result:{ active:act ? act.seq : null, focus_group:(focusGroup(p) || {}).name || null, progress:projectProgress(p), tasks:ts.map(function(t){ return taskBrief(p, t); }) } };
     },
     card:function(m, seg){ return slim('task', seg.res || 'Read the task list'); }
   });
@@ -5616,11 +5846,19 @@ MStore.ready.then(function(){
       if(!t) return terr(NOTASK);
       var fg = focusGroup(p);
       if(fg && !sameG(fg.name, gOf(t))) return terr('The focus is the group \u201c' + fg.name + '\u201d and #' + t.seq + ' is outside it. Ask the person before switching.');
+      if(t.status === 'blocked' && !((t.blockedAt || 0) < lastUserTs(p) || (t.blockedAt || 0) < (p.answeredAt || 0)))
+        return terr('#' + t.seq + ' is blocked: ' + short(t.blockReason, 120) + '. It stays blocked until the person has replied. Tell them what is needed, or ask with ask_user.');
+      var first = earlierOpen(p, t)[0];
+      if(first) return terr('#' + first.seq + ' \u201c' + short(first.title, 50) + '\u201d comes first in this group and is not finished. Do it first, or block or fail it with the real reason. Do not skip it.');
+      if(gOf(t) && p.needPick){
+        var gl = String(gOf(t)).trim().toLowerCase(), said = lastUserTextOf(p).toLowerCase();
+        if(!gl || said.indexOf(gl) < 0) return terr('The last group is finished. Ask the person which group to start next with ask_user. Do not begin another group on your own.');
+      }
       var e = activate(p, t);
       if(e) return terr(e);
-      if(!fg && gOf(t)) p.focusGroup = gOf(t);
+      if(!fg && gOf(t)){ p.focusGroup = gOf(t); p.needPick = false; }
       save();
-      return { ok:true, res:'Started #' + t.seq + ' ' + short(t.title, 40), result:{ ok:true, message:'Task started. Work on it in small steps and save a checkpoint with update_task.', task:taskFull(p, t) } };
+      return { ok:true, res:'Started #' + t.seq + ' ' + short(t.title, 40), result:{ ok:true, message:'Task started (attempt ' + (t.attempts || 1) + '). Starting is not completing: do the work, check it against Done when, then complete_task. Save a checkpoint with update_task after real progress.', task:taskFull(p, t) } };
     },
     card:function(m, seg){ return slim('task', seg.res || 'Started a task'); }
   });
@@ -5643,33 +5881,60 @@ MStore.ready.then(function(){
       }
       if(a.note){ t.notes = (t.notes || []).concat([{ ts:now, t:short(a.note, 400) }]).slice(-30); changed = true; }
       if(a.checkpoint){ t.checkpoint = { ts:now, t:short(a.checkpoint, 800) }; changed = true; }
+      if(a.needs_approval === true){ t.approval = true; changed = true; }
+      if(a.doc){ var dd = findDoc(p, a.doc); if(!dd) return terr('No single document matches \u201c' + short(a.doc, 40) + '\u201d. Use list_docs.'); t.doc = dd.id; changed = true; }
       if(!changed) return terr('Nothing to change.');
       t.mod = now; save();
       return { ok:true, res:'Updated #' + t.seq + (a.checkpoint ? ' \u00b7 checkpoint saved' : ''), result:{ ok:true, message:'Saved.' } };
     },
     card:function(m, seg){ return slim('task', seg.res || 'Updated a task'); }
   });
+  function stopTask(p, a, status){
+    var t = findTask(p, a.task);
+    if(!t) return terr(NOTASK);
+    if(t.status === 'completed') return terr('That task is already completed.');
+    setStatus(t, status); t.blockReason = short(a.reason || 'No reason given', 300); t.blockedAt = Date.now();
+    t.notes = (t.notes || []).concat([{ ts:Date.now(), t:(status === 'failed' ? 'Failed: ' : 'Blocked: ') + t.blockReason }]).slice(-30);
+    deactivate(p, t); save();
+    var word = status === 'failed' ? 'failed' : 'blocked';
+    return { ok:true, res:(status === 'failed' ? 'Failed #' : 'Blocked #') + t.seq + ': ' + short(t.blockReason, 60), result:{ ok:true, message:stopAdvice(p, t, word) } };
+  }
   T('block_task', {
     icon:'task',
     label:function(a){ return 'Block task ' + short(a.task || '', 30); },
-    run:function(p, a){
-      var t = findTask(p, a.task);
-      if(!t) return terr(NOTASK);
-      setStatus(t, 'blocked'); t.blockReason = short(a.reason || 'No reason given', 300);
-      t.notes = (t.notes || []).concat([{ ts:Date.now(), t:'Blocked: ' + t.blockReason }]).slice(-30);
-      deactivate(p, t); save();
-      return { ok:true, res:'Blocked #' + t.seq + ': ' + short(t.blockReason, 60), result:{ ok:true, message:'Task marked blocked and kept for later.' } };
-    },
+    run:function(p, a){ return stopTask(p, a, 'blocked'); },
     card:function(m, seg){ return slim('task', seg.res || 'Blocked a task', 'warn'); }
   });
-  /* completion needs the person to confirm: the model proposes, the criteria and evidence are shown */
+  /* tried, and the criteria were not met: kept apart from blocked (cannot continue) and from completed */
+  T('fail_task', {
+    icon:'task',
+    label:function(a){ return 'Task did not pass ' + short(a.task || '', 30); },
+    run:function(p, a){ return stopTask(p, a, 'failed'); },
+    card:function(m, seg){ return slim('task', seg.res || 'A task did not pass', 'warn'); }
+  });
+  /* completion: the lab checks that work was really done before anyone may say a task is finished.
+     A task the person marked "needs my OK" always shows the confirm card, even under Approve all. */
   T('complete_task', {
     icon:'task', follow:true, approveText:'Confirm done', denyText:'Not yet',
+    force:function(p, a){ var t = findTask(p, a.task); return !!(t && t.approval); },
+    pre:function(p, a){
+      var t = findTask(p, a.task);
+      if(!t) return NOTASK;
+      if(t.status === 'completed') return 'That task is already completed.';
+      if(t.status !== 'active') return 'Start it with start_task and do its work first. A task that was never started cannot be completed.';
+      var w = unmetDeps(p, t);
+      if(w.length) return 'It still waits on: ' + w.map(function(x){ return '#' + x.seq; }).join(', ') + '.';
+      if(!String(t.criteria || '').trim()) return 'This task has no \u201cDone when\u201d criteria. Set them with update_task or agree them with the person, then check the work against them.';
+      if(!t.workAt || t.workAt < (t.startedAt || 0)) return 'No work has been recorded on this task since it started. Doing the work is what completes a task, not describing it. Use the tools to do it and check it, then complete it. If you could not do it, call fail_task or block_task.';
+      if(String(a.evidence || '').trim().length < 20) return 'Say how each \u201cDone when\u201d criterion was met: what you ran or checked and what it showed.';
+      return '';
+    },
     label:function(a){ return 'Finish task ' + short(a.task || '', 30); },
     preview:function(seg){
       var a = seg.args || {}, t = current && findTask(current, a.task), w = el('div');
       w.appendChild(el('div', 'txt', t ? '#' + t.seq + ' ' + t.title : short(a.task || '', 60)));
       w.appendChild(el('div', 'txt', 'Done when: ' + ((t && t.criteria) || 'not set')));
+      if(t && t.did && t.did.length) w.appendChild(el('div', 'txt', 'Actually ran: ' + short(t.did.join('; '), 300)));
       w.appendChild(el('div', 'txt', 'Evidence: ' + short(a.evidence || '', 400)));
       return w;
     },
@@ -5678,18 +5943,21 @@ MStore.ready.then(function(){
       if(!t) return terr(NOTASK);
       var w = unmetDeps(p, t);
       if(w.length) return terr('It still waits on: ' + w.map(function(x){ return '#' + x.seq; }).join(', ') + '.');
-      setStatus(t, 'completed'); deactivate(p, t);
+      setStatus(t, 'completed'); deactivate(p, t); t.doneAt = Date.now();
       t.notes = (t.notes || []).concat([{ ts:Date.now(), t:'Completed. ' + short(a.evidence || '', 300) }]).slice(-30);
       var msg = 'Marked as done.', g = gOf(t);
       if(g && sameG(p.focusGroup, g)){
         var grp = groupsOf(p).filter(function(x){ return sameG(x.name, g); })[0];
         var left = grp ? grp.tasks.filter(function(x){ return x.status !== 'completed'; }) : [];
-        if(!left.length){ p.focusGroup = ''; msg += ' Every task in the group \u201c' + g + '\u201d is now done. Report briefly and stop; do not start other tasks.'; }
-        else{
-          var nx = left.filter(function(x){ return x.status !== 'blocked' && !unmetDeps(p, x).length; })[0];
-          if(nx) msg += ' Next in this group: #' + nx.seq + ' ' + nx.title + '.';
+        if(!left.length){
+          p.focusGroup = ''; p.needPick = true;
+          msg += ' Every task in the group \u201c' + g + '\u201d is now done. Report briefly and stop. Do not start another group: if one is waiting, ask the person which is next with ask_user.';
+        }else{
+          var nx = earlierOpen(p, { seq:1e9, group:g, id:'' }).concat(left.filter(function(x){ return x.status === 'pending' && !unmetDeps(p, x).length; }))[0];
+          msg += ' Group \u201c' + g + '\u201d: ' + tallyText(tally(grp.tasks)) + '.' + (nx ? ' Next in order: #' + nx.seq + ' ' + nx.title + '.' : ' Nothing left can run yet: report what is blocked, failed or waiting.');
         }
       }
+      msg += ' ' + projectProgress(p) + '.';
       save();
       return { ok:true, res:'Completed #' + t.seq + ' ' + short(t.title, 40), result:{ ok:true, message:msg } };
     },
@@ -5700,7 +5968,7 @@ MStore.ready.then(function(){
      DISCOVERY JOURNAL: typed entries the person chooses to keep
      ===================================================================== */
   var JTYPES = [['hypothesis', 'Hypothesis'], ['question', 'Open question'], ['method', 'Experiment method'], ['observation', 'Observation'],
-    ['result', 'Experiment result'], ['insight', 'Insight'], ['decision', 'Decision'], ['assumption', 'Revised assumption'], ['idea', 'Idea']];
+    ['result', 'Experiment result'], ['insight', 'Insight'], ['decision', 'Decision'], ['assumption', 'Revised assumption'], ['idea', 'Idea'], ['finding', 'Finding']];
   function jLabel(k){ var h = JTYPES.filter(function(x){ return x[0] === k; })[0]; return h ? h[1] : 'Entry'; }
   function journalOf(p){ if(!Array.isArray(p.journal)) p.journal = []; return p.journal; }
   T('journal_save', {
@@ -5722,6 +5990,58 @@ MStore.ready.then(function(){
       return { ok:true, res:'Saved ' + jLabel(a.type).toLowerCase() + ' to the journal', result:{ ok:true, message:'Saved to the Discovery Journal.' } };
     },
     card:function(m, seg){ return slim('note', seg.res || 'Saved to the journal', 'ok'); }
+  });
+  /* the four mode tools all write the same journal, so nothing is stored twice and the journal page shows them */
+  function jAdd(p, type, title, text, o){
+    o = o || {};
+    var dup = journalOf(p).filter(function(e){ return e.type === type && sameG(e.title, title); })[0];
+    if(dup) return { err:'An entry with that title is already saved. Do not save it again.' };
+    var tk = o.task ? findTask(p, o.task) : null, dd = o.document ? findDoc(p, o.document) : null;
+    if(o.document && !dd) return { err:'No single document matches \u201c' + short(o.document, 40) + '\u201d. Use list_docs, or leave the document out.' };
+    var ch = chatOf(p), now = Date.now();
+    var e = { id:uid(), type:type, title:short(title, 120), text:short(text || title, 3000), ts:now, mod:now, task:tk ? tk.id : '', chat:ch ? ch.id : '' };
+    if(dd) e.doc = dd.id;
+    if(o.source) e.source = short(o.source, 300);
+    if(o.conf) e.conf = o.conf;
+    if(o.status) e.status = o.status;
+    journalOf(p).push(e); save();
+    return { e:e };
+  }
+  function jTool(id, verb, build){
+    T(id, {
+      icon:'note',
+      label:function(a){ return verb + ': ' + short(a.idea || a.question || a.claim || a.decision || '', 40); },
+      run:function(p, a){
+        var b = build(a);
+        if(b.err) return terr(b.err);
+        var r = jAdd(p, b.type, b.title, b.text, b.o);
+        if(r.err) return terr(r.err);
+        return { ok:true, res:verb + ' \u00b7 ' + short(b.title, 40), result:{ ok:true, message:'Saved to the Discovery Journal.' } };
+      },
+      card:function(m, seg){ return slim('note', seg.res || verb, 'ok'); }
+    });
+  }
+  jTool('capture_idea', 'Captured idea', function(a){
+    if(!String(a.idea || '').trim()) return { err:'Give the idea.' };
+    return { type:'idea', title:a.idea, text:a.details || a.idea, o:{ task:a.task, document:a.document } };
+  });
+  jTool('park_question', 'Parked question', function(a){
+    if(!String(a.question || '').trim()) return { err:'Give the question.' };
+    return { type:'question', title:a.question, text:a.why || a.question, o:{ task:a.task, document:a.document, status:'open' } };
+  });
+  jTool('save_finding', 'Saved finding', function(a){
+    var claim = String(a.claim || '').trim(), src = String(a.source || '').trim(), cf = String(a.confidence || '').trim().toLowerCase();
+    if(!claim) return { err:'Give the finding as one claim.' };
+    if(!src) return { err:'A finding needs a source. If there is none, say \u201cown knowledge\u201d and mark the confidence low.' };
+    if(['high', 'medium', 'low'].indexOf(cf) < 0) return { err:'Confidence must be high, medium or low.' };
+    if(cf === 'high' && /^(?:own|my own|general) knowledge\b|^(?:training data|memory|inferred|inference|none|unknown|n\/a)\b/i.test(src)) return { err:'Confidence cannot be high when the only source is your own knowledge or inference. Find a source, or mark it medium or low.' };
+    return { type:'finding', title:claim, text:claim, o:{ document:a.document, source:src, conf:cf } };
+  });
+  jTool('log_decision', 'Logged decision', function(a){
+    var d = String(a.decision || '').trim(), why = String(a.reason || '').trim();
+    if(!d || !why) return { err:'A decision needs what was chosen and why.' };
+    var rj = (Array.isArray(a.rejected) ? a.rejected : []).map(function(x){ return String(x).trim(); }).filter(Boolean);
+    return { type:'decision', title:d, text:'Why: ' + why + (rj.length ? '\n\nRejected:\n' + rj.map(function(x){ return '- ' + x; }).join('\n') : '\n\nRejected: nothing recorded.'), o:{ task:a.task, document:a.document } };
   });
   T('journal_list', {
     icon:'note', read:true,
@@ -5828,8 +6148,10 @@ MStore.ready.then(function(){
   });
   var CODE_EDITS = { add_brick:1, edit_brick:1, remove_brick:1, edit_lines:1 };
   /* run the page out of sight and list what is wrong with it: script mistakes, errors while running, a blank page */
+  var PY_MSG = 'The code assembly holds Python, which the preview cannot run (it reads any line starting with import as JavaScript). Take it out of the code assembly, save it as a project file with write_file, and run it with terminal_run.';
   async function verifyPage(p){
     var src = existingSrc(p), probs = [], seen = {};
+    if(isPyLike(src)) return { problems:[PY_MSG], lines:[], n:0 };
     if(typeOf(p) !== 'module') analyzeSrc(src).forEach(function(x){ if(x.sev === 'bad' && !seen[x.t]){ seen[x.t] = 1; probs.push(x.t); } });
     var lines = await runSandbox(src, 2400), pr = runLog.probe;
     lines.forEach(function(x){
@@ -5938,14 +6260,15 @@ MStore.ready.then(function(){
     deliberate:{ d:'Lay out options with pros, cons and a recommendation so the person can decide.', p:{ question:STR('The decision being made'),
       options:{ type:'ARRAY', description:'Two to four options', items:{ type:'OBJECT', properties:{ name:STR('Option name'), pros:LIST('Good things'), cons:LIST('Costs or risks') }, required:['name'] } },
       recommendation:STR('Which option you suggest and why, briefly') }, req:['question', 'options'] },
-    add_task:{ d:'Add an action item the person can tick off.', p:{ text:STR('The task title'), description:STR('Optional details'), priority:STR('low, normal or high'), criteria:STR('How to tell it is done'), depends_on:LIST('Tasks it waits on, by number or title'), group:STR('Name of the goal these tasks serve. Give every task of one goal the same name') }, req:['text'] },
-    list_tasks:{ d:'List the project tasks with status, priority and what each waits on.', p:{ status:STR('Optional filter: pending, active, blocked or completed'), group:STR('Optional filter: a group name') } },
+    add_task:{ d:'Add an action item the person can tick off.', p:{ text:STR('The task title'), description:STR('Optional details'), priority:STR('low, normal or high'), criteria:STR('How to tell it is done'), depends_on:LIST('Tasks it waits on, by number or title'), group:STR('Name of the goal these tasks serve. Give every task of one goal the same name'), doc:STR('Title of the document this task comes from, if any'), needs_approval:S('BOOLEAN', 'True if the person must approve before this task is marked done') }, req:['text'] },
+    list_tasks:{ d:'List the project tasks with status, priority and what each waits on.', p:{ status:STR('Optional filter: pending, active, blocked, failed or completed'), group:STR('Optional filter: a group name') } },
     read_task:{ d:'Read one task in full.', p:{ task:STR('Task number or title') }, req:['task'] },
     get_active_task:{ d:'Read the task currently being worked on.' },
     start_task:{ d:'Make a task the active one. Fails while it waits on unfinished tasks.', p:{ task:STR('Task number or title') }, req:['task'] },
-    update_task:{ d:'Change a task or save progress. Use checkpoint to record what is done and what comes next, so work can resume in a later turn.', p:{ task:STR('Task number or title'), title:STR('New title'), description:STR('New details'), priority:STR('low, normal or high'), criteria:STR('Completion criteria'), depends_on:LIST('Tasks it waits on, by number or title; replaces the old list'), note:STR('A progress note'), checkpoint:STR('Where the work stands and the next step'), group:STR('Move the task to this group name') }, req:['task'] },
-    block_task:{ d:'Mark a task blocked and record why.', p:{ task:STR('Task number or title'), reason:STR('What is blocking it') }, req:['task', 'reason'] },
-    complete_task:{ d:'Mark a task as done once its completion criteria are met. Say how each was met.', p:{ task:STR('Task number or title'), evidence:STR('How each completion criterion was met') }, req:['task', 'evidence'] },
+    update_task:{ d:'Change a task or save progress. Use checkpoint to record what is done and what comes next, so work can resume in a later turn.', p:{ task:STR('Task number or title'), title:STR('New title'), description:STR('New details'), priority:STR('low, normal or high'), criteria:STR('Completion criteria'), depends_on:LIST('Tasks it waits on, by number or title; replaces the old list'), note:STR('A progress note'), checkpoint:STR('Where the work stands and the next step'), group:STR('Move the task to this group name'), doc:STR('Title of the document this task comes from'), needs_approval:S('BOOLEAN', 'Set true to require the person\u2019s approval before it is marked done. It cannot be turned off here.') }, req:['task'] },
+    block_task:{ d:'Mark a task blocked and record why. Use it when the task cannot continue: something is missing, or the person declined a step.', p:{ task:STR('Task number or title'), reason:STR('What is blocking it') }, req:['task', 'reason'] },
+    fail_task:{ d:'Mark a task failed: it was tried and its Done when was not met. Record what was tried and what went wrong.', p:{ task:STR('Task number or title'), reason:STR('What was tried and why it did not pass') }, req:['task', 'reason'] },
+    complete_task:{ d:'Mark a task as done only after its work was really performed with tools and its Done when was checked. Trying is not completing. Say how each criterion was met.', p:{ task:STR('Task number or title'), evidence:STR('How each completion criterion was met') }, req:['task', 'evidence'] },
     add_brick:{ d:'Add a piece of code to the page, or write the whole page when none exists yet.', p:{
       name:STR('Plain-language name of this piece, for example "Tap counter"'), code:STR('The code to add'),
       where:STR('One of: whole_file (replace everything with this complete HTML document; use it to start a new page), body (page markup, placed above the scripts), style (end of the CSS), script (end of the JavaScript), head, after_text (right after the line containing anchor)'),
@@ -5968,6 +6291,10 @@ MStore.ready.then(function(){
     web_search:{ d:'Search the web for current facts and sources. Use it for anything that may have changed or when unsure. Returns an answer with sources.', p:{ query:STR('What to look up') }, req:['query'] },
     edit_lines:{ d:'Replace a range of lines of the page with new code. Get the line numbers from read_assembly first. Use code with no text to delete the lines.', p:{ name:STR('Plain-language name of what is changing'), from:S('INTEGER', 'First line to replace'), to:S('INTEGER', 'Last line to replace'), code:STR('The new code for those lines') }, req:['name', 'from', 'to', 'code'] },
     journal_save:{ d:'Propose a Discovery Journal entry. Only when the person wants something kept. A hypothesis is not a fact and an observation is not a conclusion, so choose the category carefully.', p:{ type:STR('One of: hypothesis, question, method, observation, result, insight, decision, assumption, idea'), title:STR('Short title'), text:STR('The entry'), task:STR('Optional related task number or title') }, req:['type', 'title', 'text'] },
+    capture_idea:{ d:'Save an idea worth keeping to the Discovery Journal. Use it for what the person would want to find again, not every passing thought.', p:{ idea:STR('The idea in one short line'), details:STR('Optional: what it means or why it matters'), document:STR('Optional: title of the document it came from'), task:STR('Optional related task number or title') }, req:['idea'] },
+    park_question:{ d:'Save an open question that cannot be settled yet, so it is not lost. It stays open until the person resolves it.', p:{ question:STR('The question'), why:STR('Optional: why it matters or what it blocks'), document:STR('Optional: title of the document it came from'), task:STR('Optional related task number or title') }, req:['question'] },
+    save_finding:{ d:'Record a research finding with where it came from and how sure you are. A finding needs a source. Confidence cannot be high when the source is only your own knowledge or inference.', p:{ claim:STR('The finding, stated as one claim'), source:STR('Where it came from: a title or address from a search, a document, a file, or \u201cown knowledge\u201d if there is none'), confidence:STR('high, medium or low'), document:STR('Optional: title of the document it relates to') }, req:['claim', 'source', 'confidence'] },
+    log_decision:{ d:'Record a design decision: what was chosen, why, and what was rejected. Use it when a choice is actually made, not while options are still open.', p:{ decision:STR('What was chosen, in one line'), reason:STR('Why it was chosen'), rejected:LIST('Alternatives not chosen, each with why'), document:STR('Optional: title of the document this decision comes from or changes'), task:STR('Optional related task number or title') }, req:['decision', 'reason'] },
     journal_list:{ d:'Read Discovery Journal entries, newest first.', p:{ type:STR('Optional category'), query:STR('Optional word to search for') } }
   };
   function decl(id){
@@ -6824,7 +7151,7 @@ MStore.ready.then(function(){
       return new Promise(function(res){
         waiters[seg.id] = function(v){
           delete waiters[seg.id];
-          if(typeof v !== 'string' && v && v.ans != null) res({ ok:true, res:'Asked · ' + short(v.ans, 60), result:{ answer:v.ans, note:'This is the person’s answer. Carry on with it.' } });
+          if(typeof v !== 'string' && v && v.ans != null){ p.answeredAt = Date.now(); save(); } if(typeof v !== 'string' && v && v.ans != null) res({ ok:true, res:'Asked · ' + short(v.ans, 60), result:{ answer:v.ans, note:'This is the person’s answer. Carry on with it.' } });
           else res({ ok:true, res:'Question skipped', result:{ answer:null, note:'The person did not answer. Do not guess; say what you still need.' } });
         };
       });
@@ -6852,11 +7179,12 @@ MStore.ready.then(function(){
       if(!(st[t.id].enabled && st[t.id].perm !== 'deny' && IMPL[t.id] && DECL[t.id] && (!INTG[t.id] || intgUp(INTG[t.id])))) return false;
       if((t.id === 'journal_save' || t.id === 'journal_list') && !gate.journal) return false;
       if(t.id === 'write_note' && !gate.note) return false;
+      if(MODE_ONLY[t.id] && mo !== MODE_ONLY[t.id]) return false;
       if((ty === 'dataset' || ty === 'spec') && t.group === 'Code' && !gate.code) return false;
       if(intent === 'talk' && TALK_SET.indexOf(t.id) < 0 && !(ty === 'dataset' && t.id === 'dataset_add')) return false;
       if(!set) return true;
       if(INTG[t.id]) return mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk);
-      return set.indexOf(t.id) >= 0;
+      return set.indexOf(t.id) >= 0 || taskKeep(p, t.id);
     }).map(function(t){ return t.id; });
   }
 
@@ -6869,14 +7197,23 @@ MStore.ready.then(function(){
     list_documents:'list_docs', read_document:'read_doc', get_document:'read_doc', get_doc:'read_doc',
     list_task:'list_tasks', get_tasks:'list_tasks', get_task:'read_task', create_task:'add_task', new_task:'add_task',
     search_web:'web_search', google_search:'web_search', web_lookup:'web_search',
-    save_note:'write_note', add_note:'write_note', save_journal:'journal_save', write_journal:'journal_save'
+    save_note:'write_note', add_note:'write_note', save_journal:'journal_save', write_journal:'journal_save',
+    read_files:'read_file', open_file:'read_file', get_file:'read_file', view_file:'read_file', cat_file:'read_file', create_file:'write_file', save_file:'write_file', update_file:'edit_file', modify_file:'edit_file', patch_file:'edit_file', remove_file:'delete_file', list_directory:'list_files', ls:'list_files'
   };
+  /* the Settings name of every tool also works as a call name: read_project_file means read_file */
+  var NAME_SLUG = null;
+  function nameSlug(){
+    if(!NAME_SLUG){ NAME_SLUG = {}; TOOLS.forEach(function(t){ NAME_SLUG[String(t.name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')] = t.id; }); }
+    return NAME_SLUG;
+  }
   function canonTool(n){
     n = String(n || '');
     if(IMPL[n]) return n;
     var k = n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if(IMPL[k]) return k;
-    return TOOL_ALIAS[k] && IMPL[TOOL_ALIAS[k]] ? TOOL_ALIAS[k] : n;
+    if(TOOL_ALIAS[k] && IMPL[TOOL_ALIAS[k]]) return TOOL_ALIAS[k];
+    var ns = nameSlug()[k];
+    return ns && IMPL[ns] ? ns : n;
   }
   var ST_INFO = {
     ok:{ k:'ok', label:'Done', desc:'This step finished and any change it made is saved.' },
@@ -6886,6 +7223,17 @@ MStore.ready.then(function(){
     undone:{ k:'warn', label:'Undone', desc:'The change was done, then you rolled it back.' },
     fail:{ k:'bad', label:'Failed', desc:'This step hit a problem. The AI can see the reason and try another way.' }
   };
+  /* a refused tool is not always a declined one: say which it was */
+  function denyInfo(seg){
+    if(!IMPL[seg.name]) return { k:'bad', label:'Not done', desc:'The AI called \u201c' + seg.name + '\u201d, which is not a tool in this lab. It was sent the real tool names and can try again.' };
+    if(seg.res === 'Not available in this mode.'){
+      var modes = Object.keys(MODE_SETS).filter(function(k){ return !MODE_SETS[k] || MODE_SETS[k].indexOf(seg.name) >= 0; });
+      if(MODE_ONLY[seg.name]) modes = [MODE_ONLY[seg.name]];
+      return { k:'bad', label:'Not done', desc:'This tool was not loaded for that message. It works in ' + (modes.join(', ') || 'another') + ' mode.' };
+    }
+    if(seg.res === 'Not available.') return { k:'bad', label:'Not done', desc:'This tool is turned off in Settings.' };
+    return ST_INFO.denied;
+  }
   function toolCard(m, seg){
     var node = toolCard0(m, seg);
     if(node && node.classList && node.classList.contains('tact') && !node.__tap){
@@ -6893,15 +7241,22 @@ MStore.ready.then(function(){
       node.addEventListener('click', function(){
         var I = IMPL[seg.name], a = seg.args || {}, label = I ? I.label(a) : seg.name;
         var st = ST_INFO[seg.st] || ST_INFO.ok, args = [];
-        try{ Object.keys(a).forEach(function(k){ var v = a[k]; args.push(k + ': ' + (typeof v === 'string' ? short(v, 160) : short(JSON.stringify(v), 160))); }); }catch(_){}
-        UI.info(label, st, [['Tool', seg.name], ['Details', args.join('\n')], ['Result', seg.res ? short(seg.res, 400) : ''], ['Output', seg.out ? short(seg.out, 1500) : '']]);
+        if(seg.st === 'denied') st = denyInfo(seg);
+        try{
+          Object.keys(a).forEach(function(k){
+            var v = a[k], tx = typeof v === 'string' ? v : JSON.stringify(v);
+            args.push(/\n/.test(tx) || tx.length > 80 ? '**' + k + '**\n\n' + short(tx, 900) : '**' + k + ':** ' + tx);
+          });
+        }catch(_){}
+        var raw = /^(terminal_|run_|verify_)/.test(seg.name), outTx = seg.out ? short(seg.out, 1500) : '';
+        UI.info(label, st, [['Tool', seg.name], ['Details', args.join('\n\n'), true], ['Result', seg.res ? short(seg.res, 600) : '', true], ['Output', outTx && raw ? '```\n' + outTx + '\n```' : outTx, true]]);
       });
     }
     return node;
   }
   function toolCard0(m, seg){
     var I = IMPL[seg.name], a = seg.args || {};
-    if(!I) return slim('code', 'That action is not available here', 'warn');
+    if(!I) return slim('code', 'Unknown action: ' + short(seg.name, 40), 'warn');
     var label = I.label(a);
     if(seg.name === 'ask_user' && seg.st === 'run' && busy && pending === current) return askUserCard(seg);
     if(seg.st === 'run') return (busy && pending === current) ? slim(I.icon, 'Working: ' + lc(label), 'warn') : slim(I.icon, 'Interrupted: ' + lc(label), 'warn');
@@ -6947,18 +7302,33 @@ MStore.ready.then(function(){
     }
     if(ctx.allowed && ctx.allowed.indexOf(seg.name) < 0 && seg.name !== 'verify_page'){
       seg.st = 'denied'; seg.res = 'Not available in this mode.';
-      return { result:{ error:'This tool is not available in the current mode. Tell the person which mode it needs, or ask them to request the change directly.' } };
+      return { result:{ error:'This tool is not loaded for this message. The tools you can call right now are: ' + (ctx.allowed || []).join(', ') + '. Use one of those, or tell the person which mode ' + seg.name + ' needs.' } };
     }
     var pre = I.pre ? I.pre(p, a) : '';
     if(pre){ seg.st = 'fail'; seg.res = pre; return { result:{ error:pre } }; }
-    if(st.perm === 'ask' && (!ctx.autoAll || I.always)){
+    var forced = !!(I.force && I.force(p, a));
+    if((st.perm === 'ask' || forced) && (!ctx.autoAll || I.always || forced)){
       var answered = new Promise(function(res){ waiters[seg.id] = res; });
       seg.st = 'ask'; save(); draw();
       var dec = await answered;
       delete waiters[seg.id];
       if(dec === 'no'){
-        seg.st = 'denied'; seg.res = 'Declined by the person.'; seg.args = trimArgs(a); save();
-        return { result:{ declined:true, instruction:'The person declined this action. Do not retry it. Now answer what they asked in plain words, with whatever you can say without the action.' } };
+        seg.st = 'denied'; seg.res = 'Declined by the person.'; seg.args = trimArgs(a);
+        var dres = { declined:true, instruction:'The person declined this action. Do not retry it. Now answer what they asked in plain words, with whatever you can say without the action.' };
+        var at = activeTask(p);
+        if(seg.name === 'complete_task'){
+          if(at) at.notes = (at.notes || []).concat([{ ts:Date.now(), t:'The person said this is not done yet.' }]).slice(-30);
+          dres.instruction = 'The person said the task is not done yet. Do not mark it complete. Ask what is missing with ask_user, then fix that.';
+        }else if(at && !I.read && !NOWORK[seg.name] && seg.name !== 'verify_page'){
+          /* a declined step must not leave its task looking in progress */
+          setStatus(at, 'blocked'); at.blockReason = short('The person declined: ' + I.label(a) + '.', 300); at.blockedAt = Date.now();
+          at.notes = (at.notes || []).concat([{ ts:Date.now(), t:'Blocked: ' + at.blockReason }]).slice(-30);
+          deactivate(p, at);
+          dres.task_blocked = '#' + at.seq + ' ' + at.title;
+          dres.instruction += ' ' + stopAdvice(p, at, 'blocked');
+        }
+        save();
+        return { result:dres };
       }
       if(dec === 'all') ctx.autoAll = true;
     }
@@ -7137,7 +7507,7 @@ MStore.ready.then(function(){
   function modeText(mo, ov){
     var M = {
       discovery:'MODE: Discovery. You and the person are exploring ideas, theories and possibilities. Discuss and reason with them. Do not write code, create files or change the project unless their latest message explicitly asks for that. Describing an idea is not a request to build it. When something is worth keeping, offer to save it to the Discovery Journal.',
-      research:'MODE: Research. You are investigating a question. You have no web access here, so everything comes from your own knowledge. Label each point as established fact, sourced information, observation, hypothesis or uncertainty, and say when you cannot name a source. Do not turn research into implementation unless their latest message explicitly asks for it.',
+      research:'MODE: Research. You are investigating a question. When web_search is offered, use it for facts that may be current or that you are unsure of, and name the source. Label each point as established fact, sourced information, observation, hypothesis or uncertainty, and say when you cannot name a source. Do not turn research into implementation unless their latest message explicitly asks for it.',
       design:'MODE: Design. You are developing an architecture, workflow, algorithm, interface or experiment plan. Produce a design or specification in words. A design is not permission to build it: do not write or change code unless their latest message explicitly asks for that. End with one short line on what could come next.',
       build:'MODE: Build. You create and change code and files when the person asks. Read the existing page before you change it and keep what already works. If they are only exploring, asking a question or describing an idea without asking for it to be made, discuss it instead of building. If it is unclear whether they want it built, ask one short question.',
       test:'MODE: Test. You run what exists, read its output and errors, and check that it behaves as expected. Finding a problem is not permission to fix it: say what is wrong and what you would change, and change nothing unless their latest message explicitly asks for a fix.'
@@ -7184,10 +7554,13 @@ MStore.ready.then(function(){
       if(has('write_doc')) R.push('Use write_doc for written designs, specs, blueprints and reports so the person can read, edit and export them. A design is a document, not an app. Set kind (blueprint, spec, report, note or data) and format (markdown, json, csv, yaml, mermaid, html, plain or code) to fit the content. When asked to build something, call list_docs first: a document marked approved is the blueprint to follow, and one that is not approved is only a draft, so say so before building from it.');
       if(has('write_note')) R.push('write_note is loaded because the person asked to remember something. Save only that, once.');
       if(has('start_task') || has('update_task')){
-        R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work only on tasks in the focus group, in order, and never start a task from another group or an ungrouped one unless the person asks. When you start a task, do its work: read the code, make the change, check it against \u201cDone when\u201d. When the focus group is finished, report briefly and stop. Before you stop, save progress with update_task (checkpoint = what is done and the next step). When every completion criterion is met, call complete_task and say how each was met. If you cannot continue, call block_task with the reason. A task never overrides what the person just asked.');
+        R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work through every task in the focus group, in order, and finish each before the next. Never skip a task, leave one half done, or start a task from another group or an ungrouped one unless the person asks. Starting a task is only an attempt. Do its work with tools, then check it against \u201cDone when\u201d: a task is complete only when the work was really performed and each criterion is met, and complete_task is refused if no work was recorded. If it was tried and did not pass, call fail_task with what went wrong. If it cannot continue, or the person declined a step it needs, call block_task with the reason, then say so plainly and either carry on with a task that does not wait on it or stop and ask. A group is finished only when every task in it is completed; when it is, report briefly and stop, and ask which group is next instead of starting one. Before you stop, save progress with update_task (checkpoint = what is done and the next step). A task never overrides what the person just asked.');
       }
+      if(has('capture_idea')) R.push('Discovery: when an idea is worth keeping, call capture_idea; when a question cannot be settled yet, call park_question. Both save straight to the Discovery Journal, so use them for what the person would want to find again, not every thought. Keep exploring in words as well.');
+      if(has('save_finding')) R.push('Research: when you establish something, call save_finding with the claim, its source and your confidence (high, medium or low). Use a source from web_search, a document or a file. Without a checkable source the confidence is low. Do not save guesses as findings.');
+      if(has('log_decision')) R.push('Design: when a choice is actually made, call log_decision with what was chosen, why, and what was rejected. If it comes from or changes a document, name the document. Tasks you add from a document should name it too (the doc field).');
       if(has('journal_save')) R.push('The person asked to save something to the Discovery Journal. Save only what they asked for, once, under the right category. Never file a hypothesis as a fact.');
-      if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on. Python and Node scripts can run only through terminal_run, when it is offered.');
+      if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on. Python and Node scripts can run only through terminal_run, when it is offered. Python or shell code never goes in the code assembly: save it as a project file with write_file and run it with terminal_run.');
       R.push('Never say that code ran, that a test passed, or show output, unless a tool result in this conversation shows it. If you could only read the code, say plainly that you read it and did not run it, and never write expected output as if it were real. If a tool failed or is not available, say that first.');
       if(has('terminal_run')) R.push('terminal_run runs node, npm, npx, python and pip on the person\u2019s phone through Termux. Use it for anything that needs Node or Python, which the page sandbox cannot run. Put the files there first (terminal_write, terminal_send_code or terminal_send_test_files), run the command, then report the real exit code and the real output, including failures.');
       var GUIDE = {
@@ -7201,11 +7574,16 @@ MStore.ready.then(function(){
         web_search:'for current facts and sources. Not for things you can answer from the conversation.',
         write_doc:'for plans, specs and reports the person will read or edit. Not for chat replies.',
         read_doc:'before you change or build on a document. list_docs first if you do not know its name.',
-        add_task:'to break a big goal into steps. Not for one small change.',
+        add_task:'to break a big goal into steps. Not for one small change. Adding to a group that has already started asks the person first.',
+        fail_task:'when a task was tried and did not pass. Not for a task that cannot continue (block_task) and never to hide an unfinished task.',
         start_task:'once, before you begin a task. update_task saves a checkpoint after real progress, never as a way to answer.',
-        complete_task:'only when the checks pass; the person confirms it.',
+        complete_task:'only after you did the work with tools and the checks pass. Not after trying, and never to close a group.',
         dataset_add:'to save something you actually found, with its source. Not for guesses.',
         write_note:'only when the person asks you to remember something.',
+        capture_idea:'for an idea worth finding again. Not for every passing thought.',
+        park_question:'for a question that cannot be answered yet. Not for one you can answer now.',
+        save_finding:'for something you established, with its source and confidence. Not for guesses.',
+        log_decision:'when a design choice is made. Not while options are still open.',
         create_subproject:'when part of the work needs another type or must stay apart. Not for small edits.',
         ask_user:'when the request is unclear in a way that changes what you would do, or before something big or hard to undo. One question, 2 to 4 choices. Not for things you can look up or decide yourself.',
         list_files:'before you work with files or run anything in Termux, to see what exists and what is out of sync.',
@@ -7217,7 +7595,7 @@ MStore.ready.then(function(){
       };
       var gl = Object.keys(GUIDE).filter(function(k){ return has(k); }).map(function(k){ return k + ': ' + GUIDE[k]; });
       if(gl.length) R.push('When to use each tool: ' + gl.join(' ') + ' Pick the one tool that fits, and never call the same tool with the same input twice.');
-      R.push('Ways of working. To explore or answer: read what is there, then reply in words. To plan: talk it through, then write it down (document or tasks). To build: read first, make one small change, check it, then tell the person. To fix: reproduce or read the problem, change the smallest thing, check again. After a step really finishes (an install that worked, a file saved, a test that ran), update the task checkpoint to the next pending action, not the one just done. Saving notes or task checkpoints is bookkeeping, never the answer: after it, either do the real work or reply in words. If the person says continue, carry on with the real work from where it stopped.');
+      R.push('Ways of working. To explore or answer: read what is there, then reply in words. To plan: talk it through, then write it down (document or tasks). To build: read first, make one small change, check it, then tell the person. To fix: reproduce or read the problem, change the smallest thing, check again. After a step really finishes (an install that worked, a file saved, a test that ran), update the task checkpoint to the next pending action, not the one just done. If that next action was declined or cannot run, call block_task instead of leaving it written as the next step. Saving notes or task checkpoints is bookkeeping, never the answer: after it, either do the real work or reply in words. If the person says continue, carry on with the real work from where it stopped.');
       if(has('list_files')) R.push('Files live in three places and you must keep them straight: (1) the main page in code assembly, changed with the code tools; (2) the project files, changed with write_file and edit_file; (3) Termux, a separate copy on the phone. write_file never touches Termux. terminal_write puts a file in Termux only, so it will not be a project file. Send project files with sync_to_termux, and check_sync shows what Termux really holds. If a run result lists unsynced_files, the run used older copies: say so.');
       R.push('Use tools whenever the answer depends on something real: read a file before you describe or change it, run something before you say it works, search before you state a current fact. Never answer from memory or guess what a file holds. If you are truly unsure what the person wants and the answer would change what you do, ask one short question instead of guessing' + (has('ask_user') ? ' (call ask_user so they can tap a choice)' : '') + '. If it is clear, just do it.');
       R.push('Never use web_search to find out how to run a command or to work around a missing tool. If a tool you need is not loaded, say which mode or setting it needs and stop. A tool result with state timed_out, did_not_run or completed_with_error is not a pass: report exactly that state, the exit code and what the output says.');
@@ -7315,7 +7693,7 @@ MStore.ready.then(function(){
     busy = true; pending = ch; lastErr = null; stopCtl = new AbortController();
     var sig = stopCtl.signal;
     syncSend(); paintConn();
-    function draw(keep){ if(current === p && currentView === 'lab' && chatOf(p) === ch) renderThread(keep); }
+    function draw(keep){ if(current === p && currentView === 'lab' && chatOf(p) === ch) renderThread(keep, busy); }
     var m = null, ctx = { autoAll:false }, useTools = true, live = null, raf = 0, lastSave = 0, nudges = 0, force = false, verifies = 0;
     var intent = intentOf(ch), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {}, bookRounds = 0;
     var BOOK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, journal_save:1, write_note:1, read_notes:1, add_task:1 };
@@ -7446,6 +7824,7 @@ MStore.ready.then(function(){
           }
           turnSeen[tkey] = 1;
           out = await runToolCall(p, sg, ctx, draw);
+          if(sg.st === 'ok') noteWork(p, sg);
           results.push({ functionResponse:{ name:sg.name, response:out.result } });
           ent.calls.push({ name:sg.name, st:sg.st });
           follow = true;
@@ -7944,13 +8323,13 @@ MStore.ready.then(function(){
   });
   function groupHead(g, on){
     var wrap = el('div'), row = el('div', 'tool-top'), done = g.tasks.filter(function(x){ return x.status === 'completed'; }).length;
-    var h = el('div', 'group-h', g.name + ' \u00b7 ' + done + '/' + g.tasks.length); h.style.flex = '1';
+    var h = el('div', 'group-h', g.name + ' \u00b7 ' + tallyText(tally(g.tasks))); h.style.flex = '1';
     row.appendChild(h);
     var fb = el('button', 'lnk', on ? 'Focused' : 'Focus');
     fb.addEventListener('click', function(){
       if(on){ current.focusGroup = ''; }
       else{
-        current.focusGroup = g.name;
+        current.focusGroup = g.name; current.needPick = false;
         var a = activeTask(current);
         if(a && !sameG(gOf(a), g.name)){ setStatus(a, 'pending'); deactivate(current, a); }
       }
@@ -7976,6 +8355,7 @@ MStore.ready.then(function(){
       current.focusGroup = gOf(t);
       var e = activate(current, t);
       if(e){ current.focusGroup = prevF; UI.alert('Cannot select yet', e); return; }
+      current.needPick = false;
       save(); renderNotebook();
     });
     top.appendChild(sel);
@@ -7994,10 +8374,16 @@ MStore.ready.then(function(){
     var w = unmetDeps(current, t), sub = [];
     if(t.status === 'active') sub.push('Active');
     if(t.status === 'blocked') sub.push('Blocked');
+    if(t.status === 'failed') sub.push('Failed');
+    if(t.approval) sub.push('Needs your OK');
+    if((t.attempts || 0) > 1) sub.push('Attempt ' + t.attempts);
     if(w.length) sub.push('Waiting on ' + w.map(function(x){ return '#' + x.seq; }).join(', '));
     if(t.priority === 'high') sub.push('High priority');
     if(sub.length) card.appendChild(el('div', 'xsub', sub.join(' \u00b7 ')));
     var d = el('div', 'tool-info'); d.style.whiteSpace = 'pre-line'; d.textContent = taskDetailText(current, t);
+    var ap = el('button', 'lnk', t.approval ? 'Needs my OK before done: on' : 'Needs my OK before done: off'); ap.style.display = 'block'; ap.style.marginTop = '8px';
+    ap.addEventListener('click', function(){ t.approval = !t.approval; t.mod = Date.now(); save(); renderNotebook(); });
+    d.appendChild(ap);
     card.appendChild(d);
     return card;
   }
@@ -8253,7 +8639,7 @@ MStore.ready.then(function(){
   function journalMd(p){
     var es = journalOf(p).slice().sort(function(a, b){ return a.ts - b.ts; });
     return '# Discovery Journal: ' + p.name + '\n\n' + (es.length ? es.map(function(e){
-      return '## ' + e.title + '\n\n*' + jLabel(e.type) + ' \u00b7 ' + taskStamp(e.ts) + '*\n\n' + e.text;
+      return '## ' + e.title + '\n\n*' + jLabel(e.type) + ' \u00b7 ' + taskStamp(e.ts) + (e.source ? ' \u00b7 Source: ' + e.source : '') + (e.conf ? ' \u00b7 Confidence: ' + e.conf : '') + (e.status ? ' \u00b7 ' + (e.status === 'open' ? 'Open' : 'Resolved') : '') + '*\n\n' + e.text;
     }).join('\n\n') : 'No entries.') + '\n';
   }
   function tasksMd(p){
@@ -8281,8 +8667,8 @@ MStore.ready.then(function(){
   }
   function exportJournal(p){
     return exportMix('journal-' + p.name, journalMd(p), {
-      json:function(){ return JSON.stringify(journalOf(p).map(function(e){ return { category:e.type, title:e.title, text:e.text, saved:new Date(e.ts).toISOString() }; }), null, 2); },
-      csv:function(){ return csvOf(['category', 'title', 'text', 'saved'], journalOf(p).map(function(e){ return [e.type, e.title, e.text, new Date(e.ts).toISOString()]; })); }
+      json:function(){ return JSON.stringify(journalOf(p).map(function(e){ return { category:e.type, title:e.title, text:e.text, source:e.source || undefined, confidence:e.conf || undefined, status:e.status || undefined, saved:new Date(e.ts).toISOString() }; }), null, 2); },
+      csv:function(){ return csvOf(['category', 'title', 'text', 'source', 'confidence', 'status', 'saved'], journalOf(p).map(function(e){ return [e.type, e.title, e.text, e.source || '', e.conf || '', e.status || '', new Date(e.ts).toISOString()]; })); }
     });
   }
   function exportTasks(p){
@@ -9866,10 +10252,16 @@ MStore.ready.then(function(){
       var tk = e.task ? tasksOf(current).filter(function(t){ return t.id === e.task; })[0] : null;
       var cc = e.chat ? (current.chats || []).filter(function(c){ return c.id === e.chat; })[0] : null;
       var meta = [taskStamp(e.ts)];
+      if(e.source) meta.push('Source: ' + short(e.source, 60));
+      if(e.conf) meta.push('Confidence: ' + e.conf);
+      if(e.type === 'question' && e.status) meta.push(e.status === 'open' ? 'Open' : 'Resolved');
+      var jd = e.doc ? (current.docs || []).filter(function(x){ return x.id === e.doc; })[0] : null;
+      if(jd) meta.push('From ' + short(jd.title, 30));
       if(tk) meta.push('Task #' + tk.seq + ' ' + short(tk.title, 30));
       if(cc) meta.push('Chat ' + short(cc.title || 'Chat', 30));
       var mt = el('div', 'xsub', meta.join(' \u00b7 ')); mt.style.marginTop = '8px'; d.appendChild(mt);
       var row = el('div', 'tool-top'); row.style.marginTop = '10px';
+      if(e.type === 'question' && e.status) row.appendChild(mkBtn('ghost', e.status === 'open' ? 'Mark resolved' : 'Reopen', '', function(){ e.status = e.status === 'open' ? 'resolved' : 'open'; e.mod = Date.now(); save(); renderJournal(); }));
       row.appendChild(mkBtn('ghost', 'Edit', '', function(){ editor(e); host.scrollIntoView({ block:'start' }); }));
       row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
         if(await UI.confirm('Delete this entry?', '', { confirmText:'Delete', danger:true })){
@@ -10621,6 +11013,7 @@ MStore.ready.then(function(){
     return '<script>' + helpers + '<\/script>';
   }
   function runSandbox(src, ms, check){
+    if(isPyLike(src)){ runLog = { at:Date.now(), lines:[{ k:'error', t:PY_MSG }], src:src }; return Promise.resolve(runLog.lines.slice()); }
     return new Promise(function(resolve){
       if(sbFrame){ try{ sbFrame.remove(); }catch(e){} }
       if(check && current && typeOf(current) === 'module' && !/<html[\s>]|<!doctype html/i.test(src)) src = moduleHarness(src);
@@ -10654,6 +11047,7 @@ MStore.ready.then(function(){
     });
   }
   function openPreview(src){
+    if(isPyLike(src)){ consClear(); logLine('error', PY_MSG); $('frameHost').innerHTML = ''; $('preview').classList.add('show'); return; }
     lastPreview = src; helloN = 0;
     runLog = { at:Date.now(), lines:[], src:src };
     consClear();
