@@ -3152,7 +3152,7 @@ MStore.ready.then(function(){
       }
     });
     var out = { model:model, messages:msgs, stream:!!stream }, gc = body.generationConfig || {}, fd = [];
-    if(gc.maxOutputTokens) out.max_tokens = gc.maxOutputTokens;
+    if(gc.maxOutputTokens) out.max_tokens = Math.max(gc.maxOutputTokens, 1024);
     if(typeof gc.temperature === 'number') out.temperature = gc.temperature;
     (body.tools || []).forEach(function(t){ (t.functionDeclarations || []).forEach(function(f){
       fd.push({ type:'function', function:{ name:f.name, description:f.description || '', parameters:lowerTypes(f.parameters || { type:'OBJECT', properties:{} }) } });
@@ -3160,14 +3160,22 @@ MStore.ready.then(function(){
     if(fd.length) out.tools = fd;
     return out;
   }
+  function extErrBody(ej){
+    var er = (ej && ej.error) || {}, md = er.metadata || {}, raw = md.raw;
+    if(raw && typeof raw !== 'string'){ try{ raw = JSON.stringify(raw); }catch(x){ raw = ''; } }
+    var msg = (er.message || 'The provider returned an error.') + (md.provider_name ? ' (' + md.provider_name + ')' : '') + (raw ? ': ' + String(raw).slice(0, 200) : '');
+    return { error:{ code:er.code, message:msg, status:er.type || '' } };
+  }
   async function extCall(body, o){
     var e = EX(), url = e.base.replace(/\/+$/, '') + '/chat/completions', ctl = new AbortController(), timer = 0, timedOut = false, idle = o.ms || 90000;
     function arm(){ clearTimeout(timer); timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, idle); }
     if(o.signal){ if(o.signal.aborted) ctl.abort(); else o.signal.addEventListener('abort', function(){ ctl.abort(); }); }
-    var text = '', calls = [], finish = '';
+    var text = '', calls = [], finish = '', thought = false;
     function take(j){
+      if(j && j.error) throw apiError(typeof j.error.code === 'number' ? j.error.code : 502, extErrBody(j));
       var ch = j && j.choices && j.choices[0]; if(!ch) return;
       var d = ch.delta || ch.message || {};
+      if(d.reasoning || d.reasoning_content || d.reasoning_details) thought = true;
       if(typeof d.content === 'string' && d.content){ text += d.content; if(o.onText) o.onText(d.content); }
       (d.tool_calls || []).forEach(function(t, k){
         var ix = typeof t.index === 'number' ? t.index : k, c = calls[ix] || (calls[ix] = { name:'', args:'' });
@@ -3179,7 +3187,7 @@ MStore.ready.then(function(){
     try{
       var r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + e.key },
         body:JSON.stringify(toChat(body, o.model || e.model, !!o.stream)), signal:ctl.signal });
-      if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); throw apiError(r.status, Array.isArray(ej) ? ej[0] : ej); }
+      if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); throw apiError(r.status, extErrBody(Array.isArray(ej) ? ej[0] : ej)); }
       if(o.stream && r.body && r.body.getReader){
         var rd = r.body.getReader(), dec = new TextDecoder(), buf = '';
         for(;;){
@@ -3197,7 +3205,7 @@ MStore.ready.then(function(){
       var parts = [];
       if(text) parts.push({ text:text });
       calls.forEach(function(c){ if(c && c.name){ var a = {}; try{ a = JSON.parse(c.args || '{}'); }catch(x){} parts.push({ functionCall:{ name:c.name, args:a } }); } });
-      return { text:text, parts:parts, finish:finish === 'length' ? 'MAX_TOKENS' : (finish === 'content_filter' ? 'SAFETY' : 'STOP'), blocked:'' };
+      return { text:text, parts:parts, finish:finish === 'length' ? 'MAX_TOKENS' : (finish === 'content_filter' ? 'SAFETY' : 'STOP'), blocked:'', thought:thought };
     }catch(x){
       if(x && x.name === 'AbortError'){
         if(timedOut){ var te = new Error('The request timed out.'); te.timeout = true; throw te; }
@@ -4286,8 +4294,8 @@ MStore.ready.then(function(){
         if(!ids.length){ setSt('Choose a model first.', 'bad'); return; }
         tb.disabled = true; setSt('Testing...');
         try{
-          var t0 = Date.now(), r = await extCall(PING, { ms:20000, model:ids[0] });
-          setSt(r.text ? ids[0] + ' answered in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's.' : 'Connected, but no text came back.', r.text ? 'ok' : 'bad');
+          var t0 = Date.now(), r = await extCall(PING, { ms:45000, model:ids[0] });
+          setSt(r.text ? ids[0] + ' answered in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's.' : (r.thought ? 'Connected, but this model only produced hidden thinking. Try another model.' : 'Connected, but no text came back. Try another model.'), r.text ? 'ok' : 'bad');
         }catch(err){ setSt((err && err.message) || 'Could not connect.', 'bad'); }
         tb.disabled = false;
       });
