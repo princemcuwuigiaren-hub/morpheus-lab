@@ -4907,8 +4907,41 @@ MStore.ready.then(function(){
     if(last && last.src === src) return last.id;
     var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     c.hist.push({ id:id, src:src, ts:Date.now() });
-    while(c.hist.length > 12) c.hist.shift();
+    while(c.hist.length > 20) c.hist.shift();
     return id;
+  }
+  /* ---- file versions: the page and every project file keep a history; your own edits are saved too ---- */
+  function snap(box, key, label, gap){
+    var t = box[key]; if(typeof t !== 'string' || !t) return;
+    var h = box.hist = Array.isArray(box.hist) ? box.hist : [], last = h[h.length - 1];
+    if(last && last.src === t){ if(label && label !== 'You') last.label = label; return; }
+    if(gap && last && last.label === 'You' && Date.now() - last.ts < gap) return;
+    h.push({ id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), src:t, ts:Date.now(), label:label || '' });
+    while(h.length > (key === 'src' ? 20 : 15)) h.shift();
+  }
+  async function historySheet(){
+    if(!current) return;
+    saveEd();
+    var f = activeObj(), c = codeOf(current), box = f || c, key = f ? 'text' : 'src', cur = box[key];
+    var hs = (box.hist || []).filter(function(h){ return h && typeof h.src === 'string'; }).reverse();
+    var items = [{ label:'Save a version now', value:'__save' }].concat(hs.map(function(h){
+      var d = new Date(h.ts), st = diffStat(cur, h.src);
+      var nm = h.label === 'You' ? 'Before your edits' : (h.label || 'Before a change');
+      return { label:nm + ' \u00b7 ' + d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' \u00b7 ' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' vs now' : 'same as now'), value:h.id };
+    }));
+    var v = await UI.sheet('History \u00b7 ' + (f ? f.path : mainFileName(current)), items);
+    if(!v) return;
+    if(v === '__save'){
+      var nm = await UI.prompt('Name this version', { confirmText:'Save', maxLength:40, placeholder:'For example: Before the redesign' });
+      if(nm == null) return;
+      snap(box, key, nm.trim() || 'Saved by you'); save(); return;
+    }
+    var h = hs.filter(function(x){ return x.id === v; })[0]; if(!h) return;
+    var ok = await UI.confirm('Restore this version?', 'What you have now is saved to history first, so you can undo this.', { confirmText:'Restore' });
+    if(!ok) return;
+    snap(box, key, 'Before a restore');
+    box[key] = h.src; if(f) f.mod = Date.now(); else c.stack = [];
+    save(); renderCode();
   }
   /* rough line diff: counts lines added and removed */
   function diffStat(a, b){
@@ -7031,7 +7064,7 @@ MStore.ready.then(function(){
     run:function(p, a, seg){
       var path = normPath(a.path), f = findFile(p, path), created = !f;
       if(created){ f = { path:path, text:'', lang:langOfPath(path), ts:Date.now() }; filesOf(p).push(f); }
-      f.text = a.content; f.mod = Date.now(); delete f.truncated;
+      snap(f, 'text', ''); f.text = a.content; f.mod = Date.now(); delete f.truncated;
       save(); if(INT.repaintFiles) INT.repaintFiles();
       var st = fileSync(f);
       return { ok:true, res:(created ? 'Created ' : 'Saved ') + path, result:{ path:path, created:created, lines:f.text.split('\n').length, sync:st,
@@ -7055,13 +7088,13 @@ MStore.ready.then(function(){
         var ls = f.text.split('\n'), s0 = parseInt(a.from_line, 10), e0 = Math.min(ls.length, Math.max(s0, parseInt(a.to_line, 10) || s0));
         var repl = a.new_text === '' ? [] : String(a.new_text).split('\n');
         ls.splice.apply(ls, [s0 - 1, e0 - s0 + 1].concat(repl));
-        f.text = ls.join('\n'); f.mod = Date.now(); save(); if(INT.repaintFiles) INT.repaintFiles();
+        snap(f, 'text', ''); f.text = ls.join('\n'); f.mod = Date.now(); save(); if(INT.repaintFiles) INT.repaintFiles();
         return { ok:true, res:'Edited ' + f.path + ' (lines ' + s0 + '-' + e0 + ')', result:{ path:f.path, replaced_lines:e0 - s0 + 1, total_lines:ls.length, sync:fileSync(f), note:'Line numbers after this edit have shifted. Read the file again before another line edit.' } };
       }
       var parts = f.text.split(String(a.find)), n = parts.length - 1;
       if(n === 0) return terr('That text was not found in ' + f.path + '. Read the file again and copy the exact text.');
       if(n > 1 && !a.all) return terr('That text appears ' + n + ' times in ' + f.path + '. Include more surrounding text, or set all to true.');
-      f.text = parts.join(String(a.replace == null ? '' : a.replace)); f.mod = Date.now();
+      snap(f, 'text', ''); f.text = parts.join(String(a.replace == null ? '' : a.replace)); f.mod = Date.now();
       save(); if(INT.repaintFiles) INT.repaintFiles();
       return { ok:true, res:'Edited ' + f.path + (n > 1 ? ' (' + n + ' places)' : ''), result:{ path:f.path, replaced:n, sync:fileSync(f), note:'Project copy changed. Termux is not updated until sync_to_termux.' } };
     },
@@ -10721,7 +10754,8 @@ MStore.ready.then(function(){
   function saveEd(){
     if(!current) return;
     var f = activeObj();
-    if(f){ f.text = ed.value; f.mod = Date.now(); } else codeOf(current).src = ed.value;
+    if(f){ if(f.text !== ed.value) snap(f, 'text', 'You', 120000); f.text = ed.value; f.mod = Date.now(); }
+    else { var c0 = codeOf(current); if(c0.src !== ed.value) snap(c0, 'src', 'You', 120000); c0.src = ed.value; }
   }
   function edDot(k){ return k === 'in_sync' ? 'ok' : k === 'changed_here' ? 'warn' : ''; }
   function paintFileBar(){
@@ -10835,6 +10869,12 @@ MStore.ready.then(function(){
     openFile(v);
   }
   $('filesBtn').addEventListener('click', filesSheet);
+  (function(){
+    var b = el('button', 'chip'); b.id = 'histBtn'; b.setAttribute('aria-label', 'Version history');
+    b.innerHTML = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 109-9 9 9 0 00-6.4 2.6L3 8M3 3v5h5M12 7v5l3 2"/></svg>';
+    $('filesBtn').parentNode.insertBefore(b, $('filesBtn'));
+    b.addEventListener('click', historySheet);
+  })();
   function renderCode(){
     if(current && edProj !== current.id){ edProj = current.id; activeFile = ''; openTabs = []; }
     if(activeFile && !activeObj()) activeFile = '';
