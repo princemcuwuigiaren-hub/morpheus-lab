@@ -1049,6 +1049,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <button class="ptool" id="toolImage"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2-2 3 3"/></svg>Attach images</button>
         <button class="ptool" id="toolInspect"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>Code inspection</button>
           <button class="ptool" id="toolTasks"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>Tasks</button>
+          <button class="ptool" id="toolCouncil"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.6-3 2.5-4.5 5-4.5s4.4 1.500 5 4.500M11 19c.6-3 2.5-4.500 5-4.500s4.400 1.500 5 4.500"/></svg>Ask the council</button>
         </div>
         <div class="psec">Modes<button class="info" id="modeInfo" aria-label="About modes">?</button></div>
         <div id="modeHelp"></div>
@@ -2204,7 +2205,7 @@ process.on('SIGINT', function () {
    localStorage as a fallback. Failures are shown on screen, never swallowed. */
 window.MStore = (function(){
   var DB = 'morpheus-lab', ST = 'kv', LK = 'morpheus.lab.projects', LG = 'morpheus.lab.gemini';
-  var db = null, mode = 'idb', last = {}, lastG = '', arr = [], gem = null, timer = 0, busy = false, again = false, bad = '';
+  var db = null, mode = 'idb', last = {}, hkey = {}, lastG = '', arr = [], gem = null, timer = 0, busy = false, again = false, bad = '';
   var S = { initial: { projects: [], gemini: null } };
   function req(r){ return new Promise(function(res, rej){ r.onsuccess = function(){ res(r.result); }; r.onerror = function(){ rej(r.error); }; }); }
   function open(){ return new Promise(function(res){
@@ -2230,15 +2231,30 @@ window.MStore = (function(){
     localStorage.setItem(LK, JSON.stringify(arr));
     if(gem) localStorage.setItem(LG, JSON.stringify(gem));
   }
+  /* version history lives in its own records ('h:<id>'), so saving a project never rewrites the snapshots */
+  function hLists(p){ return [p.code && p.code.hist || []].concat((p.files || []).map(function(f){ return f.hist || []; })); }
+  function hKey(p){
+    return (p.files || []).map(function(f){ return f.path; }).join('|') + '#' + hLists(p).map(function(h){
+      var a = h[0], z = h[h.length - 1]; return h.length + ':' + (a && a.id) + ':' + (z && z.id) + ':' + (z && z.label);
+    }).join(',');
+  }
+  function hPack(p){
+    var o = { page: p.code && p.code.hist || [], files: {} };
+    (p.files || []).forEach(function(f){ if(f.path && f.hist && f.hist.length) o.files[f.path] = f.hist; });
+    return JSON.stringify(o);
+  }
   async function write(first){
-    var jsons = {}, ids = [];
+    var jsons = {}, ids = [], hj = {};
     arr.forEach(function(p, i){
       if(!p.id) p.id = 'p' + Date.now().toString(36) + i;
-      ids.push(p.id); jsons[p.id] = JSON.stringify(p);
+      ids.push(p.id);
+      jsons[p.id] = JSON.stringify(p, function(k, v){ return k === 'hist' && (this === p.code || (p.files && p.files.indexOf(this) >= 0)) ? undefined : v; });
+      var hk = hKey(p); if(hkey[p.id] !== hk) hj[p.id] = [hk, hPack(p)];
     });
     var tx = db.transaction(ST, 'readwrite'), st = tx.objectStore(ST);
     ids.forEach(function(id){ if(last[id] !== jsons[id]) st.put(jsons[id], 'p:' + id); });
-    Object.keys(last).forEach(function(id){ if(!(id in jsons)) st['delete']('p:' + id); });
+    Object.keys(hj).forEach(function(id){ st.put(hj[id][1], 'h:' + id); });
+    Object.keys(last).forEach(function(id){ if(!(id in jsons)){ st['delete']('p:' + id); st['delete']('h:' + id); delete hkey[id]; } });
     st.put(ids, 'order');
     var gj = gem ? JSON.stringify(gem) : '';
     if(gj && gj !== lastG) st.put(gj, 'g');
@@ -2248,6 +2264,7 @@ window.MStore = (function(){
       tx.onerror = tx.onabort = function(){ rej(tx.error || new Error('write failed')); };
     });
     last = jsons; if(gj) lastG = gj;
+    Object.keys(hj).forEach(function(id){ hkey[id] = hj[id][0]; });
   }
   async function run(first){
     timer = 0;
@@ -2277,7 +2294,7 @@ window.MStore = (function(){
 
   S.backup = function(){
     var g = gem ? JSON.parse(JSON.stringify(gem)) : null;
-    if(g){ g.key = ''; g.scanKey = ''; if(g.integ) Object.keys(g.integ).forEach(function(k){ if(g.integ[k]) g.integ[k].token = ''; }); }
+    if(g){ g.key = ''; g.scanKey = ''; if(g.ext) g.ext.key = ''; if(g.integ) Object.keys(g.integ).forEach(function(k){ if(g.integ[k]) g.integ[k].token = ''; }); }
     var o = { app: 'morpheus-lab', format: 1, exported: new Date().toISOString(), projects: arr, gemini: g };
     var d = new Date(), z = function(n){ return (n < 10 ? '0' : '') + n; };
     var name = 'morpheus-lab-backup-' + d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + '.json';
@@ -2317,7 +2334,18 @@ window.MStore = (function(){
       }else{
         var ps = [];
         (m.order || []).forEach(function(id){
-          try{ ps.push(JSON.parse(m['p:' + id])); last[id] = m['p:' + id]; }catch(e){}
+          try{
+            var pr = JSON.parse(m['p:' + id]); last[id] = m['p:' + id];
+            if(m['h:' + id]){
+              try{
+                var ho = JSON.parse(m['h:' + id]);
+                if(pr.code && Array.isArray(ho.page)) pr.code.hist = ho.page;
+                (pr.files || []).forEach(function(f){ if(ho.files && Array.isArray(ho.files[f.path])) f.hist = ho.files[f.path]; });
+                hkey[id] = hKey(pr);
+              }catch(e){}
+            }
+            ps.push(pr);
+          }catch(e){}
         });
         var g = null; try{ g = m.g ? JSON.parse(m.g) : null; }catch(e){}
         lastG = m.g || '';
@@ -2756,6 +2784,7 @@ MStore.ready.then(function(){
         G.health = (g.health && typeof g.health === 'object') ? g.health : {};
         G.prefer = g.prefer || '';
         G.integ = (g.integ && typeof g.integ === 'object') ? g.integ : {};
+        G.ext = (g.ext && typeof g.ext === 'object') ? g.ext : { on:false, base:'', key:'', model:'' };
         /* scanKey: the key the saved models were tested with. Older saves had none. */
         G.scanKey = g.scanKey || ((G.pool.length || (G.fixed.locked && G.fixed.id)) ? G.key : '');
       }
@@ -3087,7 +3116,98 @@ MStore.ready.then(function(){
     });
     return found;
   }
+  /* ---- other providers: any OpenAI-compatible chat endpoint (OpenAI, OpenRouter, Groq, local servers) ---- */
+  function EX(){ var e = G.ext || (G.ext = { on:false, base:'', key:'', model:'' }); if(!e.base) e.base = 'https://openrouter.ai/api/v1'; return e; }
+  function extList(){ return String(EX().models || '').split(',').map(function(m){ return m.trim(); }).filter(Boolean); }
+  function extIds(){ var e = EX(), l = extList(); return (G.mode === 'fixed' || !l.length) ? (e.model ? [e.model] : l.slice(0, 1)) : l; }
+  function extReady(){ var e = EX(); return !!(e.on && e.base && e.key && extIds().length); }
+  function isExt(id){ return String(id).indexOf('ext:') === 0; }
+  function lowerTypes(x){
+    if(Array.isArray(x)) return x.map(lowerTypes);
+    if(x && typeof x === 'object'){ var o = {}; Object.keys(x).forEach(function(k){ o[k] = (k === 'type' && typeof x[k] === 'string') ? x[k].toLowerCase() : lowerTypes(x[k]); }); return o; }
+    return x;
+  }
+  function toChat(body, model, stream){
+    var msgs = [], pend = [], n = 0, si = body.systemInstruction && body.systemInstruction.parts;
+    if(si) msgs.push({ role:'system', content:si.map(function(p){ return p.text || ''; }).join('') });
+    (body.contents || []).forEach(function(c){
+      var ps = c.parts || [];
+      if(c.role === 'model'){
+        var txt = ps.filter(function(p){ return !p.thought && typeof p.text === 'string'; }).map(function(p){ return p.text; }).join('');
+        var calls = ps.filter(function(p){ return p.functionCall; }).map(function(p){
+          var id = 'call_' + (++n); pend.push({ id:id, name:p.functionCall.name });
+          return { id:id, type:'function', function:{ name:p.functionCall.name, arguments:JSON.stringify(p.functionCall.args || {}) } };
+        });
+        var m = { role:'assistant', content:txt || null }; if(calls.length) m.tool_calls = calls; msgs.push(m);
+      }else{
+        var content = [];
+        ps.forEach(function(p){
+          if(p.functionResponse){
+            var k = pend.findIndex(function(x){ return x.name === p.functionResponse.name; });
+            msgs.push({ role:'tool', tool_call_id:k >= 0 ? pend.splice(k, 1)[0].id : 'call_x' + (++n), content:JSON.stringify(p.functionResponse.response || {}) });
+          }else if(p.inlineData) content.push({ type:'image_url', image_url:{ url:'data:' + p.inlineData.mimeType + ';base64,' + p.inlineData.data } });
+          else if(typeof p.text === 'string') content.push({ type:'text', text:p.text });
+        });
+        if(content.length) msgs.push({ role:'user', content:content.length === 1 && content[0].type === 'text' ? content[0].text : content });
+      }
+    });
+    var out = { model:model, messages:msgs, stream:!!stream }, gc = body.generationConfig || {}, fd = [];
+    if(gc.maxOutputTokens) out.max_tokens = gc.maxOutputTokens;
+    if(typeof gc.temperature === 'number') out.temperature = gc.temperature;
+    (body.tools || []).forEach(function(t){ (t.functionDeclarations || []).forEach(function(f){
+      fd.push({ type:'function', function:{ name:f.name, description:f.description || '', parameters:lowerTypes(f.parameters || { type:'OBJECT', properties:{} }) } });
+    }); });
+    if(fd.length) out.tools = fd;
+    return out;
+  }
+  async function extCall(body, o){
+    var e = EX(), url = e.base.replace(/\/+$/, '') + '/chat/completions', ctl = new AbortController(), timer = 0, timedOut = false, idle = o.ms || 90000;
+    function arm(){ clearTimeout(timer); timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, idle); }
+    if(o.signal){ if(o.signal.aborted) ctl.abort(); else o.signal.addEventListener('abort', function(){ ctl.abort(); }); }
+    var text = '', calls = [], finish = '';
+    function take(j){
+      var ch = j && j.choices && j.choices[0]; if(!ch) return;
+      var d = ch.delta || ch.message || {};
+      if(typeof d.content === 'string' && d.content){ text += d.content; if(o.onText) o.onText(d.content); }
+      (d.tool_calls || []).forEach(function(t, k){
+        var ix = typeof t.index === 'number' ? t.index : k, c = calls[ix] || (calls[ix] = { name:'', args:'' });
+        if(t.function){ if(t.function.name) c.name = t.function.name; if(t.function.arguments) c.args += t.function.arguments; }
+      });
+      if(ch.finish_reason) finish = ch.finish_reason;
+    }
+    arm();
+    try{
+      var r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + e.key },
+        body:JSON.stringify(toChat(body, o.model || e.model, !!o.stream)), signal:ctl.signal });
+      if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); throw apiError(r.status, Array.isArray(ej) ? ej[0] : ej); }
+      if(o.stream && r.body && r.body.getReader){
+        var rd = r.body.getReader(), dec = new TextDecoder(), buf = '';
+        for(;;){
+          var c = await rd.read(); if(c.done) break; arm();
+          buf += dec.decode(c.value, { stream:true });
+          var nl;
+          while((nl = buf.indexOf('\n')) >= 0){
+            var line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+            if(line.indexOf('data:') !== 0) continue;
+            var raw = line.slice(5).trim(); if(!raw || raw === '[DONE]') continue;
+            try{ take(JSON.parse(raw)); }catch(x){}
+          }
+        }
+      }else take(await r.json());
+      var parts = [];
+      if(text) parts.push({ text:text });
+      calls.forEach(function(c){ if(c && c.name){ var a = {}; try{ a = JSON.parse(c.args || '{}'); }catch(x){} parts.push({ functionCall:{ name:c.name, args:a } }); } });
+      return { text:text, parts:parts, finish:finish === 'length' ? 'MAX_TOKENS' : (finish === 'content_filter' ? 'SAFETY' : 'STOP'), blocked:'' };
+    }catch(x){
+      if(x && x.name === 'AbortError'){
+        if(timedOut){ var te = new Error('The request timed out.'); te.timeout = true; throw te; }
+        var ae = new Error('Stopped.'); ae.aborted = true; throw ae;
+      }
+      throw x;
+    }finally{ clearTimeout(timer); }
+  }
   async function callModel(id, body, ms){
+    if(isExt(id)) return extCall(body, { ms:ms });
     var j = await fetchJson(API + 'models/' + encodeURIComponent(id) + ':generateContent', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-goog-api-key':G.key },
@@ -3117,6 +3237,7 @@ MStore.ready.then(function(){
     });
   }
   async function callModelStream(id, body, o){
+    if(isExt(id)) return extCall(body, Object.assign({}, o, { stream:true }));
     var ctl = new AbortController(), timer = 0, timedOut = false, idle = o.ms || 45000;
     function arm(){ clearTimeout(timer); timer = setTimeout(function(){ timedOut = true; ctl.abort(); }, idle); }
     if(o.signal){
@@ -3343,7 +3464,8 @@ MStore.ready.then(function(){
     o = o || {};
     return enqueue(async function(){
       var ids;
-      if(G.mode === 'fixed'){
+      if(extReady()){ ids = extIds().map(function(m){ return 'ext:' + m; }); }
+      else if(G.mode === 'fixed'){
         if(!G.fixed.locked || !G.fixed.id) throw new Error('Connect a model in Settings first.');
         ids = [G.fixed.id];
         if(hasInline(body) && !modelSeesImages(ids[0])) throw new Error(ids[0] + ' cannot read images.');
@@ -3360,7 +3482,7 @@ MStore.ready.then(function(){
       var tried = [], last = null;
       for(var i = 0; i < ids.length; i++){
         var id = ids[i];
-        if(!fits(id, body)){
+        if(!isExt(id) && !fits(id, body)){
           last = tooLong(id);
           if(G.mode === 'fixed') throw last;
           continue;
@@ -3403,6 +3525,7 @@ MStore.ready.then(function(){
     return ready[0] || '';
   }
   function connInfo(){
+    if(extReady()) return { k:'ok', long:'Connected to ' + extIds()[0] + ' (your own provider)', short:extIds()[0] + (extIds().length > 1 ? ' \u00b7 auto' : '') };
     if(!G.key) return { k:'off', long:'Not connected \u00b7 no API key', short:'Not connected' };
     if(G.mode === 'fixed'){
       if(G.fixed.locked && G.fixed.id && G.scanKey === G.key){
@@ -3970,7 +4093,45 @@ MStore.ready.then(function(){
     }
 
     /* connection */
+
+
     body.appendChild(el('div', 'group-h', 'Connection'));
+    /* one provider choice; the matching key card shows below it */
+    var pc = el('div', 'tool on'), ptop = el('div', 'tool-top');
+    ptop.appendChild(el('div', 'tool-name', 'Provider'));
+    var pinfo = el('button', 'info', '?'); pinfo.addEventListener('click', function(){ pc.classList.toggle('open'); });
+    ptop.appendChild(pinfo); pc.appendChild(ptop);
+    pc.appendChild(el('div', 'tool-info', 'Gemini uses your Google key. OpenRouter gives you one key for many models from different companies. Keys stay on this device.'));
+    var pseg = el('div', 'seg');
+    [[false, 'Gemini'], [true, 'OpenRouter']].forEach(function(o){
+      var b = el('button', !!EX().on === o[0] ? 'sel' : '', o[1]);
+      b.addEventListener('click', function(){
+        EX().on = o[0]; saveG();
+        Array.prototype.forEach.call(pseg.children, function(x){ x.classList.toggle('sel', x === b); });
+        paintProv(); paintSummary(); renderModeCard();
+      });
+      pseg.appendChild(b);
+    });
+    pc.appendChild(pseg); body.appendChild(pc);
+
+    var xc = el('div', 'tool on'), xtop = el('div', 'tool-top');
+    xtop.appendChild(el('div', 'tool-name', 'OpenRouter API key'));
+    var xinfo = el('button', 'info', '?'); xinfo.addEventListener('click', function(){ xc.classList.toggle('open'); });
+    xtop.appendChild(xinfo); xc.appendChild(xtop);
+    xc.appendChild(el('div', 'tool-info', 'Create a key at openrouter.ai/keys. It is saved only on this device and sent only to OpenRouter.'));
+    var xr = el('div', 'keyrow'), xi = el('input', 'field');
+    xi.type = 'password'; xi.value = EX().key || '';
+    xi.setAttribute('autocomplete', 'off'); xi.setAttribute('spellcheck', 'false'); xi.setAttribute('autocapitalize', 'off');
+    xi.addEventListener('input', function(){ EX().key = xi.value.trim(); saveG(); paintSummary(); });
+    var xe = el('button', 'chip'); xe.innerHTML = ICON.eye; xe.setAttribute('aria-label', 'Show or hide key');
+    xe.addEventListener('click', function(){ xi.type = xi.type === 'password' ? 'text' : 'password'; });
+    xr.appendChild(xi); xr.appendChild(xe); xc.appendChild(xr);
+    body.appendChild(xc);
+    function paintProv(){
+      var own = !!EX().on;
+      conn.style.display = own ? 'none' : ''; sc.style.display = own ? 'none' : ''; xc.style.display = own ? '' : 'none';
+    }
+
     var conn = el('div', 'tool on');
     var ctop = el('div', 'tool-top');
     ctop.appendChild(el('div', 'tool-name', 'Gemini API key'));
@@ -3994,6 +4155,8 @@ MStore.ready.then(function(){
     kr.appendChild(f); kr.appendChild(eye);
     conn.appendChild(kr);
     body.appendChild(conn);
+
+
 
     /* web search: one tap tells whether search works with this key */
     var sc = el('div', 'tool on');
@@ -4028,6 +4191,7 @@ MStore.ready.then(function(){
       }finally{ sbtn.disabled = false; }
     });
     body.appendChild(sc);
+    paintProv();
 
     /* mode */
     body.appendChild(el('div', 'group-h', 'Model'));
@@ -4062,7 +4226,75 @@ MStore.ready.then(function(){
       return true;
     }
 
+    /* OpenRouter models: chosen from its own list, free ones first, only models that can use tools */
+    var orCat = null;
+    async function orModels(){
+      if(orCat) return orCat;
+      var r = await fetch('https://openrouter.ai/api/v1/models');
+      if(!r.ok) throw new Error('Could not load the model list from OpenRouter.');
+      var j = await r.json();
+      orCat = (j.data || []).filter(function(m){ return m && m.id && (m.supported_parameters || []).indexOf('tools') >= 0; }).map(function(m){
+        var pr = m.pricing || {};
+        return { id:m.id, name:m.name || m.id, free:Number(pr.prompt) === 0 && Number(pr.completion) === 0 };
+      }).sort(function(a, b){ return (b.free - a.free) || a.name.localeCompare(b.name); });
+      return orCat;
+    }
+    function renderExtModel(){
+      modeHost.innerHTML = '';
+      var e = EX(), auto = G.mode !== 'fixed', c = el('div', 'tool on'), top = el('div', 'tool-top');
+      top.appendChild(el('div', 'tool-name', auto ? 'Automatic' : 'Fixed model'));
+      var info = el('button', 'info', '?'); info.addEventListener('click', function(){ c.classList.toggle('open'); });
+      top.appendChild(info); c.appendChild(top);
+      c.appendChild(el('div', 'tool-info', auto
+        ? 'Add the models you want, in order. The first is used, and the lab moves to the next on its own when one runs into limits. Ask the council, in the + menu of a chat, sends one question to all of them. Free models are listed first.'
+        : 'Pick a model and test it. The lab will only ever use this one. Free models are listed first.'));
+      var st = el('div', 'status');
+      function setSt(msg, kind){ st.textContent = msg || ''; st.className = 'status' + (kind ? ' ' + kind : ''); }
+      var sel = el('button', 'select'), selName = el('span', (auto || e.model) ? '' : 'ph', auto ? 'Add a model' : (e.model || 'Choose a model'));
+      sel.appendChild(selName); sel.insertAdjacentHTML('beforeend', ICON.chev); c.appendChild(sel);
+      var list = el('div', 'mlist'); c.appendChild(list);
+      function paintRows(){
+        list.innerHTML = '';
+        if(!auto) return;
+        var l = extList();
+        l.forEach(function(id, i){
+          var b = el('button', 'mrow');
+          b.appendChild(el('span', 'dot ok')); b.appendChild(el('span', 'mname', id));
+          b.appendChild(el('span', 'mtag' + (i === 0 ? ' on' : ''), i === 0 ? 'In use' : 'Backup'));
+          b.addEventListener('click', function(){ var q = extList(); q.splice(i, 1); e.models = q.join(', '); saveG(); paintRows(); paintSummary(); });
+          list.appendChild(b);
+        });
+        if(l.length) list.appendChild(el('div', 'xsub', 'Tap a model to remove it.'));
+      }
+      paintRows();
+      sel.addEventListener('click', async function(){
+        setSt('Loading models...');
+        var cat;
+        try{ cat = await orModels(); setSt(''); }
+        catch(err){ setSt(err instanceof TypeError ? 'Could not reach OpenRouter. Check your connection.' : err.message, 'bad'); return; }
+        var cur = auto ? '' : e.model;
+        var v = await UI.sheet(auto ? 'Add a model' : 'Choose a model', cat.map(function(m){ return { label:m.name + (m.free ? ' \u00b7 free' : ''), value:m.id, selected:m.id === cur }; }));
+        if(!v) return;
+        if(auto){ var q = extList(); if(q.indexOf(v) < 0) q.push(v); e.models = q.join(', '); paintRows(); }
+        else{ e.model = v; selName.className = ''; selName.textContent = v; }
+        saveG(); setSt(''); paintSummary();
+      });
+      var row = el('div', 'btnrow'), tb = el('button', 'btn solid', 'Test'); row.appendChild(tb); c.appendChild(row); c.appendChild(st);
+      tb.addEventListener('click', async function(){
+        var ids = extIds();
+        if(!e.key){ setSt('Paste your OpenRouter key first.', 'bad'); return; }
+        if(!ids.length){ setSt('Choose a model first.', 'bad'); return; }
+        tb.disabled = true; setSt('Testing...');
+        try{
+          var t0 = Date.now(), r = await extCall(PING, { ms:20000, model:ids[0] });
+          setSt(r.text ? ids[0] + ' answered in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's.' : 'Connected, but no text came back.', r.text ? 'ok' : 'bad');
+        }catch(err){ setSt((err && err.message) || 'Could not connect.', 'bad'); }
+        tb.disabled = false;
+      });
+      modeHost.appendChild(c);
+    }
     function renderModeCard(){
+      if(EX().on){ renderExtModel(); return; }
       modeHost.innerHTML = '';
       var c = el('div', 'tool on');
       var top = el('div', 'tool-top');
@@ -4493,6 +4725,19 @@ MStore.ready.then(function(){
     body.appendChild(nt); body.appendChild(nx); body.appendChild(addN);
 
     /* saved versions of the page */
+    body.appendChild(el('div', 'label', 'Replies'));
+    var vc = el('div', 'tool on'), vseg = el('div', 'seg');
+    vc.appendChild(el('div', 'xsub', 'How much the assistant explains. Quick is short and technical. Teach me explains each change and the words it uses.'));
+    VOICES.forEach(function(v){
+      var b = el('button', (current.explain || 'balanced') === v[0] ? 'sel' : '', v[1]);
+      b.addEventListener('click', function(){
+        current.explain = v[0]; save();
+        Array.prototype.forEach.call(vseg.children, function(x){ x.classList.toggle('sel', x === b); });
+      });
+      vseg.appendChild(b);
+    });
+    vc.appendChild(vseg); body.appendChild(vc);
+
     body.appendChild(el('div', 'label', 'Versions'));
     var verBox = el('div');
     body.appendChild(verBox);
@@ -4906,17 +5151,28 @@ MStore.ready.then(function(){
     var last = c.hist[c.hist.length - 1];
     if(last && last.src === src) return last.id;
     var id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    c.hist.push({ id:id, src:src, ts:Date.now() });
+    c.hist.push({ id:id, src:src, ts:Date.now(), why:trail() });
     while(c.hist.length > 20) c.hist.shift();
     return id;
   }
   /* ---- file versions: the page and every project file keep a history; your own edits are saved too ---- */
+  /* paper trail: which task and which request a change belonged to */
+  function trail(){
+    try{
+      var o = {}, t = current && activeTask(current), ask = current ? lastUserTextOf(current) : '';
+      if(t) o.task = String(t.title || t.name || '').replace(/\s+/g, ' ').slice(0, 60);
+      if(ask) o.ask = String(ask).replace(/\s+/g, ' ').slice(0, 90);
+      return o;
+    }catch(e){ return {}; }
+  }
+  function whyTag(h){ var w = h.why || {}; return w.task ? 'task: ' + w.task : (w.ask ? '\u201c' + w.ask.slice(0, 40) + '\u201d' : ''); }
+  function whyText(h){ var w = h.why || {}; return (w.task || w.ask) ? 'This is how it was before ' + (w.task ? 'the task \u201c' + w.task + '\u201d' : 'your request') + (w.ask ? ' (you asked: \u201c' + w.ask + '\u201d)' : '') + '. ' : ''; }
   function snap(box, key, label, gap){
     var t = box[key]; if(typeof t !== 'string' || !t) return;
     var h = box.hist = Array.isArray(box.hist) ? box.hist : [], last = h[h.length - 1];
     if(last && last.src === t){ if(label && label !== 'You') last.label = label; return; }
     if(gap && last && last.label === 'You' && Date.now() - last.ts < gap) return;
-    h.push({ id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), src:t, ts:Date.now(), label:label || '' });
+    h.push({ id:Date.now().toString(36) + Math.random().toString(36).slice(2, 6), src:t, ts:Date.now(), label:label || '', why:label === 'You' ? undefined : trail() });
     while(h.length > (key === 'src' ? 20 : 15)) h.shift();
   }
   async function historySheet(){
@@ -4927,7 +5183,7 @@ MStore.ready.then(function(){
     var items = [{ label:'Save a version now', value:'__save' }].concat(hs.map(function(h){
       var d = new Date(h.ts), st = diffStat(cur, h.src);
       var nm = h.label === 'You' ? 'Before your edits' : (h.label || 'Before a change');
-      return { label:nm + ' \u00b7 ' + d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' \u00b7 ' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' vs now' : 'same as now'), value:h.id };
+      return { label:nm + ' \u00b7 ' + d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' \u00b7 ' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' vs now' : 'same as now') + (whyTag(h) ? ' \u00b7 ' + whyTag(h) : ''), value:h.id };
     }));
     var v = await UI.sheet('History \u00b7 ' + (f ? f.path : mainFileName(current)), items);
     if(!v) return;
@@ -4937,7 +5193,7 @@ MStore.ready.then(function(){
       snap(box, key, nm.trim() || 'Saved by you'); save(); return;
     }
     var h = hs.filter(function(x){ return x.id === v; })[0]; if(!h) return;
-    var ok = await UI.confirm('Restore this version?', 'What you have now is saved to history first, so you can undo this.', { confirmText:'Restore' });
+    var ok = await UI.confirm('Restore this version?', whyText(h) + 'What you have now is saved to history first, so you can undo this.', { confirmText:'Restore' });
     if(!ok) return;
     snap(box, key, 'Before a restore');
     box[key] = h.src; if(f) f.mod = Date.now(); else c.stack = [];
@@ -7550,6 +7806,13 @@ MStore.ready.then(function(){
     else if(mo !== 'build') t += ' Tools that change the project are not available in this mode. If a change is needed, tell the person to switch mode or to ask for it directly.';
     return t;
   }
+  /* how much the assistant explains: set per project with the Replies control in project settings */
+  var VOICES = [['quick', 'Quick'], ['balanced', 'Balanced'], ['teach', 'Teach me']];
+  function voiceText(p){
+    if(p.explain === 'quick') return 'The person is comfortable with technical detail. Be terse: say what you changed and why in a sentence or two, and let the diff speak instead of explaining it.';
+    if(p.explain === 'teach') return 'The person is learning. Use plain, friendly language. After each change, explain in a few short sentences what it does and why you chose it, define any technical word the first time you use it, and suggest one thing to try next. Never go through code line by line.';
+    return 'The person is not a programmer. Use plain, friendly language, keep replies short, and never explain code line by line.';
+  }
   function systemText(p, offered, ch, skip, ov, intent){
     var st = toolState(p), src = existingSrc(p), FENCE = '```';
     var has = function(id){ return offered.indexOf(id) >= 0; };
@@ -7557,7 +7820,7 @@ MStore.ready.then(function(){
     var t = 'You are the assistant inside a workspace app where people build all sorts of projects. You are working on the project "' + p.name + '"' + (parent ? ' (a sub-project of "' + parent.name + '")' : '') + '.\n';
     if(p.desc) t += 'What the person says this project is about: ' + p.desc + '\n';
     if(parent) t += 'The main project is a ' + typeName(typeOf(parent)) + (parent.desc ? ' about: ' + parent.desc : '') + '. It is connected to this one: use read_related to read its files when you need them.\n';
-    t += 'The person is not a programmer. Use plain, friendly language, keep replies short, and never explain code line by line.\n\n';
+    t += voiceText(p) + '\n\n';
     var mo = opModeOf(p), canWrite = !!ov || mo === 'build', talk = intent === 'talk';
     t += modeText(mo, ov) + '\n\n';
     t += capText(p, ov, gateOf(ch)) + '\n\n';
@@ -7983,6 +8246,51 @@ MStore.ready.then(function(){
   document.addEventListener('pointerdown', function(e){
     if($('plusBar').classList.contains('show') && !e.target.closest('#plusBar') && !e.target.closest('#plusBtn')) closePlus();
   }, true);
+  /* ---- council: the same question to several models, then a plain comparison ---- */
+  function councilView(q){
+    var w = el('div');
+    w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
+    var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
+    top.appendChild(el('div', 'tool-name', 'Council'));
+    var x = el('button', 'btn solid', 'Close'); x.addEventListener('click', function(){ w.remove(); });
+    top.appendChild(x); w.appendChild(top);
+    var qb = el('div'); qb.style.cssText = 'color:var(--muted);font-size:13px;margin-bottom:12px;white-space:pre-wrap'; qb.textContent = q; w.appendChild(qb);
+    document.body.appendChild(w);
+    return function(title, text, muted){
+      var c = el('div'); c.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px';
+      var h = el('div', 'tool-name', title), b = el('div');
+      b.style.cssText = 'white-space:pre-wrap;margin-top:6px;line-height:1.5;font-size:14px;color:' + (muted ? 'var(--muted)' : 'var(--text)');
+      b.textContent = text; c.appendChild(h); c.appendChild(b); w.appendChild(c);
+      return { t:h, b:b };
+    };
+  }
+  async function askCouncil(){
+    closePlus();
+    var e = EX(), models = extList().slice(0, 4);
+    if(!extReady()){ UI.alert('Provider needed', 'Choose OpenRouter in Settings, paste your key and add models first.'); return; }
+    if(models.length < 2){ UI.alert('Add council models', 'In Settings, under Model, choose Automatic and add two to four models.'); return; }
+    var q = comp.value.trim() || await UI.prompt('Ask the council', { multi:true, maxLength:2000, confirmText:'Ask', placeholder:'A decision or question for several AIs' });
+    if(!q) return;
+    var add = councilView(q), st = add('Asking ' + models.length + ' models', 'This takes a few seconds.', true);
+    var sys = 'You are one member of a council of AIs advising on a project called "' + (current ? current.name : 'untitled') + '"' + (current && current.desc ? ' (' + current.desc + ')' : '') + '. Give your recommendation first, then the main reasons, in under 150 words, in plain language.';
+    function ask(model, system, text, cap){
+      return extCall({ systemInstruction:{ parts:[{ text:system }] }, contents:[{ role:'user', parts:[{ text:text }] }], generationConfig:{ maxOutputTokens:cap } }, { ms:90000, model:model });
+    }
+    var res = await Promise.all(models.map(function(m){
+      return ask(m, sys, q, 600).then(function(r){ return { m:m, t:r.text.trim() }; }, function(err){ return { m:m, err:(err && err.message) || 'Failed' }; });
+    }));
+    var ok = res.filter(function(r){ return r.t; });
+    if(ok.length >= 2){
+      st.t.textContent = 'Comparing the answers'; 
+      try{
+        var cmp = await ask(models[0], 'You compare answers from several AIs. Reply in plain language with three short parts headed Agree, Disagree and Best next step. Name the models when they differ. Under 160 words.',
+          'Question:\n' + q + '\n\n' + ok.map(function(r){ return '[' + r.m + ']\n' + r.t; }).join('\n\n'), 500);
+        st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; st.b.textContent = cmp.text.trim() || 'No comparison came back.';
+      }catch(err){ st.t.textContent = 'Comparison failed'; st.b.textContent = (err && err.message) || 'Could not compare. Read the answers below.'; }
+    }else{ st.t.textContent = 'Not enough answers to compare'; st.b.textContent = ok.length ? 'Only one model answered.' : 'No model answered. Check the model names and your provider key.'; }
+    res.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t); });
+  }
+  $('toolCouncil').addEventListener('click', askCouncil);
   var importBuf = null;
   function paintMode(){
     $('modeSub').textContent = importBuf
