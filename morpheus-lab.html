@@ -3185,8 +3185,15 @@ MStore.ready.then(function(){
     }
     arm();
     try{
-      var r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + e.key },
-        body:JSON.stringify(toChat(body, o.model || e.model, !!o.stream)), signal:ctl.signal });
+      var payload = toChat(body, o.model || e.model, !!o.stream);
+      if(e.cap && (!payload.max_tokens || payload.max_tokens > e.cap)) payload.max_tokens = e.cap;
+      var send = function(){ return fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + e.key }, body:JSON.stringify(payload), signal:ctl.signal }); };
+      var r = await send();
+      if(r.status === 402){
+        /* OpenRouter reserves credit for the full reply size: learn what the balance allows, remember it, and retry once */
+        var mm = /afford (\d+)/.exec(await r.clone().text().catch(function(){ return ''; }));
+        if(mm){ e.cap = Math.max(1024, parseInt(mm[1], 10) - 500); saveG(); payload.max_tokens = e.cap; r = await send(); }
+      }
       if(!r.ok){ var ej = await r.json().catch(function(){ return {}; }); throw apiError(r.status, extErrBody(Array.isArray(ej) ? ej[0] : ej)); }
       if(o.stream && r.body && r.body.getReader){
         var rd = r.body.getReader(), dec = new TextDecoder(), buf = '';
