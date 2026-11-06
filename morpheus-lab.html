@@ -2726,12 +2726,13 @@ MStore.ready.then(function(){
     for(var i = ms.length - 1; i >= 0; i--){ if(ms[i].r === 'u') return ms[i].kind === 'inspect' ? '' : String(ms[i].t || ''); }
     return '';
   }
-  function intentOf(ch){
+  function intentOf(ch, p){
     var t = lastUserText(ch);
     if(!t.trim()) return 'talk';
     if(RESUME_RE.test(t) && t.trim().length < 40) return 'resume';
     if(TALK_FIRST_RE.test(t)) return 'talk';
     if(ACT_RE.test(t) || ACT_ANY_RE.test(t) || ASK2_RE.test(t)) return 'act';
+    if(p && opModeOf(p) === 'build' && /^(?:app|module)$/.test(typeOf(p)) && !/\?\s*$/.test(t.trim())) return 'act';
     return 'talk';
   }
   /* the journal and memory notes are only loaded when the person asks to keep something */
@@ -2743,12 +2744,13 @@ MStore.ready.then(function(){
   }
   var TALK_SET = ['capture_idea', 'park_question', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
-  function capText(p, ov, gate){
+  function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
     TOOLS.forEach(function(t){
       if(!IMPL[t.id] || !DECL[t.id] || !st[t.id].enabled || st[t.id].perm === 'deny' || (INTG[t.id] && !intgUp(INTG[t.id]))) return;
       var ok = (!MODE_ONLY[t.id] || mo === MODE_ONLY[t.id]) && (!set || (INTG[t.id] ? (mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk)) : (set.indexOf(t.id) >= 0 || taskKeep(p, t.id))));
       if((typeOf(p) === 'dataset' || typeOf(p) === 'spec') && t.group === 'Code' && !(gate && gate.code)) ok = false;
+      if(intent === 'talk' && TALK_SET.indexOf(t.id) < 0 && !(typeOf(p) === 'dataset' && t.id === 'dataset_add')) ok = false;
       (ok ? can : cannot).push(t.name.toLowerCase());
     });
     var o = 'WHAT YOU CAN DO IN THIS MODE: ' + (can.join(', ') || 'talk only') + '.';
@@ -7847,7 +7849,7 @@ MStore.ready.then(function(){
     t += voiceText(p) + '\n\n';
     var mo = opModeOf(p), canWrite = !!ov || mo === 'build', talk = intent === 'talk';
     t += modeText(mo, ov) + '\n\n';
-    t += capText(p, ov, gateOf(ch)) + '\n\n';
+    t += capText(p, ov, gateOf(ch), intent) + '\n\n';
     if(typeText(p)) t += typeText(p) + '\n\n';
     t += 'HOW TO TALK: Read what the person wrote and answer it directly, in complete natural sentences, before anything else. Give the answer the question needs, as long or as short as that takes, and never reply in fragments. Questions, ideas and opinions get a conversation, not tools. After you use tools, always finish with a plain-words reply: what you did or found, and what they can do next. Never leave them with only cards.\n\n';
     if(intent === 'resume'){
@@ -8015,7 +8017,7 @@ MStore.ready.then(function(){
     syncSend(); paintConn();
     function draw(keep){ if(current === p && currentView === 'lab' && chatOf(p) === ch) renderThread(keep, busy); }
     var m = null, ctx = { autoAll:false }, useTools = true, live = null, raf = 0, lastSave = 0, nudges = 0, force = false, verifies = 0;
-    var intent = intentOf(ch), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {}, bookRounds = 0;
+    var intent = intentOf(ch, p), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {}, bookRounds = 0;
     var BOOK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, journal_save:1, write_note:1, read_notes:1, add_task:1 };
     var DEDUP = { read_assembly:1, journal_save:1, add_task:1, write_note:1, list_tasks:1, read_task:1, get_active_task:1, list_subprojects:1, read_related:1, read_notes:1, web_search:1, start_task:1, create_subproject:1, read_sandbox_output:1 };
     /* the words appear as they are written; only the live paragraph is repainted */
