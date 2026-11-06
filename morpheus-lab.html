@@ -3157,7 +3157,7 @@ MStore.ready.then(function(){
     (body.tools || []).forEach(function(t){ (t.functionDeclarations || []).forEach(function(f){
       fd.push({ type:'function', function:{ name:f.name, description:f.description || '', parameters:lowerTypes(f.parameters || { type:'OBJECT', properties:{} }) } });
     }); });
-    if(fd.length) out.tools = fd;
+    if(fd.length){ out.tools = fd; out.provider = { require_parameters:true }; }
     return out;
   }
   function extErrBody(ej){
@@ -4243,6 +4243,8 @@ MStore.ready.then(function(){
 
     /* OpenRouter models: chosen from its own list, free ones first, only models that can use tools */
     var orCat = null;
+    var TOOLPING = { systemInstruction:{ parts:[{ text:'You must call the tool you are given.' }] }, contents:[{ role:'user', parts:[{ text:'Call the ping_tool tool now.' }] }],
+      tools:[{ functionDeclarations:[{ name:'ping_tool', description:'Call this to confirm tool use works.', parameters:{ type:'OBJECT', properties:{ ok:{ type:'BOOLEAN', description:'Always true' } }, required:['ok'] } }] }], generationConfig:{ maxOutputTokens:1024 } };
     async function orModels(){
       if(orCat) return orCat;
       var r = await fetch('https://openrouter.ai/api/v1/models');
@@ -4302,7 +4304,14 @@ MStore.ready.then(function(){
         tb.disabled = true; setSt('Testing...');
         try{
           var t0 = Date.now(), r = await extCall(PING, { ms:45000, model:ids[0] });
-          setSt(r.text ? ids[0] + ' answered in ' + ((Date.now() - t0) / 1000).toFixed(1) + 's.' : (r.thought ? 'Connected, but this model only produced hidden thinking. Try another model.' : 'Connected, but no text came back. Try another model.'), r.text ? 'ok' : 'bad');
+          var secs = ((Date.now() - t0) / 1000).toFixed(1);
+          if(!r.text){ setSt(r.thought ? 'Connected, but this model only produced hidden thinking. Try another model.' : 'Connected, but no text came back. Try another model.', 'bad'); }
+          else{
+            setSt('Answered in ' + secs + 's. Checking tools...');
+            var tr = await extCall(TOOLPING, { ms:45000, model:ids[0] });
+            var used = (tr.parts || []).some(function(x){ return x.functionCall; });
+            setSt(ids[0] + ' answered in ' + secs + 's' + (used ? ' and can use tools.' : ', but it ignored the tools, so it cannot build or edit here. Pick another model.'), used ? 'ok' : 'bad');
+          }
         }catch(err){ setSt((err && err.message) || 'Could not connect.', 'bad'); }
         tb.disabled = false;
       });
