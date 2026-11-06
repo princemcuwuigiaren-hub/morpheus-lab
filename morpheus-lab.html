@@ -2681,7 +2681,7 @@ MStore.ready.then(function(){
     var codeWord = /\b(?:code|script|function|program|app|page|html|javascript|module|class|button|screen|css|python|pytest|tests?|npm|node|sqlite|schema|bot)\b|\.py\b/i.test(t);
     var tx = false; try{ tx = intgUp('termux'); }catch(e){}
     if(AUTO_BUILD.test(t) && (codeish || codeWord)) return 'build';
-    if((codeish || tx || codeWord) && /\b(?:try (?:it |that |this )?again|retry|re-?run|execute|run (?:it|them|that|this|the|my|a)\b|run\b.*\b(?:tests?|script|file|command)s?)\b/i.test(t)) return 'test';
+    if((codeish || tx || codeWord) && /\b(?:re-?run|execute|run (?:it|them|that|this|the|my|a)\b|run\b.*\b(?:tests?|script|file|command)s?)\b/i.test(t)) return 'test';
     if((codeish || tx || codeWord) && AUTO_TEST.test(t)) return 'test';
     if(AUTO_PLAN.test(t) || (!codeish && AUTO_PLAN2.test(t))) return 'design';
     if(AUTO_RESEARCH.test(t)) return 'research';
@@ -3213,7 +3213,7 @@ MStore.ready.then(function(){
       }else take(await r.json());
       var parts = [];
       if(text) parts.push({ text:text });
-      calls.forEach(function(c){ if(c && c.name){ var a = {}; try{ a = JSON.parse(c.args || '{}'); }catch(x){} parts.push({ functionCall:{ name:c.name, args:a } }); } });
+      calls.forEach(function(c){ if(c && c.name){ var a = {}; try{ a = JSON.parse(c.args || '{}'); }catch(x){ var i0 = (c.args || '').indexOf('{'), j0 = (c.args || '').lastIndexOf('}'); if(i0 >= 0 && j0 > i0){ try{ a = JSON.parse(c.args.slice(i0, j0 + 1)); }catch(y){} } } parts.push({ functionCall:{ name:c.name, args:a } }); } });
       return { text:text, parts:parts, finish:finish === 'length' ? 'MAX_TOKENS' : (finish === 'content_filter' ? 'SAFETY' : 'STOP'), blocked:'', thought:thought };
     }catch(x){
       if(x && x.name === 'AbortError'){
@@ -7452,7 +7452,7 @@ MStore.ready.then(function(){
 
 
   /* ask the person one short question, with choices they can tap */
-  TOOLS.push({ id:'ask_user', group:'Projects', name:'Ask you a question', perm:'allow',
+  TOOLS.splice(TOOLS.map(function(t){ return t.group; }).lastIndexOf('Projects') + 1, 0, { id:'ask_user', group:'Projects', name:'Ask you a question', perm:'allow',
     desc:'Lets the AI stop and ask you one short question with tappable choices when it is unsure what you want.' });
   DECL.ask_user = { d:'Ask the person one short question with 2 to 4 choices, then wait. Use it when the request is unclear in a way that changes what you would do, or before something big or hard to undo. Not for things you can look up or decide yourself.',
     p:{ question:STR('One clear question'), options:LIST('2 to 4 short choices') }, req:['question'] };
