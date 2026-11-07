@@ -7456,15 +7456,18 @@ MStore.ready.then(function(){
   /* ask the person one short question, with choices they can tap */
   TOOLS.splice(TOOLS.map(function(t){ return t.group; }).lastIndexOf('Projects') + 1, 0, { id:'ask_user', group:'Projects', name:'Ask you a question', perm:'allow',
     desc:'Lets the AI stop and ask you one short question with tappable choices when it is unsure what you want.' });
-  DECL.ask_user = { d:'Ask the person one short question with 2 to 4 choices, then wait. Use it when the request is unclear in a way that changes what you would do, or before something big or hard to undo. Not for things you can look up or decide yourself.',
-    p:{ question:STR('One clear question'), options:LIST('2 to 4 short choices') }, req:['question'] };
+  DECL.ask_user = { d:'Ask the person one short question, then wait. By default give 2 to 4 choices; set style to multiple when several can apply, or yesno for a plain yes or no question. Use it when the request is unclear in a way that changes what you would do, or before something big or hard to undo. Not for things you can look up or decide yourself.',
+    p:{ question:STR('One clear question'), options:LIST('2 to 4 short choices (up to 6 for multiple, none for yesno)'), style:STR('How the person answers: single (default, pick one), multiple (tick several) or yesno') }, req:['question'] };
   T('ask_user', {
     icon:'note', read:true, testOk:true,
     label:function(a){ return 'Ask: ' + short(a.question || '', 50); },
     pre:function(p, a){ return String(a.question || '').trim() ? '' : 'Give the question to ask.'; },
     run:function(p, a, seg){
-      var opts = (Array.isArray(a.options) ? a.options : []).map(function(x){ return short(String(x), 80); }).filter(Boolean).slice(0, 4);
-      seg.args = Object.assign({}, a, { options:opts });
+      var sty = String(a.style || '').toLowerCase().replace(/[^a-z]/g, ''), style = /^(multi|many|checklist|tick)/.test(sty) ? 'multiple' : (/^(yesno|yn|boolean|confirm)/.test(sty) ? 'yesno' : 'single');
+      var opts = (Array.isArray(a.options) ? a.options : []).map(function(x){ return short(String(x), 80); }).filter(Boolean).slice(0, style === 'multiple' ? 6 : 4);
+      if(style === 'multiple' && opts.length < 2) style = 'single';
+      if(style === 'yesno') opts = [];
+      seg.args = Object.assign({}, a, { options:opts, style:style });
       return new Promise(function(res){
         waiters[seg.id] = function(v){
           delete waiters[seg.id];
@@ -7476,13 +7479,63 @@ MStore.ready.then(function(){
     card:function(m, seg){ return slim('note', seg.res || 'Asked a question'); }
   });
   function askUserCard(seg){
-    var a = seg.args || {}, c = tcard('note', short(a.question || '', 300), 'Pick one, or type your own answer', ['Your turn', 'warn']);
+    var a = seg.args || {}, opts = Array.isArray(a.options) ? a.options : [], style = (a.style === 'multiple' || a.style === 'yesno') ? a.style : 'single';
+    var sub = style === 'multiple' ? 'Tick all that apply, then press Send' : style === 'yesno' ? 'Tap Yes or No, or write your own answer' : (opts.length ? 'Tap an answer, type its letter, or write your own' : 'Write your answer');
+    var c = tcard('note', short(a.question || '', 300), sub, ['Your turn', 'warn']);
+    c.row.style.display = 'none';
+    var done = false, picked = [];
     function answer(v){
-      Array.prototype.forEach.call(c.row.children, function(b){ b.disabled = true; });
+      v = String(v || '').trim();
+      if(done || !v) return;
+      done = true;
+      Array.prototype.forEach.call(c.body.querySelectorAll('button, input'), function(x){ x.disabled = true; });
       var w = waiters[seg.id]; if(w) w({ ans:v });
     }
-    (Array.isArray(a.options) ? a.options : []).forEach(function(o){ c.row.appendChild(mkBtn('ghost', o, '', function(){ answer(o); })); });
-    c.row.appendChild(mkBtn('ghost', 'Something else', '', function(){ answer('None of these. I will type my own answer.'); try{ comp.focus(); }catch(e){} }));
+    var list = el('div'); list.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:10px';
+    if(style === 'yesno'){
+      list.style.flexDirection = 'row';
+      ['Yes', 'No'].forEach(function(t){
+        var b = el('button', '', t);
+        b.style.cssText = 'flex:1;padding:13px 14px;border-radius:14px;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);font-weight:600';
+        b.addEventListener('click', function(){ answer(t); });
+        list.appendChild(b);
+      });
+      c.body.appendChild(list);
+    }else if(opts.length){
+      opts.forEach(function(o, i){
+        var b = el('button'), k = el('span', '', String.fromCharCode(65 + i) + '.');
+        b.style.cssText = 'display:flex;align-items:flex-start;gap:12px;width:100%;text-align:left;padding:11px 14px;border-radius:14px;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);line-height:1.35';
+        k.style.cssText = 'flex:none;min-width:22px;font-weight:600;color:var(--muted)';
+        b.appendChild(k); b.appendChild(el('span', '', String(o)));
+        b.addEventListener('click', function(){
+          if(style !== 'multiple'){ answer(o); return; }
+          var at = picked.indexOf(i), on = at < 0;
+          if(on) picked.push(i); else picked.splice(at, 1);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          b.style.background = on ? 'var(--hover)' : 'var(--chip)'; b.style.borderColor = on ? 'var(--muted)' : 'var(--line-soft)';
+          k.textContent = on ? '\u2713' : String.fromCharCode(65 + i) + '.';
+        });
+        list.appendChild(b);
+      });
+      c.body.appendChild(list);
+    }
+    var row = el('div'), inp = el('input', 'field');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:10px;align-items:center';
+    inp.type = 'text'; inp.style.cssText = 'flex:1;min-width:0';
+    inp.setAttribute('aria-label', 'Your own answer'); inp.setAttribute('autocomplete', 'off'); inp.setAttribute('enterkeyhint', 'send');
+    function submit(){
+      var v = inp.value.trim(), parts = [];
+      if(style === 'multiple') picked.slice().sort(function(x, y){ return x - y; }).forEach(function(i){ parts.push(opts[i]); });
+      var ls = /^[A-Za-z](?:[\s,]+[A-Za-z])*$/.test(v) ? v.toUpperCase().split(/[\s,]+/).map(function(L){ return opts[L.charCodeAt(0) - 65]; }) : null;
+      if(ls && ls.length && ls.every(function(x){ return x !== undefined; })){
+        if(style === 'multiple'){ ls.forEach(function(x){ if(parts.indexOf(x) < 0) parts.push(x); }); }
+        else parts = [ls[0]];
+      }else if(v) parts.push(v);
+      answer(parts.join(', '));
+    }
+    inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); submit(); } });
+    row.appendChild(inp); row.appendChild(mkBtn('ghost', 'Send', '', submit));
+    c.body.appendChild(row);
     return c.root;
   }
 
