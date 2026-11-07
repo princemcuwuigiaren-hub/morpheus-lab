@@ -856,8 +856,8 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .rrow .rtx b{font-weight:500;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rrow .rtx i{font-style:normal;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rall{align-self:center;padding:8px 14px;font-size:14px;color:var(--muted)}
-.rrow .qic{width:40px;height:40px;border-radius:13px;flex:none;animation:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -2px 3px rgba(0,0,0,.3),inset 0 0 0 1px rgba(0,0,0,.18),0 2px 5px rgba(0,0,0,.25)}
-.rrow .qic>svg{width:20px;height:20px}
+.rrow .rbadge{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--icon)}
+.rrow .rbadge>svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 :root[data-theme="light"] #home .chip{background:#fff;border-color:var(--line)}
 
 .qtile{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:2px 0;transition:transform .12s}
@@ -1063,6 +1063,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <button class="ptool" id="toolInspect"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>Code inspection</button>
           <button class="ptool" id="toolTasks"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>Tasks</button>
           <button class="ptool" id="toolTime"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4M12 8v4.5l3 1.8"/></svg>Time travel</button>
+          <button class="ptool" id="toolTest"><svg viewBox="0 0 24 24"><path d="M9 4h6M10 4v5l-4.5 8.5A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-2.5L14 9V4"/></svg>Test my app</button>
         </div>
         <div class="psec">Council</div>
         <div class="prow">
@@ -4116,7 +4117,7 @@ MStore.ready.then(function(){
     $('recentWrap').style.display = tops.length ? '' : 'none';
     tops.slice(0, 3).forEach(function(p){
       var ty = typeOf(p), row = el('div', 'rrow'), b = el('button', 'rmain'), tx = el('span', 'rtx');
-      var ic = el('span', 'qic ' + (TYPE_CLS[ty] || '')); ic.innerHTML = TYPE_ICON[ty] || TYPE_ICON.all; b.appendChild(ic);
+      var ic = el('span', 'rbadge'); ic.innerHTML = TYPE_ICON[ty] || TYPE_ICON.all; b.appendChild(ic);
       tx.appendChild(el('b', '', p.name)); tx.appendChild(el('i', '', typeName(ty) + ' \u00b7 ' + agoText(lastActive(p))));
       b.appendChild(tx);
       b.addEventListener('click', function(){ closeSide(); openProject(p); });
@@ -8377,37 +8378,149 @@ MStore.ready.then(function(){
   document.addEventListener('pointerdown', function(e){
     if(($('plusBar').classList.contains('show') || $('modeSheet').classList.contains('show')) && !e.target.closest('#plusBar, #modeSheet, #plusBtn, #modeChip')) closePlus();
   }, true);
+  /* ---- the tester: opens the app out of sight, taps and types into every control, reports in plain words ---- */
+  function explorerFn(){
+    var t0 = Date.now(), errs = [], muts = 0, items = [], page = [];
+    window.addEventListener('error', function(e){ errs.push(String((e && e.message) || 'Error')); }, true);
+    window.addEventListener('unhandledrejection', function(e){ errs.push('Unhandled: ' + ((e.reason && e.reason.message) || e.reason)); });
+    try{ new MutationObserver(function(m){ muts += m.length; }).observe(document, { subtree:true, childList:true, attributes:true, characterData:true }); }catch(x){}
+    function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+    function vis(e){
+      try{ var r = e.getBoundingClientRect(), cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; }catch(x){ return false; }
+    }
+    function lab(e){
+      var t = String(e.getAttribute('aria-label') || e.innerText || e.value || e.placeholder || e.title || e.name || e.id || '').replace(/\s+/g, ' ').trim();
+      return (t || e.tagName.toLowerCase()).slice(0, 40);
+    }
+    var b = document.body;
+    if(b){
+      if(!document.querySelector('canvas, svg') && (b.innerText || '').trim().length === 0 && b.querySelectorAll('*').length < 3) page.push('The page is blank.');
+      if(document.documentElement.scrollWidth > window.innerWidth + 2) page.push('The content is wider than the screen, so the page scrolls sideways.');
+      if(!document.querySelector('meta[name=viewport]')) page.push('There is no viewport tag, so the page may look tiny on a phone.');
+      var bad = 0; Array.prototype.forEach.call(document.images, function(i){ if(i.complete && i.naturalWidth === 0 && i.getAttribute('src')) bad++; });
+      if(bad) page.push(bad + (bad === 1 ? ' image does' : ' images do') + ' not load.');
+    }
+    var sel = 'button, a[href^="#"], a:not([href]), [onclick], [role=button], summary, select, textarea, input:not([type=hidden])';
+    var cands = Array.prototype.filter.call(document.querySelectorAll(sel), function(e){ return vis(e) && !e.disabled; }).slice(0, 30);
+    var tiny = 0;
+    cands.forEach(function(e){ var r = e.getBoundingClientRect(); if(Math.min(r.width, r.height) < 28 && e.tagName !== 'INPUT') tiny++; });
+    if(tiny) page.push(tiny + (tiny === 1 ? ' control is' : ' controls are') + ' smaller than a fingertip.');
+    return (async function(){
+      for(var i = 0; i < cands.length; i++){
+        if(Date.now() - t0 > 9000) break;
+        var e = cands[i];
+        if(!document.contains(e) || !vis(e)) continue;
+        var name = lab(e), e0 = errs.length, m0 = muts, tag = e.tagName, ty = String(e.type || '').toLowerCase(), act = 'tap';
+        try{
+          if(tag === 'TEXTAREA' || (tag === 'INPUT' && /^(text|search|email|number|tel|url|password|)$/.test(ty))){
+            act = 'type'; e.focus(); e.value = ty === 'number' ? '5' : (ty === 'email' ? 'a@b.co' : 'test');
+            e.dispatchEvent(new Event('input', { bubbles:true })); e.dispatchEvent(new Event('change', { bubbles:true }));
+          }else if(tag === 'SELECT'){
+            act = 'choose';
+            if(e.options.length > 1){ e.selectedIndex = (e.selectedIndex + 1) % e.options.length; e.dispatchEvent(new Event('input', { bubbles:true })); e.dispatchEvent(new Event('change', { bubbles:true })); }
+          }else if(tag === 'INPUT' && ty === 'range'){
+            act = 'slide'; e.value = Math.round((Number(e.min || 0) + Number(e.max || 100)) / 2);
+            e.dispatchEvent(new Event('input', { bubbles:true })); e.dispatchEvent(new Event('change', { bubbles:true }));
+          }else{ e.click(); }
+        }catch(x){ errs.push(String((x && x.message) || x)); }
+        await sleep(260);
+        var broke = errs.length > e0;
+        items.push({ n:name, a:act, s:broke ? 'broke' : (muts > m0 ? 'ok' : 'quiet'), e:broke ? errs[errs.length - 1] : '' });
+      }
+      console.log('EXPLORE ' + JSON.stringify({ total:cands.length, items:items, page:page, errs:errs.slice(0, 5) }));
+    })();
+  }
+  async function testMyApp(){
+    closePlus();
+    if(!current) return;
+    var src = existingSrc(current);
+    if(!String(src || '').trim()){ UI.alert('Nothing to test yet', 'Build something in Code assembly first, then test it.'); return; }
+    if(isPyLike(src)){ UI.alert('Cannot test this here', 'The tester opens web pages, and this looks like Python.'); return; }
+    var add = councilView('Opens your app out of sight, types into inputs, taps every control once and reports what happened. It cannot judge looks or game rules.', 'Test my app');
+    var st = add('Testing', 'Please wait about ten seconds...', true);
+    var lines = await runSandbox(src, 12500, '(' + explorerFn.toString() + ')()');
+    var rep = null, loadErrs = [];
+    lines.forEach(function(l){
+      var t = String((l && l.t) || '');
+      if(t.indexOf('EXPLORE ') === 0){ try{ rep = JSON.parse(t.slice(8)); }catch(e){} }
+      else if(l && l.k === 'error' && loadErrs.indexOf(t) < 0 && loadErrs.length < 5) loadErrs.push(t);
+    });
+    var probs = [], notes = [], good = 0, quiet = 0, broke = 0;
+    if(!rep){ probs.push(loadErrs.length ? 'The page failed to start: ' + short(loadErrs[0], 140) : 'The page did not respond. It may be blank or stuck in a loop.'); }
+    else{
+      loadErrs.filter(function(t){ return !rep.items.some(function(i){ return i.e === t; }); }).forEach(function(t){ probs.push('An error appeared: ' + short(t, 140)); });
+      rep.items.forEach(function(i){
+        if(i.s === 'broke'){ broke++; probs.push((i.a === 'tap' ? 'Tapping' : 'Using') + ' \u201c' + i.n + '\u201d caused an error: ' + short(i.e, 120)); }
+        else if(i.s === 'quiet' && i.a === 'tap'){ quiet++; notes.push('\u201c' + i.n + '\u201d did nothing visible when tapped.'); }
+        else good++;
+      });
+      rep.page.forEach(function(t){ notes.push(t); });
+      if(!rep.total) notes.push('No buttons or inputs were found to try.');
+    }
+    var tried = rep ? rep.items.length : 0;
+    st.t.textContent = probs.length ? 'Found ' + probs.length + (probs.length === 1 ? ' problem' : ' problems') : (rep ? 'No errors found' : 'The test could not run');
+    st.b.style.color = 'var(--text)';
+    st.b.textContent = rep ? 'Tried ' + tried + (tried === 1 ? ' control' : ' controls') + ': ' + good + ' worked, ' + quiet + ' did nothing visible, ' + broke + ' broke.' : 'Nothing could be tested.';
+    if(probs.length) add('Needs fixing', probs.map(function(t){ return '\u2022 ' + t; }).join('\n'));
+    if(notes.length) add('Worth a look', notes.map(function(t){ return '\u2022 ' + t; }).join('\n'), true);
+    var all = probs.concat(notes), bar = el('div');
+    bar.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px';
+    function tb(label, fn){ var b = mkBtn('ghost', label, '', fn); b.style.cssText = 'height:34px;min-height:0;padding:0 14px;font-size:14px'; return b; }
+    var digest = 'I ran an automatic test on my app and it found these:\n' + all.map(function(t){ return '- ' + t; }).join('\n') + '\n\nPlease check each one, fix what is really broken, and tell me what you changed.';
+    if(all.length) bar.appendChild(tb('Ask the AI to fix', function(){
+      add.root.remove(); comp.value = digest;
+      try{ sizeComposer(); syncSend(); comp.focus(); }catch(e){}
+    }));
+    bar.appendChild(tb('Test again', function(){ add.root.remove(); testMyApp(); }));
+    if(all.length) bar.appendChild(tb('Copy', function(){ try{ navigator.clipboard.writeText(digest); }catch(e){} }));
+    add.root.insertBefore(bar, st.t.parentNode.nextSibling);
+  }
   /* ---- time travel: every saved version of the page and files, with what you asked around it ---- */
   function branchFrom(src){
     var np = { id:uid(), name:current.name + ' (branch)', created:Date.now(), type:current.type, opMode:current.opMode, opAuto:current.opAuto !== false };
     toolState(np); projects.push(np); codeOf(np).src = src; save(); renderSide(); openProject(np);
   }
+  function dayLabel(t){
+    var d = new Date(t), n = new Date(), k = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    return k === 0 ? 'Today' : k === 1 ? 'Yesterday' : d.toLocaleDateString([], { weekday:'short', day:'numeric', month:'short' });
+  }
+  function timeLabel(t){ return new Date(t).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }); }
   function timeTravel(){
     closePlus();
     if(!current) return;
-    var c = codeOf(current), ev = [];
-    (c.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') ev.push({ k:'page', h:h, ts:h.ts || 0 }); });
-    (current.files || []).forEach(function(f){ (f.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') ev.push({ k:'file', f:f, h:h, ts:h.ts || 0 }); }); });
+    var c = codeOf(current), snaps = [], asks = [];
+    (c.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') snaps.push({ k:'page', h:h, ts:h.ts || 0 }); });
+    (current.files || []).forEach(function(f){ (f.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') snaps.push({ k:'file', f:f, h:h, ts:h.ts || 0 }); }); });
     var ch = null; try{ ch = chatOf(current); }catch(e){}
-    ((ch && ch.msgs) || []).forEach(function(m){ if(m && m.r === 'u' && m.ts && m.kind !== 'inspect' && m.t) ev.push({ k:'ask', t:String(m.t), ts:m.ts }); });
-    ev.sort(function(a, b){ return b.ts - a.ts; });
-    var add = councilView('Every saved version, newest first, with what you asked around it. Preview, restore, or branch into a new project from any point.', 'Time travel');
-    if(!ev.some(function(e){ return e.k !== 'ask'; })){ add('Nothing saved yet', 'Versions appear here as you or the AI change the page and files.', true); return; }
-    ev.slice(0, 60).forEach(function(e){
-      if(e.k === 'ask'){
-        var t = el('div'); t.style.cssText = 'color:var(--muted);font-size:13px;margin:2px 6px 10px;white-space:pre-wrap';
-        t.textContent = 'You: ' + short(e.t, 140) + ' \u00b7 ' + agoText(e.ts);
-        add.root.appendChild(t); return;
-      }
-      var cur = e.k === 'file' ? e.f.text : c.src, st = diffStat(cur, e.h.src), why = whyTag(e.h);
-      var nm = e.h.label === 'You' ? 'Before your edits' : (e.h.label || 'Before a change');
-      var card = add((e.k === 'file' ? e.f.path : 'Page') + ' \u00b7 ' + agoText(e.ts), nm + (why ? ' \u00b7 ' + why : '') + '\n' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' lines vs now' : 'Same as now'));
-      var row = el('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+    ((ch && ch.msgs) || []).forEach(function(m){ if(m && m.r === 'u' && m.ts && m.kind !== 'inspect' && m.t) asks.push({ t:String(m.t), ts:m.ts, snaps:[] }); });
+    asks.sort(function(x, y){ return x.ts - y.ts; });
+    var early = { t:'Earlier changes', ts:0, snaps:[], early:true };
+    snaps.forEach(function(sn){
+      var g = early;
+      for(var i = asks.length - 1; i >= 0; i--){ if(asks[i].ts <= sn.ts){ g = asks[i]; break; } }
+      g.snaps.push(sn);
+    });
+    var groups = asks.filter(function(g){ return g.snaps.length; }).reverse();
+    if(early.snaps.length) groups.push(early);
+    var add = councilView('Each request, with the versions saved before it changed things. Tap a version.', 'Time travel');
+    if(!groups.length){ add('Nothing saved yet', 'Versions appear here as you or the AI change the page and files.', true); return; }
+    function tbtn(label, fn){ var b = mkBtn('ghost', label, '', fn); b.style.cssText = 'height:34px;min-height:0;padding:0 14px;font-size:14px'; return b; }
+    function snapRow(e){
+      var cur = e.k === 'file' ? e.f.text : c.src, st = diffStat(cur, e.h.src);
+      var lab = e.h.label === 'You' ? 'Before your edit' : (e.h.label && e.h.label !== 'Before a restore' ? e.h.label : (e.h.label ? 'Before a restore' : 'Before the change'));
+      var r = el('div'); r.style.cssText = 'border-top:1px solid var(--line-soft)';
+      var b = el('button'); b.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:11px 14px;text-align:left;color:var(--text);font-size:14px';
+      var l = el('span'); l.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+      l.textContent = (e.k === 'file' ? e.f.path : 'Page') + ' \u00b7 ' + lab;
+      var rt = el('span'); rt.style.cssText = 'flex:none;color:var(--muted);font-size:13px';
+      rt.textContent = timeLabel(e.ts) + ' \u00b7 ' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del : 'same');
+      b.appendChild(l); b.appendChild(rt); r.appendChild(b);
+      var act = el('div'); act.style.cssText = 'display:none;flex-wrap:wrap;gap:8px;padding:0 14px 12px';
       if(e.k === 'page'){
-        row.appendChild(mkBtn('ghost', 'Preview', '', function(){ add.root.remove(); openPreview(e.h.src); }));
-        row.appendChild(mkBtn('ghost', 'Branch', '', function(){ add.root.remove(); branchFrom(e.h.src); }));
+        act.appendChild(tbtn('Preview', function(){ add.root.remove(); openPreview(e.h.src); }));
+        act.appendChild(tbtn('Branch', function(){ add.root.remove(); branchFrom(e.h.src); }));
       }
-      row.appendChild(mkBtn('ghost', 'Restore', '', async function(){
+      act.appendChild(tbtn('Restore', async function(){
         var ok = await UI.confirm('Restore this version?', whyText(e.h) + 'What you have now is saved to history first, so you can undo this.', { confirmText:'Restore' });
         if(!ok) return;
         var box = e.k === 'file' ? e.f : c, key = e.k === 'file' ? 'text' : 'src';
@@ -8415,7 +8528,26 @@ MStore.ready.then(function(){
         if(e.k === 'file') e.f.mod = Date.now(); else c.stack = [];
         save(); add.root.remove(); renderCode();
       }));
-      card.b.parentNode.appendChild(row);
+      r.appendChild(act);
+      b.addEventListener('click', function(){ act.style.display = act.style.display === 'none' ? 'flex' : 'none'; });
+      return r;
+    }
+    var lastDay = '';
+    groups.slice(0, 25).forEach(function(g){
+      var d = g.ts ? dayLabel(g.ts) : '';
+      if(d && d !== lastDay){
+        var dh = el('div'); dh.style.cssText = 'font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 4px 8px';
+        dh.textContent = d; add.root.appendChild(dh); lastDay = d;
+      }
+      var gw = el('div'); gw.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:10px;overflow:hidden';
+      var hd = el('div'); hd.style.cssText = 'padding:12px 14px';
+      var ttl = el('div'); ttl.style.cssText = 'font-size:15px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden';
+      ttl.textContent = g.early ? g.t : '\u201c' + g.t + '\u201d';
+      var sb = el('div'); sb.style.cssText = 'font-size:12px;color:var(--muted);margin-top:3px';
+      sb.textContent = (g.ts ? timeLabel(g.ts) + ' \u00b7 ' : '') + g.snaps.length + (g.snaps.length === 1 ? ' version' : ' versions');
+      hd.appendChild(ttl); hd.appendChild(sb); gw.appendChild(hd);
+      g.snaps.slice().sort(function(x, y){ return y.ts - x.ts; }).forEach(function(e){ gw.appendChild(snapRow(e)); });
+      add.root.appendChild(gw);
     });
   }
   /* ---- council: the same question to several models, then a plain comparison ---- */
@@ -8424,7 +8556,7 @@ MStore.ready.then(function(){
     w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
     var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
     top.appendChild(el('div', 'tool-name', title || 'Council'));
-    var x = el('button', 'btn solid', 'Close'); x.addEventListener('click', function(){ w.remove(); });
+    var x = el('button', 'btn solid', 'Close'); x.style.cssText = 'height:34px;min-height:0;padding:0 16px;font-size:14px'; x.addEventListener('click', function(){ w.remove(); });
     top.appendChild(x); w.appendChild(top);
     var qb = el('div'); qb.style.cssText = 'color:var(--muted);font-size:13px;margin-bottom:12px;white-space:pre-wrap'; qb.textContent = q; w.appendChild(qb);
     document.body.appendChild(w);
@@ -8494,6 +8626,7 @@ MStore.ready.then(function(){
   $('toolCouncil').addEventListener('click', askCouncil);
   $('toolCouncilLast').addEventListener('click', showSavedCouncil);
   $('toolTime').addEventListener('click', timeTravel);
+  $('toolTest').addEventListener('click', testMyApp);
   var importBuf = null;
   function paintMode(){
     $('modeSub').textContent = importBuf
