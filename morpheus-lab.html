@@ -847,6 +847,19 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 #home.typing .qwrap{display:none}
 .qhead{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 6px 12px}
 .qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px}
+.rlist{display:flex;flex-direction:column;gap:8px}
+.rrow{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding-right:2px;transition:background .15s}
+.rrow:active{background:var(--press)}
+.rrow .rmain{flex:1;min-width:0;display:flex;align-items:center;gap:14px;height:62px;padding:0 14px;text-align:left;color:var(--text)}
+.rrow .rmain>svg{width:22px;height:22px;flex:none;stroke:var(--icon);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rrow .rtx{min-width:0;display:flex;flex-direction:column;gap:2px}
+.rrow .rtx b{font-weight:500;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrow .rtx i{font-style:normal;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rall{align-self:center;padding:8px 14px;font-size:14px;color:var(--muted)}
+.rrow .qic{width:40px;height:40px;border-radius:13px;flex:none;animation:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.75),inset 0 -2px 3px rgba(0,0,0,.3),inset 0 0 0 1px rgba(0,0,0,.18),0 2px 5px rgba(0,0,0,.25)}
+.rrow .qic>svg{width:20px;height:20px}
+:root[data-theme="light"] #home .chip{background:#fff;border-color:var(--line)}
+
 .qtile{display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;padding:2px 0;transition:transform .12s}
 .qtile:active{transform:scale(.94)}
 .qic{position:relative;width:46px;height:46px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--text);transition:box-shadow .15s}
@@ -1004,7 +1017,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <div class="qgrid" id="typeGrid"></div>
         <div id="recentWrap">
           <div class="qhead">Recent</div>
-          <div class="qgrid" id="recentGrid"></div>
+          <div class="rlist" id="recentGrid"></div>
         </div>
       </div>
     </div>
@@ -3868,13 +3881,15 @@ MStore.ready.then(function(){
   /* The phone's back gesture or button closes the top layer first:
      dialog, then sidebar, then page, then project, then leaves the app.
      One spare history entry is kept so the gesture always reaches us. */
-  var armed = false;
+  var armed = false, pos = 0, leaving = false, SPARE = 4;
+  /* Spare entries are only ever added inside a real tap: Chrome skips entries a page adds on its own,
+     which is what made a second back swipe leave the app. Every tap tops the stack back up. */
   function arm(){
-    if(armed) return;
+    if(leaving) return;
     armed = true;
-    try{ history.pushState({ m:1 }, ''); }catch(e){}
+    try{ while(pos < SPARE){ history.pushState({ m:1 }, ''); pos++; } }catch(e){}
   }
-  document.addEventListener('pointerdown', arm, { once:true, capture:true });
+  ['pointerup', 'touchend', 'click', 'keydown'].forEach(function(ev){ document.addEventListener(ev, arm, { capture:true }); });
   function handleBack(){
     if(UI.isOpen()){ UI.dismiss(); return true; }
     if($('sidebar').classList.contains('open') || $('homeSidebar').classList.contains('open')){ closeSide(); return true; }
@@ -3887,13 +3902,16 @@ MStore.ready.then(function(){
     return false;
   }
   window.addEventListener('popstate', function(){
-    if(!armed) return;
-    if(handleBack()){
-      try{ history.pushState({ m:1 }, ''); }catch(e){}
-    }else{
-      armed = false;
-      history.back();
-    }
+    if(!armed || leaving) return;
+    pos = Math.max(0, pos - 1);
+    if(handleBack()) return;
+    /* nothing left to close: step over the spare entries and leave in one go */
+    leaving = true; armed = false;
+    setTimeout(function(){ leaving = false; pos = 0; }, 1200);
+    if(pos <= 0){ history.back(); return; }
+    var again = function(){ window.removeEventListener('popstate', again); history.back(); };
+    window.addEventListener('popstate', again);
+    history.go(-pos);
   });
 
   /* ---- home: projects sidebar with a menu on every project ---- */
@@ -4069,6 +4087,15 @@ MStore.ready.then(function(){
     b.addEventListener('click', onTap);
     return b;
   }
+  function agoText(t){
+    if(!t) return '';
+    var m = Math.round((Date.now() - t) / 60000);
+    if(m < 1) return 'just now';
+    if(m < 60) return m + ' min ago';
+    var h = Math.round(m / 60); if(h < 24) return h + ' h ago';
+    var d = Math.round(h / 24); if(d < 7) return d + (d === 1 ? ' day ago' : ' days ago');
+    return new Date(t).toLocaleDateString([], { day:'numeric', month:'short' });
+  }
   function paintHome(){
     var tg = $('typeGrid'), rg = $('recentGrid');
     tg.innerHTML = ''; rg.innerHTML = '';
@@ -4080,12 +4107,21 @@ MStore.ready.then(function(){
     });
     var tops = projects.filter(function(x){ return !x.parent; }).sort(function(a, b){ return lastActive(b) - lastActive(a); });
     $('recentWrap').style.display = tops.length ? '' : 'none';
-    (tops.length > 4 ? tops.slice(0, 3) : tops).forEach(function(p){
-      var ty = typeOf(p);
-      var first = Array.from(String(p.name || '').trim())[0] || '?';
-      rg.appendChild(homeTile(TYPE_CLS[ty], TYPE_ICON[ty], p.name, function(){ closeSide(); openProject(p); }, false, first.toLocaleUpperCase()));
+    tops.slice(0, 3).forEach(function(p){
+      var ty = typeOf(p), row = el('div', 'rrow'), b = el('button', 'rmain'), tx = el('span', 'rtx');
+      var ic = el('span', 'qic ' + (TYPE_CLS[ty] || '')); ic.innerHTML = TYPE_ICON[ty] || TYPE_ICON.all; b.appendChild(ic);
+      tx.appendChild(el('b', '', p.name)); tx.appendChild(el('i', '', typeName(ty) + ' \u00b7 ' + agoText(lastActive(p))));
+      b.appendChild(tx);
+      b.addEventListener('click', function(){ closeSide(); openProject(p); });
+      var d = el('button', 'dots'); d.innerHTML = ICON.dots; d.setAttribute('aria-label', 'Options for ' + p.name);
+      d.addEventListener('click', function(){ projectMenu(p); });
+      row.appendChild(b); row.appendChild(d); rg.appendChild(row);
     });
-    if(tops.length > 4) rg.appendChild(homeTile('', TYPE_ICON.all, 'All ' + tops.length, function(){ $('homeMenuBtn').click(); }));
+    if(tops.length > 3){
+      var all = el('button', 'rall', 'See all ' + tops.length + ' projects');
+      all.addEventListener('click', function(){ $('homeMenuBtn').click(); });
+      rg.appendChild(all);
+    }
   }
 
   function enterLab(){
