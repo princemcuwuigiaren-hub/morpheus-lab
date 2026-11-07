@@ -7987,6 +7987,7 @@ MStore.ready.then(function(){
       if(has('log_decision')) R.push('Design: when a choice is actually made, call log_decision with what was chosen, why, and what was rejected. If it comes from or changes a document, name the document. Tasks you add from a document should name it too (the doc field).');
       if(has('journal_save')) R.push('The person asked to save something to the Discovery Journal. Save only what they asked for, once, under the right category. Never file a hypothesis as a fact.');
       if(code || has('run_sandbox')) R.push('The preview runs only browser HTML, CSS and JavaScript. It has no Python, Node, Android or Blender runtime, and its network access is off unless the person turns it on. Python and Node scripts can run only through terminal_run, when it is offered. Python or shell code never goes in the code assembly: save it as a project file with write_file and run it with terminal_run.');
+      if(code && has('write_file')) R.push('ES modules work across files. Project files ending in .js (write them with write_file, for example utils.js or lib/math.js) can be imported by the page with <script type="module">import { add } from \'./utils.js\';<\/script>, or the page can load one entry file with <script type="module" src="./main.js"><\/script>. The preview wires the files together by itself. Use relative paths that match the file names exactly.');
       R.push('Never say that code ran, that a test passed, or show output, unless a tool result in this conversation shows it. If you could only read the code, say plainly that you read it and did not run it, and never write expected output as if it were real. If a tool failed or is not available, say that first.');
       if(has('terminal_run')) R.push('terminal_run runs node, npm, npx, python and pip on the person\u2019s phone through Termux. Use it for anything that needs Node or Python, which the page sandbox cannot run. Put the files there first (terminal_write, terminal_send_code or terminal_send_test_files), run the command, then report the real exit code and the real output, including failures.');
       var GUIDE = {
@@ -11657,12 +11658,55 @@ MStore.ready.then(function(){
     return "default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' " + web + "; style-src 'unsafe-inline' " + web + "; img-src data: blob: " + web +
       "; font-src data: " + web + "; media-src data: blob: " + web + "; connect-src " + web + " " + ws + "; frame-src 'none'; worker-src blob:; form-action 'none'; base-uri 'none'";
   }
+  /* ---- multi-file ES modules: project .js files the page imports are wired together with an import map ----
+     Relative imports are rewritten to lab/<path> names, and each file travels as a data: module, so the
+     sandboxed preview needs no server and the frame stays unable to reach the lab. */
+  function bundleModules(src){
+    var files = {}, any = false;
+    ((current && current.files) || []).forEach(function(f){
+      if(f && f.path && typeof f.text === 'string' && /\.m?js$/i.test(f.path)){ files[String(f.path).replace(/^\.?\//, '')] = f.text; any = true; }
+    });
+    if(!any || !/type\s*=\s*["']?module/i.test(src)) return { src:src, map:'' };
+    function norm(dir, spec){
+      var parts = (spec.charAt(0) === '/' ? spec.slice(1) : (dir ? dir + '/' : '') + spec).split('/'), out = [];
+      parts.forEach(function(x){ if(x === '' || x === '.') return; if(x === '..') out.pop(); else out.push(x); });
+      var base = out.join('/');
+      return [base, base + '.js', base + '/index.js'].filter(function(c){ return files[c] !== undefined; })[0] || null;
+    }
+    function fix(dir){
+      return function(m, a, q, sp){ var r = norm(dir, sp); return r ? a + q + 'lab/' + r + q : m; };
+    }
+    function rewrite(code, dir){
+      return code
+        .replace(/(\bfrom\s*)(['"])((?:\.{1,2}\/|\/)[^'"\n]+)\2/g, fix(dir))
+        .replace(/(\bimport\s*)(['"])((?:\.{1,2}\/|\/)[^'"\n]+)\2/g, fix(dir))
+        .replace(/(\bimport\s*\(\s*)(['"])((?:\.{1,2}\/|\/)[^'"\n]+)\2/g, fix(dir));
+    }
+    var used = false;
+    var out = src.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, function(m, attrs, body){
+      if(!/type\s*=\s*["']?module/i.test(attrs)) return m;
+      var sm = /\bsrc\s*=\s*["']([^"']+)["']/i.exec(attrs);
+      if(sm){ var r = norm('', sm[1]); if(r){ used = true; return '<script type="module">import "lab/' + r + '";<\/script>'; } return m; }
+      var nb = rewrite(body, '');
+      if(nb !== body) used = true;
+      return '<script' + attrs + '>' + nb + '<\/script>';
+    });
+    if(!used) return { src:src, map:'' };
+    var imports = {};
+    Object.keys(files).forEach(function(k){
+      var dir = k.split('/').slice(0, -1).join('/');
+      imports['lab/' + k] = 'data:text/javascript;base64,' + btoa(unescape(encodeURIComponent(rewrite(files[k], dir))));
+    });
+    return { src:out, map:'<script type="importmap">' + JSON.stringify({ imports:imports }).replace(/</g, '\\u003c') + '<\/script>' };
+  }
   /* the hook goes in first thing, so the user's own scripts are already covered */
   function withHook(src){
     if(current && typeOf(current) === 'module' && !/<html[\s>]|<!doctype html/i.test(src)) src = moduleHarness(src);
-    var n = netOf();
-    var csp = '<meta http-equiv="Content-Security-Policy" content="' + cspFor(n).replace(/"/g, '&quot;') + '">';
-    var tag = csp + '<script>window.__mnet=' + (n.on ? 1 : 0) + ';(' + frameHook.toString() + ')()' + END;
+    var bm = bundleModules(src); src = bm.src;
+    var n = netOf(), cs = cspFor(n);
+    if(bm.map) cs = cs.replace('script-src ', 'script-src data: ');
+    var csp = '<meta http-equiv="Content-Security-Policy" content="' + cs.replace(/"/g, '&quot;') + '">';
+    var tag = csp + bm.map + '<script>window.__mnet=' + (n.on ? 1 : 0) + ';(' + frameHook.toString() + ')()' + END;
     var m = /<head[^>]*>/i.exec(src) || /<html[^>]*>/i.exec(src) || /^\s*<!doctype[^>]*>/i.exec(src);
     if(m) return src.slice(0, m.index + m[0].length) + '\n' + tag + src.slice(m.index + m[0].length);
     return tag + src;
