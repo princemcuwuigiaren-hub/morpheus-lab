@@ -3649,7 +3649,9 @@ MStore.ready.then(function(){
       var x = e.touches[0].clientX, y = e.touches[0].clientY;
       var opened = $('sidebar').classList.contains('open') ? $('sidebar') : $('homeSidebar').classList.contains('open') ? $('homeSidebar') : null;
       if(opened){ st = { mode:'close', el:opened, x0:x, y0:y, t0:Date.now(), locked:false, p:1, dx:0 }; return; }
-      if(x > EDGE) return;
+      /* start zone is the left 40% of the screen, so a swipe that begins a little inside the edge still works (the phone's own back gesture owns the very edge) */
+      if(x > Math.max(EDGE, Math.round(window.innerWidth * 0.4))) return;
+      if(e.target && e.target.closest && e.target.closest('.mtw, .mmb, #keys, .opts, pre, textarea, input, [contenteditable]')) return;
       var t = target(); if(!t) return;
       st = { mode:'open', t:t, el:t.el, x0:x, y0:y, t0:Date.now(), locked:false, p:0, dx:0 };
     }, { passive:true });
@@ -7573,8 +7575,8 @@ MStore.ready.then(function(){
     var I = IMPL[seg.name], a = seg.args || {};
     if(!I) return slim('code', 'Unknown action: ' + short(seg.name, 40), 'warn');
     var label = I.label(a);
-    if(seg.name === 'ask_user' && seg.st === 'run' && busy && pending === current) return askUserCard(seg);
-    if(seg.st === 'run') return (busy && pending === current) ? slim(I.icon, 'Working: ' + lc(label), 'warn') : slim(I.icon, 'Interrupted: ' + lc(label), 'warn');
+    if(seg.name === 'ask_user' && seg.st === 'run' && busy && pending === chatOf(current)) return askUserCard(seg);
+    if(seg.st === 'run') return (busy && pending === chatOf(current)) ? slim(I.icon, 'Working: ' + lc(label), 'warn') : slim(I.icon, 'Interrupted: ' + lc(label), 'warn');
     if(seg.st === 'ask'){
       if(!waiters[seg.id]) return slim(I.icon, 'No answer: ' + lc(label), 'warn');
       return askCard(seg, I, label);
