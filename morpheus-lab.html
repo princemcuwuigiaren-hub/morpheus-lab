@@ -694,8 +694,8 @@ svg{display:block;pointer-events:none}
 .plus:active{background:var(--hover)}
 .plus svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;transition:transform .18s}
 .plus.open svg{transform:rotate(45deg)}
-#plusBar{position:absolute;left:12px;bottom:calc(100% - 4px);display:none;gap:8px;flex-wrap:wrap;padding:8px;max-width:calc(100% - 24px);background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:0 10px 30px var(--shadow);z-index:6}
-#plusBar.show{display:flex}
+#plusBar,#modeSheet{position:absolute;left:12px;bottom:calc(100% - 4px);display:none;gap:8px;flex-wrap:wrap;padding:8px;max-width:calc(100% - 24px);background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:0 10px 30px var(--shadow);z-index:6}
+#plusBar.show,#modeSheet.show{display:flex}
 .ptool{display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 12px;border-radius:20px;background:var(--chip);border:1px solid var(--line-soft);font-size:14.5px;color:var(--text)}
 .ptool:active{background:var(--hover)}
 .ptool svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -779,9 +779,9 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .msg.copying .mcopy{display:flex}
 
 /* composer tools stack vertically */
-#plusBar{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:6px;width:max-content}
+#plusBar,#modeSheet{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:6px;width:max-content}
 
-#plusBar{flex-direction:column;flex-wrap:nowrap;gap:6px;align-items:stretch}
+#plusBar,#modeSheet{flex-direction:column;flex-wrap:nowrap;gap:6px;align-items:stretch}
 .prow{display:flex;flex-wrap:wrap;gap:8px}
 .psec{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 6px 0}
 .psec .info{width:22px;height:22px;font-size:11px}
@@ -843,7 +843,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .tchip .tci svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tchip>svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;opacity:.75}
 .tchip:active{transform:scale(.97)}
-.qwrap{display:flex;flex-direction:column;gap:22px;margin-top:4px}
+.qwrap{display:flex;flex-direction:column;gap:40px;margin-top:24px}
 #home.typing .qwrap{display:none}
 .qhead{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 6px 12px}
 .qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px}
@@ -1055,16 +1055,23 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
       <button id="toBottom" aria-label="Scroll to the latest message"><svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
       <input type="file" id="filePick" multiple hidden>
       <input type="file" id="imgPick" accept="image/png,image/jpeg,image/webp" multiple hidden>
-      <div id="plusBar" aria-label="Tools and modes">
+      <div id="plusBar" aria-label="Tools">
         <div class="psec">Tools</div>
         <div class="prow">
         <button class="ptool" id="toolImport"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 17v-6M9.5 13.5L12 11l2.5 2.5"/></svg>Attach files</button>
         <button class="ptool" id="toolImage"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l5-5 4 4 2-2 3 3"/></svg>Attach images</button>
         <button class="ptool" id="toolInspect"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>Code inspection</button>
           <button class="ptool" id="toolTasks"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>Tasks</button>
-          <button class="ptool" id="toolCouncil"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.6-3 2.5-4.5 5-4.5s4.4 1.500 5 4.500M11 19c.6-3 2.5-4.500 5-4.500s4.400 1.500 5 4.500"/></svg>Ask the council</button>
+          <button class="ptool" id="toolTime"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4M12 8v4.5l3 1.8"/></svg>Time travel</button>
         </div>
-        <div class="psec">Modes<button class="info" id="modeInfo" aria-label="About modes">?</button></div>
+        <div class="psec">Council</div>
+        <div class="prow">
+          <button class="ptool" id="toolCouncil"><svg viewBox="0 0 24 24"><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.6-3 2.5-4.5 5-4.5s4.4 1.500 5 4.500M11 19c.6-3 2.5-4.500 5-4.500s4.400 1.500 5 4.500"/></svg>Ask the council</button>
+          <button class="ptool" id="toolCouncilLast"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>Last council result</button>
+        </div>
+      </div>
+      <div id="modeSheet" aria-label="Operating mode">
+        <div class="psec">Mode<button class="info" id="modeInfo" aria-label="About modes">?</button></div>
         <div id="modeHelp"></div>
         <div class="prow" id="modeRow"></div>
       </div>
@@ -4876,8 +4883,12 @@ MStore.ready.then(function(){
     }
   }
   /* what is typed in the composer is kept per project, so leaving the app or the project does not lose it */
+  var follow = false; /* true from a send until you touch or drag the chat yourself */
   (function(){
     var box = $('sheet'), btn = $('toBottom'), last = 0, idle = 0;
+    box.addEventListener('touchstart', function(e){ if(!(e.target.closest && e.target.closest('button, input, textarea, a, .act'))) follow = false; }, { passive:true });
+    box.addEventListener('touchmove', function(){ follow = false; }, { passive:true });
+    box.addEventListener('wheel', function(){ follow = false; }, { passive:true });
     function far(){ return box.scrollHeight - box.scrollTop - box.clientHeight > 160; }
     function show(on){ btn.classList.toggle('show', !!on); }
     box.addEventListener('scroll', function(){
@@ -4889,7 +4900,7 @@ MStore.ready.then(function(){
       idle = setTimeout(function(){ if(far()) show(true); }, 1400);
     }, { passive:true });
     btn.addEventListener('pointerdown', function(e){ e.preventDefault(); });
-    btn.addEventListener('click', function(){ box.scrollTo({ top:box.scrollHeight, behavior:'smooth' }); show(false); });
+    btn.addEventListener('click', function(){ follow = true; box.scrollTo({ top:box.scrollHeight, behavior:'smooth' }); show(false); });
   })();
   var DKEY = 'morpheus.lab.drafts', dTimer = 0;
   function draftsGet(){ try{ return JSON.parse(localStorage.getItem(DKEY) || '{}') || {}; }catch(e){ return {}; } }
@@ -5244,13 +5255,14 @@ MStore.ready.then(function(){
     saveEd();
     var f = activeObj(), c = codeOf(current), box = f || c, key = f ? 'text' : 'src', cur = box[key];
     var hs = (box.hist || []).filter(function(h){ return h && typeof h.src === 'string'; }).reverse();
-    var items = [{ label:'Save a version now', value:'__save' }].concat(hs.map(function(h){
+    var items = [{ label:'Save a version now', value:'__save' }, { label:'Time travel: whole project', value:'__tt' }].concat(hs.map(function(h){
       var d = new Date(h.ts), st = diffStat(cur, h.src);
       var nm = h.label === 'You' ? 'Before your edits' : (h.label || 'Before a change');
       return { label:nm + ' \u00b7 ' + d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' \u00b7 ' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' vs now' : 'same as now') + (whyTag(h) ? ' \u00b7 ' + whyTag(h) : ''), value:h.id };
     }));
     var v = await UI.sheet('History \u00b7 ' + (f ? f.path : mainFileName(current)), items);
     if(!v) return;
+    if(v === '__tt'){ timeTravel(); return; }
     if(v === '__save'){
       var nm = await UI.prompt('Name this version', { confirmText:'Save', maxLength:40, placeholder:'For example: Before the redesign' });
       if(nm == null) return;
@@ -5525,7 +5537,7 @@ MStore.ready.then(function(){
      Everything else (switching chats, retry, edit, the end of a turn) still rebuilds the whole thread. */
   var nodeCache = new WeakMap();
   function renderThread(keep, inc){
-    var box = $('sheet'), top = box.scrollTop, stick = box.scrollHeight - top - box.clientHeight < 90;
+    var box = $('sheet'), top = box.scrollTop, stick = follow || box.scrollHeight - top - box.clientHeight < 90;
     if(!current){ box.innerHTML = ''; return; }
     var msgs = chatOf(current).msgs, desired = [];
     var waiting = busy && pending === chatOf(current);
@@ -8103,6 +8115,7 @@ MStore.ready.then(function(){
     var ch = chatOf(p);
     if(chOver) ch = chOver;
     ch.cut = false;
+    follow = true; requestAnimationFrame(function(){ var sb = $('sheet'); sb.scrollTop = sb.scrollHeight; });
     busy = true; pending = ch; lastErr = null; stopCtl = new AbortController();
     var sig = stopCtl.signal;
     syncSend(); paintConn();
@@ -8118,7 +8131,7 @@ MStore.ready.then(function(){
         raf = 0;
         var host = live && liveEls.get(live);
         if(!host) return;
-        var box = $('sheet'), stick = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+        var box = $('sheet'), stick = follow || box.scrollHeight - box.scrollTop - box.clientHeight < 90;
         host.innerHTML = '';
         fillRich(host, cleanModelText(live.t), m, 'live');
         if(stick) box.scrollTop = box.scrollHeight;
@@ -8291,7 +8304,7 @@ MStore.ready.then(function(){
       save();
     }
     if(m) m.segs.forEach(function(sg){ if(sg.k === 'tool' && (sg.st === 'run' || sg.st === 'ask')){ sg.st = 'denied'; sg.res = 'Stopped.'; } });
-    busy = false; pending = null; stopCtl = null;
+    busy = false; pending = null; stopCtl = null; follow = false;
     var q = queued; queued = null;
     if(q && !lastErr) setTimeout(function(){ respond(q.p, q.ch); }, 50);
     syncSend(); paintConn();
@@ -8355,31 +8368,99 @@ MStore.ready.then(function(){
 
   /* ---- composer tools: the + button opens a bar attached to the composer ---- */
   var mode = null;
-  function closePlus(){ $('plusBar').classList.remove('show'); $('plusBtn').classList.remove('open'); }
+  function closePlus(){ $('plusBar').classList.remove('show'); $('modeSheet').classList.remove('show'); $('plusBtn').classList.remove('open'); }
   $('plusBtn').addEventListener('click', function(){
-    var open = $('plusBar').classList.toggle('show');
-    $('plusBtn').classList.toggle('open', open);
+    var was = $('plusBar').classList.contains('show');
+    closePlus();
+    if(!was){ $('plusBar').classList.add('show'); $('plusBtn').classList.add('open'); }
   });
   document.addEventListener('pointerdown', function(e){
-    if($('plusBar').classList.contains('show') && !e.target.closest('#plusBar') && !e.target.closest('#plusBtn')) closePlus();
+    if(($('plusBar').classList.contains('show') || $('modeSheet').classList.contains('show')) && !e.target.closest('#plusBar, #modeSheet, #plusBtn, #modeChip')) closePlus();
   }, true);
+  /* ---- time travel: every saved version of the page and files, with what you asked around it ---- */
+  function branchFrom(src){
+    var np = { id:uid(), name:current.name + ' (branch)', created:Date.now(), type:current.type, opMode:current.opMode, opAuto:current.opAuto !== false };
+    toolState(np); projects.push(np); codeOf(np).src = src; save(); renderSide(); openProject(np);
+  }
+  function timeTravel(){
+    closePlus();
+    if(!current) return;
+    var c = codeOf(current), ev = [];
+    (c.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') ev.push({ k:'page', h:h, ts:h.ts || 0 }); });
+    (current.files || []).forEach(function(f){ (f.hist || []).forEach(function(h){ if(h && typeof h.src === 'string') ev.push({ k:'file', f:f, h:h, ts:h.ts || 0 }); }); });
+    var ch = null; try{ ch = chatOf(current); }catch(e){}
+    ((ch && ch.msgs) || []).forEach(function(m){ if(m && m.r === 'u' && m.ts && m.kind !== 'inspect' && m.t) ev.push({ k:'ask', t:String(m.t), ts:m.ts }); });
+    ev.sort(function(a, b){ return b.ts - a.ts; });
+    var add = councilView('Every saved version, newest first, with what you asked around it. Preview, restore, or branch into a new project from any point.', 'Time travel');
+    if(!ev.some(function(e){ return e.k !== 'ask'; })){ add('Nothing saved yet', 'Versions appear here as you or the AI change the page and files.', true); return; }
+    ev.slice(0, 60).forEach(function(e){
+      if(e.k === 'ask'){
+        var t = el('div'); t.style.cssText = 'color:var(--muted);font-size:13px;margin:2px 6px 10px;white-space:pre-wrap';
+        t.textContent = 'You: ' + short(e.t, 140) + ' \u00b7 ' + agoText(e.ts);
+        add.root.appendChild(t); return;
+      }
+      var cur = e.k === 'file' ? e.f.text : c.src, st = diffStat(cur, e.h.src), why = whyTag(e.h);
+      var nm = e.h.label === 'You' ? 'Before your edits' : (e.h.label || 'Before a change');
+      var card = add((e.k === 'file' ? e.f.path : 'Page') + ' \u00b7 ' + agoText(e.ts), nm + (why ? ' \u00b7 ' + why : '') + '\n' + (st.add || st.del ? '+' + st.add + ' \u2212' + st.del + ' lines vs now' : 'Same as now'));
+      var row = el('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+      if(e.k === 'page'){
+        row.appendChild(mkBtn('ghost', 'Preview', '', function(){ add.root.remove(); openPreview(e.h.src); }));
+        row.appendChild(mkBtn('ghost', 'Branch', '', function(){ add.root.remove(); branchFrom(e.h.src); }));
+      }
+      row.appendChild(mkBtn('ghost', 'Restore', '', async function(){
+        var ok = await UI.confirm('Restore this version?', whyText(e.h) + 'What you have now is saved to history first, so you can undo this.', { confirmText:'Restore' });
+        if(!ok) return;
+        var box = e.k === 'file' ? e.f : c, key = e.k === 'file' ? 'text' : 'src';
+        snap(box, key, 'Before a restore'); box[key] = e.h.src;
+        if(e.k === 'file') e.f.mod = Date.now(); else c.stack = [];
+        save(); add.root.remove(); renderCode();
+      }));
+      card.b.parentNode.appendChild(row);
+    });
+  }
   /* ---- council: the same question to several models, then a plain comparison ---- */
-  function councilView(q){
+  function councilView(q, title){
     var w = el('div');
     w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
     var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
-    top.appendChild(el('div', 'tool-name', 'Council'));
+    top.appendChild(el('div', 'tool-name', title || 'Council'));
     var x = el('button', 'btn solid', 'Close'); x.addEventListener('click', function(){ w.remove(); });
     top.appendChild(x); w.appendChild(top);
     var qb = el('div'); qb.style.cssText = 'color:var(--muted);font-size:13px;margin-bottom:12px;white-space:pre-wrap'; qb.textContent = q; w.appendChild(qb);
     document.body.appendChild(w);
-    return function(title, text, muted){
+    var addCard = function(title, text, muted){
       var c = el('div'); c.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px';
       var h = el('div', 'tool-name', title), b = el('div');
       b.style.cssText = 'white-space:pre-wrap;margin-top:6px;line-height:1.5;font-size:14px;color:' + (muted ? 'var(--muted)' : 'var(--text)');
       b.textContent = text; c.appendChild(h); c.appendChild(b); w.appendChild(c);
       return { t:h, b:b };
     };
+    addCard.root = w; return addCard;
+  }
+  function councilDigest(d){
+    return 'Council on: ' + d.q + '\n\n' + (d.summary || d.answers.filter(function(a){ return a.t; }).map(function(a){ return a.m + ': ' + a.t; }).join('\n\n'));
+  }
+  function councilActions(add, d){
+    var bar = el('div'); bar.style.cssText = 'display:flex;gap:8px;margin:2px 0 12px';
+    var cp = mkBtn('ghost', 'Copy', '', function(){
+      try{ navigator.clipboard.writeText(councilDigest(d)); cp.textContent = 'Copied'; setTimeout(function(){ cp.textContent = 'Copy'; }, 1500); }catch(e){}
+    });
+    var use = mkBtn('ghost', 'Use in chat', '', function(){
+      add.root.remove();
+      comp.value = councilDigest(d) + '\n\nWhat should we do next?';
+      try{ sizeComposer(); syncSend(); comp.focus(); }catch(e){}
+    });
+    bar.appendChild(use); bar.appendChild(cp);
+    add.root.insertBefore(bar, add.root.children[2] || null);
+  }
+  function showSavedCouncil(){
+    closePlus();
+    var d = current && current.council;
+    if(!d){ UI.alert('No council yet', 'Ask the council a question first. The latest result is kept here.'); return; }
+    var add = councilView(d.q);
+    if(d.summary) add('Where they agree and differ', d.summary);
+    d.answers.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t); });
+    councilActions(add, d);
   }
   async function askCouncil(){
     closePlus();
@@ -8396,18 +8477,23 @@ MStore.ready.then(function(){
     var res = await Promise.all(models.map(function(m){
       return ask(m, sys, q, 600).then(function(r){ return { m:m, t:r.text.trim() }; }, function(err){ return { m:m, err:(err && err.message) || 'Failed' }; });
     }));
-    var ok = res.filter(function(r){ return r.t; });
+    var ok = res.filter(function(r){ return r.t; }), sumText = '';
     if(ok.length >= 2){
       st.t.textContent = 'Comparing the answers'; 
       try{
         var cmp = await ask(models[0], 'You compare answers from several AIs. Reply in plain language with three short parts headed Agree, Disagree and Best next step. Name the models when they differ. Under 160 words.',
           'Question:\n' + q + '\n\n' + ok.map(function(r){ return '[' + r.m + ']\n' + r.t; }).join('\n\n'), 500);
-        st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; st.b.textContent = cmp.text.trim() || 'No comparison came back.';
+        st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; sumText = cmp.text.trim(); st.b.textContent = sumText || 'No comparison came back.';
       }catch(err){ st.t.textContent = 'Comparison failed'; st.b.textContent = (err && err.message) || 'Could not compare. Read the answers below.'; }
     }else{ st.t.textContent = 'Not enough answers to compare'; st.b.textContent = ok.length ? 'Only one model answered.' : 'No model answered. Check the model names and your provider key.'; }
     res.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t); });
+    var data = { q:q, ts:Date.now(), summary:sumText, answers:res.map(function(r){ return { m:r.m, t:r.t || '', err:r.err || '' }; }) };
+    if(current){ current.council = data; save(); }
+    councilActions(add, data);
   }
   $('toolCouncil').addEventListener('click', askCouncil);
+  $('toolCouncilLast').addEventListener('click', showSavedCouncil);
+  $('toolTime').addEventListener('click', timeTravel);
   var importBuf = null;
   function paintMode(){
     $('modeSub').textContent = importBuf
@@ -10764,7 +10850,11 @@ MStore.ready.then(function(){
     save(); paintOpMode(); closePlus();
   }
   buildModeRow();
-  $('modeChip').addEventListener('click', function(){ $('plusBtn').click(); });
+  $('modeChip').addEventListener('click', function(){
+    var was = $('modeSheet').classList.contains('show');
+    closePlus();
+    if(!was) $('modeSheet').classList.add('show');
+  });
   $('modeInfo').addEventListener('click', function(){ $('modeHelp').classList.toggle('show'); });
   $('toolTasks').addEventListener('click', function(){ closePlus(); go('notebook'); });
 
