@@ -520,8 +520,8 @@ svg{display:block;pointer-events:none}
 #fileBar{flex:none;display:flex;align-items:center;gap:8px;margin:8px 12px 0}
 #fileTabs{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
 #fileTabs::-webkit-scrollbar{display:none}
-.ftab{flex:none;display:flex;align-items:center;gap:7px;max-width:180px;padding:8px 12px;border:1px solid var(--edge);border-radius:12px;background:var(--panel);color:var(--muted);font:inherit;font-size:13.5px;white-space:nowrap}
-.ftab.on{color:var(--text);border-color:var(--focus)}
+.ftab{flex:none;display:flex;align-items:center;gap:7px;max-width:180px;padding:10px 2px;margin-right:16px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;white-space:nowrap}
+.ftab.on{color:var(--text);border-bottom-color:var(--text)}
 .ftab .fn{overflow:hidden;text-overflow:ellipsis}
 .ftab .fx{margin-left:2px;opacity:.6;font-size:15px;line-height:1}
 #filesBtn{width:40px;height:40px;flex:none}
@@ -2597,6 +2597,8 @@ MStore.ready.then(function(){
      desc:'Lets the AI read one task in full.'},
     {id:'get_active_task', group:'Tasks', name:'Read active task', perm:'allow',
      desc:'Lets the AI see which task it is working on.'},
+    {id:'focus_group', group:'Tasks', name:'Switch group', perm:'allow',
+     desc:'Moves focus to another task group. The lab already moves on by itself when a group finishes.'},
     {id:'start_task', group:'Tasks', name:'Start task', perm:'allow',
      desc:'Makes a task the one being worked on. Refused while it waits on unfinished tasks.'},
     {id:'update_task', group:'Tasks', name:'Update task', perm:'allow',
@@ -2652,6 +2654,12 @@ MStore.ready.then(function(){
      desc:'Proposes a Discovery Journal entry. Nothing is saved until you approve it.'},
     {id:'journal_list', group:'Journal', name:'Read journal', perm:'allow',
      desc:'Lets the AI read Discovery Journal entries.'},
+    {id:'log_hypothesis', group:'Journal', name:'Log hypothesis', perm:'allow',
+     desc:'Records a testable claim in the ledger with its prediction and how sure the AI is, from 1 to 10.'},
+    {id:'plan_experiment', group:'Journal', name:'Plan experiment', perm:'allow',
+     desc:'Plans how a hypothesis will be tested and what would count as success. Can link to a task.'},
+    {id:'log_result', group:'Journal', name:'Log result', perm:'allow',
+     desc:'Records what an experiment showed. Needs evidence, and updates confidence in the hypothesis.'},
     {id:'capture_idea', group:'Journal', name:'Capture idea', perm:'allow',
      desc:'Discovery mode only. Saves an idea straight to the Discovery Journal.'},
     {id:'park_question', group:'Journal', name:'Park question', perm:'allow',
@@ -2681,10 +2689,10 @@ MStore.ready.then(function(){
   /* each of these exists in exactly one mode; the shared toolset is untouched */
   var MODE_ONLY = { capture_idea:'discovery', park_question:'discovery', save_finding:'research', log_decision:'design' };
   var MODE_SETS = {
-    discovery:M_READ.concat(['capture_idea', 'park_question']),
-    research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc', 'save_finding']),
-    design:M_READ.concat(['analyze_code', 'propose_direction', 'add_task', 'update_task', 'start_task', 'block_task', 'fail_task', 'complete_task', 'write_doc', 'log_decision']),
-    test:M_READ.concat(['analyze_code', 'run_sandbox', 'update_task', 'start_task', 'block_task', 'fail_task', 'complete_task']),
+    discovery:M_READ.concat(['capture_idea', 'park_question', 'log_hypothesis']),
+    research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc', 'save_finding', 'log_hypothesis']),
+    design:M_READ.concat(['analyze_code', 'propose_direction', 'add_task', 'update_task', 'start_task', 'focus_group', 'block_task', 'fail_task', 'complete_task', 'write_doc', 'log_decision', 'log_hypothesis', 'plan_experiment']),
+    test:M_READ.concat(['analyze_code', 'run_sandbox', 'update_task', 'start_task', 'focus_group', 'block_task', 'fail_task', 'complete_task', 'plan_experiment', 'log_result']),
     build:null
   };
   /* ---- automatic mode: the lab picks the mode from what the person says and the kind of project ---- */
@@ -2763,7 +2771,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['capture_idea', 'park_question', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -2973,7 +2981,7 @@ MStore.ready.then(function(){
     else o += 'Nothing else can run without it. Stop here: tell the person what happened and what you need, and use ask_user if they must choose.';
     return o;
   }
-  var NOWORK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, add_task:1, block_task:1, fail_task:1, complete_task:1, ask_user:1, read_notes:1, write_note:1, journal_list:1 };
+  var NOWORK = { focus_group:1, update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, add_task:1, block_task:1, fail_task:1, complete_task:1, ask_user:1, read_notes:1, write_note:1, journal_list:1 };
   /* a real tool result while a task is active is the only thing that counts as work on it */
   function noteWork(p, sg){
     var t = activeTask(p);
@@ -3899,6 +3907,9 @@ MStore.ready.then(function(){
   }
   ['pointerup', 'touchend', 'click', 'keydown'].forEach(function(ev){ document.addEventListener(ev, arm, { capture:true }); });
   function handleBack(){
+    if(sheetClose){ sheetClose(); return true; }
+    var cv = document.getElementById('councilOv');
+    if(cv){ var cb = cv.querySelector('button'); if(cb) cb.click(); return true; }
     if(UI.isOpen()){ UI.dismiss(); return true; }
     if($('sidebar').classList.contains('open') || $('homeSidebar').classList.contains('open')){ closeSide(); return true; }
     if($('lightbox').classList.contains('show')){ closeLightbox(); return true; }
@@ -4205,7 +4216,7 @@ MStore.ready.then(function(){
     conn.appendChild(el('div', 'tool-info', 'Your key is saved only in this browser and sent only to Google. Create one in Google AI Studio.'));
     var kr = el('div', 'keyrow');
     var f = el('input', 'field');
-    f.type = 'password'; f.value = G.key; f.placeholder = 'Paste your key';
+    f.type = 'password'; f.value = G.key;
     f.setAttribute('autocomplete', 'off'); f.setAttribute('spellcheck', 'false'); f.setAttribute('autocapitalize', 'off');
     f.addEventListener('input', function(){ G.key = f.value.trim(); saveG(); paintSummary(); });
     f.addEventListener('change', function(){
@@ -4311,7 +4322,7 @@ MStore.ready.then(function(){
       var info = el('button', 'info', '?'); info.addEventListener('click', function(){ c.classList.toggle('open'); });
       top.appendChild(info); c.appendChild(top);
       c.appendChild(el('div', 'tool-info', auto
-        ? 'Add the models you want, in order. The first is used, and the lab moves to the next on its own when one runs into limits. Ask the council, in the + menu of a chat, sends one question to all of them. Free models are listed first.'
+        ? 'Add the models you want, in order. The first is used, and the lab moves to the next on its own when one runs into limits. Ask the council, in the + menu of a chat, sends one question to all of them. Free models are listed first. Tap a model in the list to remove it.'
         : 'Pick a model and test it. The lab will only ever use this one. Free models are listed first.'));
       var st = el('div', 'status');
       function setSt(msg, kind){ st.textContent = msg || ''; st.className = 'status' + (kind ? ' ' + kind : ''); }
@@ -4329,7 +4340,6 @@ MStore.ready.then(function(){
           b.addEventListener('click', function(){ var q = extList(); q.splice(i, 1); e.models = q.join(', '); saveG(); paintRows(); paintSummary(); });
           list.appendChild(b);
         });
-        if(l.length) list.appendChild(el('div', 'xsub', 'Tap a model to remove it.'));
       }
       paintRows();
       sel.addEventListener('click', async function(){
@@ -4516,7 +4526,7 @@ MStore.ready.then(function(){
     var wc = el('div', 'tool on'), wtop = el('div', 'tool-top');
     wtop.appendChild(el('div', 'tool-name', 'Text weight'));
     wc.appendChild(wtop);
-    wc.appendChild(el('div', 'xsub', 'Thicker text is easier to read on a phone screen.'));
+    addInfo(wc, 'Thicker text is easier to read on a phone screen.');
     var wseg = el('div', 'seg'); wseg.style.marginTop = '12px';
     [['400', 'Regular'], ['500', 'Medium'], ['600', 'Bold']].forEach(function(w){
       var b = el('button', getWeight() === w[0] ? 'sel' : '', w[1]);
@@ -4532,7 +4542,7 @@ MStore.ready.then(function(){
     var bc = el('div', 'tool on'), btop = el('div', 'tool-top');
     btop.appendChild(el('div', 'tool-name', 'Your message color'));
     bc.appendChild(btop);
-    bc.appendChild(el('div', 'xsub', 'The bubble around what you type. Replies from the AI stay plain.'));
+    addInfo(bc, 'The bubble around what you type. Replies from the AI stay plain.');
     var sws = el('div'); sws.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center';
     var BUB = [['', 'Default'], ['#000000', 'Black'], ['#2d5bd6', 'Blue'], ['#1f7a4d', 'Green'], ['#7a3fa0', 'Plum'], ['#c2410c', 'Rust']];
     var cp = document.createElement('input'); cp.type = 'color'; cp.setAttribute('aria-label', 'Custom color');
@@ -4674,11 +4684,24 @@ MStore.ready.then(function(){
     var tasks = tasksOf(current).slice().sort(bySeq), notes = current.notes || [];
     var subs = projects.filter(function(x){ return x.parent === current.id; });
     var openN = tasks.filter(function(t){ return t.status !== 'completed'; }).length, act = activeTask(current);
-    body.appendChild(el('div', 'summary', openN + ' open task' + (openN === 1 ? '' : 's') + (act ? ' \u00b7 working on #' + act.seq : '')));
-    if(tasks.length){ var pg = el('div', 'xsub', projectProgress(current)); pg.style.marginTop = '4px'; body.appendChild(pg); }
-    var ex1 = el('div', 'prow'); ex1.style.marginTop = '10px';
-    ex1.appendChild(mkBtn('ghost', 'Export', '', function(){ exportTasks(current); }));
-    body.appendChild(ex1);
+    var doneN = tasks.length - openN, gAll = groupsOf(current);
+    var gDone = gAll.filter(function(g){ return g.tasks.length && g.tasks.every(function(t){ return t.status === 'completed'; }); }).length;
+    var sc = el('div', 'tool on'), st1 = el('div', 'tool-top');
+    st1.appendChild(el('div', 'tool-name', tasks.length ? doneN + ' of ' + tasks.length + ' tasks done' : 'No tasks yet'));
+    var mb = el('button', 'cp'); mb.innerHTML = ICON.dots; mb.setAttribute('aria-label', 'Task options');
+    mb.addEventListener('click', async function(){ var a2 = await UI.sheet('Tasks', [{ label:'Export tasks', value:'export' }]); if(a2 === 'export') exportTasks(current); });
+    st1.appendChild(mb); sc.appendChild(st1);
+    if(tasks.length){
+      var tr = el('div'), fl = el('div'), meta = [];
+      tr.style.cssText = 'height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px';
+      fl.style.cssText = 'height:100%;border-radius:3px;background:var(--text);width:' + Math.round(doneN / tasks.length * 100) + '%';
+      tr.appendChild(fl); sc.appendChild(tr);
+      if(gAll.length) meta.push(gDone + ' of ' + gAll.length + ' groups done');
+      if(act) meta.push('working on #' + act.seq);
+      if(meta.length) sc.appendChild(el('div', 'xsub', meta.join(' \u00b7 ')));
+    }
+    sc.style.marginTop = '10px';
+    body.appendChild(sc);
     body.appendChild(el('div', 'group-h', 'Tasks'));
     body.classList.toggle('pe', !tasks.length);
     if(!tasks.length) body.appendChild(el('div', 'proj-empty page-empty', 'No tasks yet'));
@@ -4758,12 +4781,18 @@ MStore.ready.then(function(){
 
     body.appendChild(el('div', 'label', 'Project type'));
     body.appendChild(typeChips(function(){ return typeOf(current); }, function(v){ current.type = v; current.opMode = TYPE_MODE[v]; current.opAuto = true; save(); }));
-    body.appendChild(el('div', 'hint', 'You can change this any time. To work in another type without losing this one, start a sub-project from the sidebar and pick the type there.'));
     body.appendChild(el('div', 'label', 'Export'));
-    var exr = el('div', 'prow');
-    exr.appendChild(mkBtn('ghost', 'Memory', '', function(){ exportMix('memory-' + current.name, notesMd(current), null); }));
-    exr.appendChild(mkBtn('ghost', 'This chat', '', function(){ var xc = chatOf(current); exportMix(xc.title || 'chat', chatMd(current, xc), null); }));
-    exr.appendChild(mkBtn('ghost', 'Code', '', function(){ exportCode(current); }));
+    var exr = el('div');
+    exr.style.cssText = 'background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden';
+    [['Project memory', function(){ exportMix('memory-' + current.name, notesMd(current), null); }],
+     ['This chat', function(){ var xc = chatOf(current); exportMix(xc.title || 'chat', chatMd(current, xc), null); }],
+     ['Code', function(){ exportCode(current); }]].forEach(function(r, i){
+      var b = el('button'), l = el('span', '', r[0]);
+      b.style.cssText = 'display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px;text-align:left;color:var(--text)' + (i ? ';border-top:1px solid var(--line-soft)' : '');
+      b.appendChild(l); b.insertAdjacentHTML('beforeend', ICON.chev);
+      b.lastChild.style.cssText = 'width:16px;height:16px;flex:none;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transform:rotate(-90deg)';
+      b.addEventListener('click', r[1]); exr.appendChild(b);
+    });
     body.appendChild(exr);
 
     /* project memory: notes the AI is sent with every message */
@@ -4797,9 +4826,10 @@ MStore.ready.then(function(){
     body.appendChild(nt); body.appendChild(nx); body.appendChild(addN);
 
     /* saved versions of the page */
-    body.appendChild(el('div', 'label', 'Replies'));
-    var vc = el('div', 'tool on'), vseg = el('div', 'seg');
-    vc.appendChild(el('div', 'xsub', 'How much the assistant explains. Quick is short and technical. Teach me explains each change and the words it uses.'));
+    var vc = el('div', 'tool on'), vseg = el('div', 'seg'), vtop = el('div', 'tool-top');
+    vc.style.marginTop = '24px';
+    vtop.appendChild(el('div', 'tool-name', 'Replies')); vc.appendChild(vtop);
+    addInfo(vc, 'How much the assistant explains. Quick is short and technical. Teach me explains why it chose an approach and the words it uses.');
     VOICES.forEach(function(v){
       var b = el('button', (current.explain || 'balanced') === v[0] ? 'sel' : '', v[1]);
       b.addEventListener('click', function(){
@@ -5265,7 +5295,7 @@ MStore.ready.then(function(){
     if(!v) return;
     if(v === '__tt'){ timeTravel(); return; }
     if(v === '__save'){
-      var nm = await UI.prompt('Name this version', { confirmText:'Save', maxLength:40, placeholder:'For example: Before the redesign' });
+      var nm = await UI.prompt('Name this version', { confirmText:'Save', maxLength:40 });
       if(nm == null) return;
       snap(box, key, nm.trim() || 'Saved by you'); save(); return;
     }
@@ -5408,6 +5438,42 @@ MStore.ready.then(function(){
   }
   /* two or more quiet actions in a row become one line: their icons, the first action's words, and an arrow to open them */
   var groupOpen = new WeakMap();
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('button.info');
+    var card = b && b.closest('.tool');
+    var inf = card && card.querySelector(':scope > .tool-info');
+    if(!inf || inf.children.length) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    var nm = card.querySelector('.tool-name');
+    bottomSheet(nm ? nm.textContent : 'About', function(body){
+      var t = el('div'); t.style.cssText = 'line-height:1.55;font-size:15px;white-space:pre-wrap'; t.textContent = inf.textContent; body.appendChild(t);
+    });
+  }, true);
+  function addInfo(card, text){
+    var top = card.querySelector('.tool-top');
+    if(!top){ card.appendChild(el('div', 'xsub', text)); return; }
+    var b = el('button', 'info', '?'); b.addEventListener('click', function(){ card.classList.toggle('open'); });
+    top.appendChild(b); card.appendChild(el('div', 'tool-info', text));
+  }
+  /* a bottom sheet for long content, so steps and output open over the chat instead of stretching it */
+  var sheetClose = null;
+  function bottomSheet(title, fill, onClose){
+    if(sheetClose) sheetClose();
+    var bd = el('div'), sh = el('div'), top = el('div'), body = el('div'), x = el('button', 'btn solid', 'Close');
+    bd.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:flex;align-items:flex-end';
+    sh.style.cssText = 'width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))';
+    top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px';
+    x.style.cssText = 'height:34px;min-height:0;padding:0 16px;font-size:14px;flex:none';
+    var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    body.style.cssText = 'overflow:auto;display:flex;flex-direction:column;gap:6px';
+    top.appendChild(tt); top.appendChild(x);
+    fill(body);
+    function close(){ if(onClose) onClose(); bd.remove(); sheetClose = null; }
+    x.addEventListener('click', close);
+    bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
+    sh.appendChild(top); sh.appendChild(body); bd.appendChild(sh); document.body.appendChild(bd);
+    sheetClose = close;
+  }
   function toolGroup(run){
     var first = run[0].sg, wrap = el('div', 'tgroup'), head = el('button', 'tact tghead'), ics = el('span', 'tgics'), kinds = {};
     run.slice(0, 4).forEach(function(r){
@@ -5425,8 +5491,9 @@ MStore.ready.then(function(){
     head.appendChild(chev);
     var gb = el('div', 'tgbody');
     run.forEach(function(r){ gb.appendChild(r.node); });
-    if(groupOpen.get(first)) wrap.classList.add('open');
-    head.addEventListener('click', function(){ var o = wrap.classList.toggle('open'); groupOpen.set(first, o); });
+    head.addEventListener('click', function(){
+      bottomSheet(run.length + ' steps', function(b){ run.forEach(function(r){ b.appendChild(r.node); }); }, function(){ run.forEach(function(r){ gb.appendChild(r.node); }); });
+    });
     wrap.appendChild(head); wrap.appendChild(gb);
     return wrap;
   }
@@ -6204,6 +6271,18 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){ return slim('task', seg.res || 'Read the active task'); }
   });
+  T('focus_group', {
+    icon:'task',
+    label:function(a){ return 'Focus ' + short(a.group || 'a group', 30); },
+    run:function(p, a){
+      var g = groupsOf(p).filter(function(x){ return sameG(x.name, a.group); })[0];
+      if(!g) return terr('No group has that name. Use list_tasks to see the groups.');
+      if(!g.tasks.some(function(t){ return t.status !== 'completed'; })) return terr('Every task in that group is already done.');
+      p.focusGroup = g.name; p.needPick = false; save();
+      return { ok:true, res:'Focus \u00b7 ' + short(g.name, 40), result:{ ok:true, message:'Focus moved to the group \u201c' + g.name + '\u201d.' } };
+    },
+    card:function(m, seg){ return slim('task', seg.res || 'Moved focus', 'ok'); }
+  });
   T('start_task', {
     icon:'task', follow:true,
     label:function(a){ return 'Start task ' + short(a.task || '', 30); },
@@ -6316,13 +6395,21 @@ MStore.ready.then(function(){
         var grp = groupsOf(p).filter(function(x){ return sameG(x.name, g); })[0];
         var left = grp ? grp.tasks.filter(function(x){ return x.status !== 'completed'; }) : [];
         if(!left.length){
-          p.focusGroup = ''; p.needPick = true;
-          msg += ' Every task in the group \u201c' + g + '\u201d is now done. Report briefly and stop. Do not start another group: if one is waiting, ask the person which is next with ask_user.';
+          var nxg = groupsOf(p).filter(function(x){ return !sameG(x.name, g) && x.tasks.some(function(y){ return y.status !== 'completed'; }); })[0];
+          if(nxg){
+            p.focusGroup = nxg.name; p.needPick = false;
+            msg += ' Every task in the group \u201c' + g + '\u201d is now done. The lab moved focus to the next group, \u201c' + nxg.name + '\u201d. Report briefly, then carry on with it unless the person said otherwise.';
+          }else{
+            p.focusGroup = ''; p.needPick = true;
+            msg += ' Every task in the group \u201c' + g + '\u201d is now done and no other group has open tasks. Report briefly and stop.';
+          }
         }else{
           var nx = earlierOpen(p, { seq:1e9, group:g, id:'' }).concat(left.filter(function(x){ return x.status === 'pending' && !unmetDeps(p, x).length; }))[0];
           msg += ' Group \u201c' + g + '\u201d: ' + tallyText(tally(grp.tasks)) + '.' + (nx ? ' Next in order: #' + nx.seq + ' ' + nx.title + '.' : ' Nothing left can run yet: report what is blocked, failed or waiting.');
         }
       }
+      var exp = journalOf(p).filter(function(x){ return x.type === 'method' && x.task === t.id && x.status !== 'done'; })[0];
+      if(exp) msg += ' This task ran the experiment \u201c' + short(exp.title, 50) + '\u201d. Record what happened with log_result.';
       msg += ' ' + projectProgress(p) + '.';
       save();
       return { ok:true, res:'Completed #' + t.seq + ' ' + short(t.title, 40), result:{ ok:true, message:msg } };
@@ -6370,6 +6457,9 @@ MStore.ready.then(function(){
     if(o.source) e.source = short(o.source, 300);
     if(o.conf) e.conf = o.conf;
     if(o.status) e.status = o.status;
+    if(o.evidence) e.evidence = short(o.evidence, 600);
+    if(o.verdict) e.verdict = o.verdict;
+    if(o.ver) e.ver = o.ver;
     journalOf(p).push(e); save();
     return { e:e };
   }
@@ -6408,6 +6498,68 @@ MStore.ready.then(function(){
     if(!d || !why) return { err:'A decision needs what was chosen and why.' };
     var rj = (Array.isArray(a.rejected) ? a.rejected : []).map(function(x){ return String(x).trim(); }).filter(Boolean);
     return { type:'decision', title:d, text:'Why: ' + why + (rj.length ? '\n\nRejected:\n' + rj.map(function(x){ return '- ' + x; }).join('\n') : '\n\nRejected: nothing recorded.'), o:{ task:a.task, document:a.document } };
+  });
+  /* ---- the ledger: hypothesis, experiment, result, kept in the Discovery Journal and chained with entry.of ---- */
+  function findJ(p, type, q){
+    q = String(q || '').trim().toLowerCase();
+    if(!q) return null;
+    var es = journalOf(p).filter(function(e){ return e.type === type; });
+    return es.filter(function(e){ return e.title.trim().toLowerCase() === q; })[0] || es.filter(function(e){ var t = e.title.toLowerCase(); return t.indexOf(q) >= 0 || q.indexOf(t) >= 0; })[0] || null;
+  }
+  function confNum(v){ var n = parseInt(v, 10); return n >= 1 && n <= 10 ? n : 0; }
+  T('log_hypothesis', {
+    icon:'note',
+    label:function(a){ return 'Hypothesis: ' + short(a.claim || '', 40); },
+    run:function(p, a){
+      var claim = String(a.claim || '').trim(), cn = confNum(a.confidence);
+      if(!claim) return terr('Give the hypothesis as one testable claim.');
+      if(!String(a.prediction || '').trim()) return terr('A hypothesis needs a prediction: what would be seen if it is true?');
+      if(!cn) return terr('Give your confidence as a whole number from 1 to 10.');
+      var r = jAdd(p, 'hypothesis', claim, 'Why: ' + (a.why || 'not given') + '\n\nPrediction: ' + a.prediction, { conf:String(cn), status:'open' });
+      if(r.err) return terr(r.err);
+      r.e.trail = [{ ts:Date.now(), conf:cn, v:'start' }]; save();
+      return { ok:true, res:'Hypothesis \u00b7 ' + short(claim, 40), result:{ ok:true, message:'Logged in the ledger at confidence ' + cn + ' of 10.' } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Logged a hypothesis', 'ok'); }
+  });
+  T('plan_experiment', {
+    icon:'note',
+    label:function(a){ return 'Experiment: ' + short(a.title || a.method || '', 40); },
+    run:function(p, a){
+      var h = findJ(p, 'hypothesis', a.hypothesis), m = String(a.method || '').trim(), sc = String(a.success || '').trim();
+      if(!h) return terr('No hypothesis matches. Log it first with log_hypothesis, or use journal_list to see the titles.');
+      if(!m || !sc) return terr('An experiment needs a method and what result would count as success.');
+      var r = jAdd(p, 'method', String(a.title || '').trim() || m, 'Method: ' + m + '\n\nSuccess looks like: ' + sc, { task:a.task, status:'planned' });
+      if(r.err) return terr(r.err);
+      r.e.of = h.id; save();
+      return { ok:true, res:'Experiment \u00b7 ' + short(r.e.title, 40), result:{ ok:true, message:'Planned against \u201c' + short(h.title, 50) + '\u201d. When it has run, record it with log_result.' } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Planned an experiment', 'ok'); }
+  });
+  T('log_result', {
+    icon:'note',
+    label:function(a){ return 'Result: ' + short(a.outcome || '', 40); },
+    run:function(p, a){
+      var ex = a.experiment ? findJ(p, 'method', a.experiment) : null;
+      var h = ex ? journalOf(p).filter(function(e){ return e.id === ex.of; })[0] : findJ(p, 'hypothesis', a.hypothesis);
+      var vd = String(a.verdict || '').trim().toLowerCase(), ev = String(a.evidence || '').trim(), out = String(a.outcome || '').trim(), cn = confNum(a.confidence);
+      if(!h) return terr('No experiment or hypothesis matches. Name the experiment from plan_experiment, or the hypothesis.');
+      if(['supports', 'refutes', 'inconclusive'].indexOf(vd) < 0) return terr('The verdict must be supports, refutes or inconclusive.');
+      if(!out) return terr('Say what happened.');
+      if(ev.length < 12) return terr('A result needs evidence: the test output, the numbers, or the file or version that shows it. No evidence, no result.');
+      if(!cn) return terr('Give your updated confidence as a whole number from 1 to 10.');
+      var c = codeOf(p); snap(c, 'src', 'Result: ' + short(h.title, 28));
+      var last = (c.hist || [])[(c.hist || []).length - 1];
+      var r = jAdd(p, 'result', short(out, 110), out, { evidence:ev, verdict:vd, conf:String(cn), ver:last ? last.id : '' });
+      if(r.err) return terr(r.err);
+      r.e.of = ex ? ex.id : h.id;
+      if(ex){ ex.status = 'done'; ex.mod = Date.now(); }
+      h.status = vd === 'supports' ? 'supported' : (vd === 'refutes' ? 'refuted' : 'open');
+      h.conf = String(cn); h.mod = Date.now(); h.trail = (h.trail || []).concat([{ ts:Date.now(), conf:cn, v:vd }]);
+      save();
+      return { ok:true, res:'Result \u00b7 ' + vd, result:{ ok:true, message:'Recorded as ' + vd + '. Confidence in the hypothesis is now ' + cn + ' of 10.' } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Logged a result', 'ok'); }
   });
   T('journal_list', {
     icon:'note', read:true,
@@ -6657,6 +6809,10 @@ MStore.ready.then(function(){
     web_search:{ d:'Search the web for current facts and sources. Use it for anything that may have changed or when unsure. Returns an answer with sources.', p:{ query:STR('What to look up') }, req:['query'] },
     edit_lines:{ d:'Replace a range of lines of the page with new code. Get the line numbers from read_assembly first. Use code with no text to delete the lines.', p:{ name:STR('Plain-language name of what is changing'), from:S('INTEGER', 'First line to replace'), to:S('INTEGER', 'Last line to replace'), code:STR('The new code for those lines') }, req:['name', 'from', 'to', 'code'] },
     journal_save:{ d:'Propose a Discovery Journal entry. Only when the person wants something kept. A hypothesis is not a fact and an observation is not a conclusion, so choose the category carefully.', p:{ type:STR('One of: hypothesis, question, method, observation, result, insight, decision, assumption, idea'), title:STR('Short title'), text:STR('The entry'), task:STR('Optional related task number or title') }, req:['type', 'title', 'text'] },
+    focus_group:{ d:'Switch the task group you are working on. The lab already moves to the next group by itself when one finishes; use this only to switch on purpose, for example when the person asks for a different group.', p:{ group:STR('Name of the group') }, req:['group'] },
+    log_hypothesis:{ d:'Log a hypothesis in the ledger: one testable claim, why it might be true, the prediction that would confirm it, and your confidence from 1 to 10. A hypothesis is a guess to test, not a fact.', p:{ claim:STR('The hypothesis as one testable claim'), why:STR('Why it might be true'), prediction:STR('What would be observed if it is true'), confidence:S('INTEGER', 'How sure you are, 1 to 10') }, req:['claim', 'prediction', 'confidence'] },
+    plan_experiment:{ d:'Plan an experiment against a logged hypothesis: how it will be tested and what result would count as success. Use task to link the work that runs it.', p:{ hypothesis:STR('Title of the hypothesis it tests'), method:STR('How it will be tested'), success:STR('What result would support the hypothesis'), title:STR('Optional short name for the experiment'), task:STR('Optional related task number or title') }, req:['hypothesis', 'method', 'success'] },
+    log_result:{ d:'Record the result of an experiment. It needs a verdict and real evidence (test output, numbers, a file or version), and it updates your confidence in the hypothesis. Without evidence it is refused.', p:{ experiment:STR('Title of the experiment (leave empty and name the hypothesis if none was planned)'), hypothesis:STR('Optional: title of the hypothesis'), outcome:STR('What happened, in plain words'), verdict:STR('supports, refutes or inconclusive'), evidence:STR('What shows it: test output, numbers, the file or version'), confidence:S('INTEGER', 'Updated confidence in the hypothesis, 1 to 10') }, req:['outcome', 'verdict', 'evidence', 'confidence'] },
     capture_idea:{ d:'Save an idea worth keeping to the Discovery Journal. Use it for what the person would want to find again, not every passing thought.', p:{ idea:STR('The idea in one short line'), details:STR('Optional: what it means or why it matters'), document:STR('Optional: title of the document it came from'), task:STR('Optional related task number or title') }, req:['idea'] },
     park_question:{ d:'Save an open question that cannot be settled yet, so it is not lost. It stays open until the person resolves it.', p:{ question:STR('The question'), why:STR('Optional: why it matters or what it blocks'), document:STR('Optional: title of the document it came from'), task:STR('Optional related task number or title') }, req:['question'] },
     save_finding:{ d:'Record a research finding with where it came from and how sure you are. A finding needs a source. Confidence cannot be high when the source is only your own knowledge or inference.', p:{ claim:STR('The finding, stated as one claim'), source:STR('Where it came from: a title or address from a search, a document, a file, or \u201cown knowledge\u201d if there is none'), confidence:STR('high, medium or low'), document:STR('Optional: title of the document it relates to') }, req:['claim', 'source', 'confidence'] },
@@ -7214,7 +7370,14 @@ MStore.ready.then(function(){
     var pre = el('pre', 'term-out', out); w.appendChild(pre);
     if(out.split('\n').length > 8 || out.length > 600){
       var mb = el('button', 'term-more', 'Show all');
-      mb.addEventListener('click', function(){ var o = w.classList.toggle('open'); mb.textContent = o ? 'Show less' : 'Show all'; });
+      mb.addEventListener('click', function(){
+        bottomSheet('$ ' + short(seg.cmd || '', 40), function(b){
+          var pr = el('pre', 'term-out', out);
+          pr.style.cssText = 'max-height:none;overflow:visible;white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px';
+          b.appendChild(mkBtn('ghost', 'Copy output', '', function(){ try{ navigator.clipboard.writeText(out); }catch(e){} }));
+          b.appendChild(pr);
+        });
+      });
       w.appendChild(mb);
     }
     return w;
@@ -7940,7 +8103,7 @@ MStore.ready.then(function(){
   var VOICES = [['quick', 'Quick'], ['balanced', 'Balanced'], ['teach', 'Teach me']];
   function voiceText(p){
     if(p.explain === 'quick') return 'The person is comfortable with technical detail. Be terse: say what you changed and why in a sentence or two, and let the diff speak instead of explaining it.';
-    if(p.explain === 'teach') return 'The person is learning. Use plain, friendly language. After each change, explain in a few short sentences what it does and why you chose it, define any technical word the first time you use it, and suggest one thing to try next. Never go through code line by line.';
+    if(p.explain === 'teach') return 'The person is learning. Use plain, friendly language. After the work, explain in a few short sentences why you chose that approach, define any technical word the first time you use it, and suggest one thing to try next. Never go through code line by line.';
     return 'The person is not a programmer. Use plain, friendly language, keep replies short, and never explain code line by line.';
   }
   function systemText(p, offered, ch, skip, ov, intent){
@@ -7950,7 +8113,7 @@ MStore.ready.then(function(){
     var t = 'You are the assistant inside a workspace app where people build all sorts of projects. You are working on the project "' + p.name + '"' + (parent ? ' (a sub-project of "' + parent.name + '")' : '') + '.\n';
     if(p.desc) t += 'What the person says this project is about: ' + p.desc + '\n';
     if(parent) t += 'The main project is a ' + typeName(typeOf(parent)) + (parent.desc ? ' about: ' + parent.desc : '') + '. It is connected to this one: use read_related to read its files when you need them.\n';
-    t += voiceText(p) + '\n\n';
+    t += voiceText(p) + ' The person sees every step you take as a card, so never retell what a step did: give the result, the reason, and the next step.\n\n';
     var mo = opModeOf(p), canWrite = !!ov || mo === 'build', talk = intent === 'talk';
     t += modeText(mo, ov) + '\n\n';
     t += capText(p, ov, gateOf(ch), intent) + '\n\n';
@@ -7982,6 +8145,8 @@ MStore.ready.then(function(){
       if(has('start_task') || has('update_task')){
         R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work through every task in the focus group, in order, and finish each before the next. Never skip a task, leave one half done, or start a task from another group or an ungrouped one unless the person asks. Starting a task is only an attempt. Do its work with tools, then check it against \u201cDone when\u201d: a task is complete only when the work was really performed and each criterion is met, and complete_task is refused if no work was recorded. If it was tried and did not pass, call fail_task with what went wrong. If it cannot continue, or the person declined a step it needs, call block_task with the reason, then say so plainly and either carry on with a task that does not wait on it or stop and ask. A group is finished only when every task in it is completed; when it is, report briefly and stop, and ask which group is next instead of starting one. Before you stop, save progress with update_task (checkpoint = what is done and the next step). A task never overrides what the person just asked.');
       }
+      if(has('read_assembly')) R.push('How you work, every time. (1) Understand: if the request is unclear, ask one question with ask_user, otherwise carry on. If the person names a file or shows an error from one, work on exactly that file first. (2) Plan: for more than one small change, add tasks grouped by theme. The lab focuses the group for you and moves to the next one itself; switch on purpose with focus_group. (3) Look before you change: read the lines or file you will edit, and read a failing output from the first error down. (4) Change small: one change per step with the narrowest edit tool, never a rewrite for a small fix. (5) Check: run it after each change and read the result. (6) If a run fails, fix the first error only. Never repeat an edit you already made, and after two failed attempts at the same error stop and tell the person what you know. (7) Finish: complete the task with evidence, and use the ledger when you are testing an idea. (8) Reply briefly: the result, why anything failed, and one next step.');
+      if(has('log_hypothesis')) R.push('Ledger: when a claim can be tested, log it with log_hypothesis (claim, why, prediction, confidence 1 to 10). Plan how to test it with plan_experiment and link the task that does the work. When it has run, call log_result with the verdict and real evidence, never a hope: a hypothesis is only supported or refuted by a result you actually observed.');
       if(has('capture_idea')) R.push('Discovery: when an idea is worth keeping, call capture_idea; when a question cannot be settled yet, call park_question. Both save straight to the Discovery Journal, so use them for what the person would want to find again, not every thought. Keep exploring in words as well.');
       if(has('save_finding')) R.push('Research: when you establish something, call save_finding with the claim, its source and your confidence (high, medium or low). Use a source from web_search, a document or a file. Without a checkable source the confidence is low. Do not save guesses as findings.');
       if(has('log_decision')) R.push('Design: when a choice is actually made, call log_decision with what was chosen, why, and what was rejected. If it comes from or changes a document, name the document. Tasks you add from a document should name it too (the doc field).');
@@ -8124,7 +8289,7 @@ MStore.ready.then(function(){
     function draw(keep){ if(current === p && currentView === 'lab' && chatOf(p) === ch) renderThread(keep, busy); }
     var m = null, ctx = { autoAll:false }, useTools = true, live = null, raf = 0, lastSave = 0, nudges = 0, force = false, verifies = 0;
     var intent = intentOf(ch, p), ov = turnOverride(p, ch), gate = gateOf(ch), capped = false, lastRoundText = '', turnSeen = {}, bookRounds = 0;
-    var BOOK = { update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, journal_save:1, write_note:1, read_notes:1, add_task:1 };
+    var BOOK = { focus_group:1, update_task:1, start_task:1, get_active_task:1, list_tasks:1, read_task:1, journal_save:1, write_note:1, read_notes:1, add_task:1 };
     var DEDUP = { read_assembly:1, journal_save:1, add_task:1, write_note:1, list_tasks:1, read_task:1, get_active_task:1, list_subprojects:1, read_related:1, read_notes:1, web_search:1, start_task:1, create_subproject:1, read_sandbox_output:1 };
     /* the words appear as they are written; only the live paragraph is repainted */
     function paintLive(){
@@ -8153,7 +8318,10 @@ MStore.ready.then(function(){
         return (IMPL[sg.name] ? IMPL[sg.name].label(sg.args || {}) : sg.name) + ': ' + (sg.st === 'ok' ? (sg.res || 'done') : sg.st === 'denied' ? 'the person declined it' : 'did not work' + (sg.res ? ' (' + short(sg.res, 80) + ')' : ''));
       }).slice(-8);
       var c2 = buildContents(p, ch);
-      var note = '[Lab note, not from the person] Your tool steps this turn: ' + (did.join('; ') || 'none') + '. Now reply to the person in plain, full sentences: answer what they asked, say what you did or found, and say what they can do next. Do not call tools.';
+      var bad = m.segs.filter(function(sg){ return sg.k === 'tool' && sg.st !== 'run' && sg.st !== 'ask' && sg.st !== 'ok'; }).map(function(sg){
+        return (IMPL[sg.name] ? IMPL[sg.name].label(sg.args || {}) : sg.name) + (sg.res ? ' (' + short(sg.res, 100) + ')' : '');
+      });
+      var note = '[Lab note, not from the person] The person already sees every step as a card, so do not list or retell the steps. In plain sentences: give the result in one or two sentences, say plainly if anything failed and why' + (bad.length ? ' (what failed: ' + bad.join('; ') + ')' : '') + ', then give the one next step you suggest. Do not call tools.';
       var lastC = c2[c2.length - 1];
       if(lastC && lastC.role === 'user') lastC.parts[0].text += '\n\n' + note; else c2.push({ role:'user', parts:[{ text:note }] });
       live = null;
@@ -8168,7 +8336,7 @@ MStore.ready.then(function(){
         else{ var wi = m.segs.indexOf(live); if(wi >= 0) m.segs.splice(wi, 1); }
         live = null;
       }else if(t2) m.segs.push({ k:'t', t:t2 });
-      if(!t2) m.segs.push({ k:'t', t:'Here is what happened: ' + (did.join('; ') || 'nothing ran') + '. Tell me what you would like next.' });
+      if(!t2) m.segs.push({ k:'t', t:bad.length ? 'The last step did not work: ' + short(bad[bad.length - 1], 140) + '. Tell me how you want to go on.' : 'Done. Tell me what you would like next.' });
       m.t = textOfMsg(m); save(); draw();
     }
     draw();
@@ -8553,7 +8721,7 @@ MStore.ready.then(function(){
   }
   /* ---- council: the same question to several models, then a plain comparison ---- */
   function councilView(q, title){
-    var w = el('div');
+    var w = el('div'); w.id = 'councilOv';
     w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
     var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
     top.appendChild(el('div', 'tool-name', title || 'Council'));
@@ -8600,7 +8768,7 @@ MStore.ready.then(function(){
     var e = EX(), models = extList().slice(0, 4);
     if(!extReady()){ UI.alert('Provider needed', 'Choose OpenRouter in Settings, paste your key and add models first.'); return; }
     if(models.length < 2){ UI.alert('Add council models', 'In Settings, under Model, choose Automatic and add two to four models.'); return; }
-    var q = comp.value.trim() || await UI.prompt('Ask the council', { multi:true, maxLength:2000, confirmText:'Ask', placeholder:'A decision or question for several AIs' });
+    var q = comp.value.trim() || await UI.prompt('Ask the council', { multi:true, maxLength:2000, confirmText:'Ask' });
     if(!q) return;
     var add = councilView(q), st = add('Asking ' + models.length + ' models', 'This takes a few seconds.', true);
     var sys = 'You are one member of a council of AIs advising on a project called "' + (current ? current.name : 'untitled') + '"' + (current && current.desc ? ' (' + current.desc + ')' : '') + '. Give your recommendation first, then the main reasons, in under 150 words, in plain language.';
@@ -10198,7 +10366,7 @@ MStore.ready.then(function(){
       dcard.innerHTML = '';
       var ds = el('textarea', 'field'), tg = el('input', 'field'), so = el('input', 'field'), li = el('input', 'field'), co = el('input', 'field');
       ds.rows = 3; ds.maxLength = 6000; ds.value = meta.description; ds.style.resize = 'none';
-      tg.value = meta.tags.join(', '); tg.placeholder = 'research, chemistry, lab'; so.value = meta.source; so.maxLength = 300;
+      tg.value = meta.tags.join(', '); so.value = meta.source; so.maxLength = 300;
       li.value = meta.licence; li.maxLength = 120; co.value = meta.collected; co.placeholder = 'YYYY-MM-DD'; co.maxLength = 20;
       [['Description', ds], ['Tags (separate with commas)', tg], ['Source', so], ['Licence', li], ['Collected on', co]].forEach(function(x){
         dcard.appendChild(el('div', 'label', x[0])); dcard.appendChild(x[1]);
@@ -10687,7 +10855,7 @@ MStore.ready.then(function(){
       inp.click();
     }));
     bar.appendChild(mkBtn('ghost', 'New group', '', async function(){
-      var v = await UI.prompt('New group', { confirmText:'Create', maxLength:40, placeholder:'For example: Valid inputs' });
+      var v = await UI.prompt('New group', { confirmText:'Create', maxLength:40 });
       if(!v || !String(v).trim()) return;
       gs.push({ id:uid(), name:String(v).trim().slice(0, 40) }); save(); renderTestFiles();
     }));
@@ -10839,20 +11007,25 @@ MStore.ready.then(function(){
     return UI.sheet(title || 'What kind of project?', PTYPES.map(function(x){ return { label:x[1] + ' \u00b7 ' + TYPE_BLURB[x[0]], value:x[0] }; }));
   }
   function typeChips(get, set){
-    var wrap = el('div'), row = el('div', 'prow'), hint = el('div', 'hint'), btns = [];
-    hint.style.display = 'none'; hint.style.whiteSpace = 'pre-line'; hint.style.marginTop = '6px';
-    hint.textContent = PTYPES.map(function(x){ return x[1] + ': ' + x[2]; }).join('\n');
-    function paint(){ btns.forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-ty') === get()); }); }
+    var wrap = el('div'), rows = [];
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+    function paint(){
+      rows.forEach(function(r){
+        var on = r.getAttribute('data-ty') === get();
+        r.style.borderColor = on ? 'var(--muted)' : 'var(--line)'; r.style.background = on ? 'var(--hover)' : 'var(--card)';
+        r.lastChild.style.opacity = on ? '1' : '0';
+      });
+    }
     PTYPES.forEach(function(x){
-      var b = el('button', 'ptool', x[1]); b.setAttribute('data-ty', x[0]);
-      b.addEventListener('mousedown', function(e){ e.preventDefault(); });
-      b.addEventListener('click', function(){ set(x[0]); paint(); });
-      btns.push(b); row.appendChild(b);
+      var r = el('button'), tx = el('span'), nm = el('span', '', x[1]), ds = el('span', '', String(x[2]).split('. ')[0] + '.'), ck = el('span', '', '\u2713');
+      r.setAttribute('data-ty', x[0]);
+      r.style.cssText = 'display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:12px 14px;border-radius:16px;border:1px solid var(--line);color:var(--text)';
+      tx.style.cssText = 'flex:1;min-width:0;display:flex;flex-direction:column;gap:2px';
+      nm.style.fontWeight = '600'; ds.style.cssText = 'font-size:13px;color:var(--muted);line-height:1.35'; ck.style.cssText = 'flex:none;font-weight:700';
+      tx.appendChild(nm); tx.appendChild(ds); r.appendChild(tx); r.appendChild(ck);
+      r.addEventListener('click', function(){ set(x[0]); paint(); });
+      rows.push(r); wrap.appendChild(r);
     });
-    var q = el('button', 'info', '?'); q.setAttribute('aria-label', 'About project types'); q.style.alignSelf = 'center';
-    q.addEventListener('mousedown', function(e){ e.preventDefault(); });
-    q.addEventListener('click', function(){ hint.style.display = hint.style.display === 'none' ? '' : 'none'; });
-    row.appendChild(q); wrap.appendChild(row); wrap.appendChild(hint);
     paint();
     return wrap;
   }
@@ -10876,15 +11049,39 @@ MStore.ready.then(function(){
     paint();
     return b;
   }
+  var jLedger = false;
+  function ledgerView(host){
+    var all = journalOf(current), hy = all.filter(function(e){ return e.type === 'hypothesis'; }).sort(function(a, b){ return b.mod - a.mod; });
+    if(!hy.length){ host.appendChild(el('div', 'proj-empty page-empty', 'No hypotheses yet. Ask the AI to log one, or add one with New entry.')); return; }
+    hy.forEach(function(h){
+      var card = el('div', 'tool on'), top = el('div', 'tool-top');
+      top.appendChild(el('div', 'tool-name', h.title));
+      top.appendChild(el('span', 'spill', h.status === 'supported' ? 'Supported' : (h.status === 'refuted' ? 'Refuted' : 'Open')));
+      card.appendChild(top);
+      var tr = (h.trail || []).map(function(x){ return x.conf; }).filter(Boolean);
+      if(!tr.length && h.conf) tr = [h.conf];
+      if(tr.length) card.appendChild(el('div', 'xsub', 'Confidence ' + tr.join(' \u2192 ') + ' of 10'));
+      var mids = all.filter(function(e){ return e.of === h.id; }).map(function(e){ return e.id; }).concat(h.id);
+      all.filter(function(e){ return mids.indexOf(e.of) >= 0 && (e.type === 'method' || e.type === 'result'); }).sort(function(a, b){ return a.ts - b.ts; }).forEach(function(c){
+        var ln = el('div', 'xsub');
+        ln.style.cssText = 'margin-top:8px;padding-left:12px;border-left:2px solid var(--line);white-space:pre-wrap';
+        if(c.type === 'method') ln.textContent = 'Experiment' + (c.status === 'done' ? ' (done)' : '') + ': ' + c.title;
+        else ln.textContent = 'Result, ' + (c.verdict || 'noted') + (c.conf ? ' (confidence ' + c.conf + ')' : '') + ': ' + c.title + (c.evidence ? '\nEvidence: ' + short(c.evidence, 160) : '');
+        card.appendChild(ln);
+      });
+      host.appendChild(card);
+    });
+  }
   function renderJournal(){
     var body = $('pageBody');
     body.innerHTML = '';
     var all = journalOf(current).slice().sort(function(a, b){ return b.mod - a.mod; });
     body.appendChild(el('div', 'summary', all.length + ' entr' + (all.length === 1 ? 'y' : 'ies')));
-    var bar = el('div', 'tool-top'); bar.style.margin = '14px 0 4px';
+    var bar = el('div', 'tool-top'); bar.style.margin = '14px 0 4px'; bar.style.flexWrap = 'wrap'; bar.style.gap = '8px';
     var fs = pickField('Category', [['', 'All categories']].concat(JTYPES), jFilter, function(v){ jFilter = v; renderJournal(); });
     fs.style.flex = '1';
     bar.appendChild(fs);
+    bar.appendChild(mkBtn('ghost', jLedger ? 'List' : 'Ledger', '', function(){ jLedger = !jLedger; renderJournal(); }));
     bar.appendChild(mkBtn('solid', 'New entry', '', function(){ editor(null); }));
     bar.appendChild(mkBtn('ghost', 'Export', '', function(){ exportJournal(current); }));
     body.appendChild(bar);
@@ -10913,6 +11110,7 @@ MStore.ready.then(function(){
       ti.focus();
     }
     if(jDraft){ var dr = jDraft; jDraft = ''; editor(null); host.querySelector('textarea').value = short(dr, 3000); }
+    if(jLedger){ body.classList.remove('pe'); ledgerView(list); return; }
     var shown = all.filter(function(e){ return !jFilter || e.type === jFilter; });
     body.classList.toggle('pe', !shown.length);
     list.style.cssText = shown.length ? '' : 'flex:1;display:flex;flex-direction:column';
@@ -10932,6 +11130,8 @@ MStore.ready.then(function(){
       var meta = [taskStamp(e.ts)];
       if(e.source) meta.push('Source: ' + short(e.source, 60));
       if(e.conf) meta.push('Confidence: ' + e.conf);
+      if(e.verdict) meta.push('Verdict: ' + e.verdict);
+      if(e.evidence) meta.push('Evidence: ' + short(e.evidence, 80));
       if(e.type === 'question' && e.status) meta.push(e.status === 'open' ? 'Open' : 'Resolved');
       var jd = e.doc ? (current.docs || []).filter(function(x){ return x.id === e.doc; })[0] : null;
       if(jd) meta.push('From ' + short(jd.title, 30));
