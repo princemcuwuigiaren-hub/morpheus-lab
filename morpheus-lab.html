@@ -350,6 +350,7 @@ svg{display:block;pointer-events:none}
   transition:background .15s;
 }
 .nav-item:active{background:var(--press)}
+.navdiv{margin:16px 12px 6px;padding-top:14px;border-top:1px solid var(--edge);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .nav-item.active{background:var(--chip);color:var(--text)}
 .nav-item svg{width:22px;height:22px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .nav-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -694,10 +695,16 @@ svg{display:block;pointer-events:none}
 .plus:active{background:var(--hover)}
 .plus svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;transition:transform .18s}
 .plus.open svg{transform:rotate(45deg)}
-#plusBar,#modeSheet{position:absolute;left:12px;bottom:calc(100% - 4px);display:none;gap:8px;flex-wrap:wrap;padding:8px;max-width:calc(100% - 24px);background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:0 10px 30px var(--shadow);z-index:6}
-#plusBar.show,#modeSheet.show{display:flex}
+#plusBar,#modeSheet,#modelSheet{position:absolute;left:12px;bottom:calc(100% - 4px);display:none;gap:8px;flex-wrap:wrap;padding:8px;max-width:calc(100% - 24px);background:var(--card);border:1px solid var(--line);border-radius:24px;box-shadow:0 10px 30px var(--shadow);z-index:6}
+#plusBar.show,#modeSheet.show,#modelSheet.show{display:flex}
 .ptool{display:flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 12px;border-radius:20px;background:var(--chip);border:1px solid var(--line-soft);font-size:14.5px;color:var(--text)}
 .ptool:active{background:var(--hover)}
+#plusBar .prow,#modeSheet .prow,#modelSheet .prow{flex-direction:column;flex-wrap:nowrap;gap:0;margin-top:2px}
+#plusBar .ptool,#modeSheet .ptool,#modelSheet .ptool{height:46px;width:100%;padding:0 12px;gap:12px;border:0;border-radius:12px;background:transparent}
+#plusBar .ptool+.ptool,#modeSheet .ptool+.ptool,#modelSheet .ptool+.ptool{border-top:1px solid var(--line-soft);border-top-left-radius:0;border-top-right-radius:0}
+#modeSheet .ptool.sel,#modelSheet .ptool.sel{background:var(--hover);color:var(--text)}
+#modeSheet .ptool.sel::after,#modelSheet .ptool.sel::after{content:'\2713';margin-left:auto;font-weight:700}
+#modelSheet .psec .cp{width:30px;height:30px}
 .ptool svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 #modeBar{display:none;align-items:center;gap:10px;margin:-4px 8px 10px -8px;padding:8px 6px 8px 12px;border-radius:14px;background:var(--chip);border:1px solid var(--line-soft)}
 #composerCard.inspect #modeBar{display:flex}
@@ -779,9 +786,9 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .msg.copying .mcopy{display:flex}
 
 /* composer tools stack vertically */
-#plusBar,#modeSheet{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:6px;width:max-content}
+#plusBar,#modeSheet,#modelSheet{flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:6px;width:max-content}
 
-#plusBar,#modeSheet{flex-direction:column;flex-wrap:nowrap;gap:6px;align-items:stretch}
+#plusBar,#modeSheet,#modelSheet{flex-direction:column;flex-wrap:nowrap;gap:6px;align-items:stretch}
 .prow{display:flex;flex-wrap:wrap;gap:8px}
 .psec{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 6px 0}
 .psec .info{width:22px;height:22px;font-size:11px}
@@ -856,6 +863,13 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .rrow .rtx b{font-weight:500;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rrow .rtx i{font-style:normal;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rall{align-self:center;padding:8px 14px;font-size:14px;color:var(--muted)}
+.rowgroup{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.rowbtn{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:14px;text-align:left;color:var(--text)}
+.rowbtn+.rowbtn{border-top:1px solid var(--line-soft)}
+.rowbtn:disabled{opacity:.5}
+.rowbtn svg{width:16px;height:16px;flex:none;stroke:var(--muted);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transform:rotate(-90deg)}
+#modeChip{flex:none;max-width:none}
+#conn{flex:0 1 auto;min-width:0}
 .rrow .rbadge{width:40px;height:40px;border-radius:12px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--icon)}
 .rrow .rbadge>svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 :root[data-theme="light"] #home .chip{background:#fff;border-color:var(--line)}
@@ -1076,6 +1090,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
         <div id="modeHelp"></div>
         <div class="prow" id="modeRow"></div>
       </div>
+      <div id="modelSheet" aria-label="AI"></div>
       <div class="card" id="composerCard">
         <div id="attachRow"></div>
         <div id="attachPrev"></div>
@@ -1185,6 +1200,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
       <button class="nav-item" id="parentLink"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg><span></span></button>
       <div class="sec" id="chatSec"></div>
       <div class="sec" id="subSec"></div>
+      <div class="navdiv">Project</div>
       <button class="nav-item" data-route="code">
         <svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14"/></svg>
         Code assembly
@@ -1203,7 +1219,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
       </button>
       <button class="nav-item" data-route="testfiles">
         <svg viewBox="0 0 24 24"><path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/></svg>
-        Test files
+        References
       </button>
       <button class="nav-item" data-route="data">
         <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
@@ -2640,10 +2656,10 @@ MStore.ready.then(function(){
      desc:'Lets the AI see which documents exist.'},
     {id:'read_doc', group:'Documents', name:'Read document', perm:'allow',
      desc:'Lets the AI read one document.'},
-    {id:'list_test_files', group:'Test files', name:'List test files', perm:'allow',
-     desc:'Lets the AI see which test files you keep and how they are grouped.'},
-    {id:'read_test_file', group:'Test files', name:'Read test file', perm:'allow',
-     desc:'Lets the AI read the text of one test file (up to 20,000 characters).'},
+    {id:'list_references', group:'References', name:'List references', perm:'allow',
+     desc:'Lets the AI see which reference files you keep and how they are grouped.'},
+    {id:'read_reference', group:'References', name:'Read reference', perm:'allow',
+     desc:'Lets the AI read the text of one reference file (up to 20,000 characters).'},
     {id:'dataset_add', group:'Dataset', name:'Add to dataset', perm:'allow',
      desc:'Saves a piece of gathered information to the dataset, with its source.'},
     {id:'dataset_info', group:'Dataset', name:'Read dataset', perm:'allow',
@@ -2682,7 +2698,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
   /* while a group is in focus or a task is active, the status tools stay loaded whatever mode Auto picks, so work is never left half-recorded */
   var TASK_KEEP = ['start_task', 'update_task', 'block_task', 'fail_task', 'complete_task'];
   function taskKeep(p, id){ return TASK_KEEP.indexOf(id) >= 0 && !!(p && (focusGroup(p) || activeTask(p))); }
@@ -2771,7 +2787,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_test_files', 'read_test_file', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -3874,7 +3890,7 @@ MStore.ready.then(function(){
     /* the page always opens, even if one of its parts fails to draw */
     var pb = $('pageBody');
     pb.className = 'pbody';
-    var titles = { tools:'Tools', notebook:'Tasks', journal:'Journal', docs:'Documents', data:'Data', testfiles:'Test files', terminal:'Terminal', xray:'X-ray log', settings:'Project settings' };
+    var titles = { tools:'Tools', notebook:'Tasks', journal:'Journal', docs:'Documents', data:'Data', testfiles:'References', terminal:'Terminal', xray:'X-ray log', settings:'Project settings' };
     var draw = { tools:renderTools, notebook:renderNotebook, journal:renderJournal, docs:renderDocs, data:renderData, testfiles:renderTestFiles, terminal:renderTerminal, xray:renderXray, settings:renderProjectSettings };
     $('pageTitle').textContent = titles[route] || '';
     show('page');
@@ -4590,9 +4606,9 @@ MStore.ready.then(function(){
         '. Backup files leave out your API key.';
     });
     var drow = el('div', '');
-    drow.style.cssText = 'display:flex;gap:10px;margin-top:12px;flex-wrap:wrap';
-    drow.appendChild(mkBtn('ghost', 'Export backup', '', function(){ MStore.backup(); }));
-    drow.appendChild(mkBtn('ghost', 'Restore backup', '', function(){
+    drow.className = 'rowgroup'; drow.style.marginTop = '12px';
+    drow.appendChild(rowBtn('Export backup', function(){ MStore.backup(); }));
+    drow.appendChild(rowBtn('Restore backup', function(){
       var inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
       inp.addEventListener('change', async function(){
         var f = inp.files && inp.files[0]; if(!f) return;
@@ -4779,8 +4795,18 @@ MStore.ready.then(function(){
     dsc.addEventListener('blur', commitDesc);
     body.appendChild(dsc);
 
-    body.appendChild(el('div', 'label', 'Project type'));
-    body.appendChild(typeChips(function(){ return typeOf(current); }, function(v){ current.type = v; current.opMode = TYPE_MODE[v]; current.opAuto = true; save(); }));
+    var ptc = el('div', 'tool on'), ptt = el('div', 'tool-top'), ptg = el('div', 'seg');
+    ptt.appendChild(el('div', 'tool-name', 'Project type')); ptc.appendChild(ptt);
+    addInfo(ptc, PTYPES.map(function(x){ return x[1] + ': ' + x[2]; }).join('\n\n'));
+    PTYPES.forEach(function(x){
+      var b = el('button', typeOf(current) === x[0] ? 'sel' : '', x[1]);
+      b.addEventListener('click', function(){
+        current.type = x[0]; current.opMode = TYPE_MODE[x[0]]; current.opAuto = true; save();
+        Array.prototype.forEach.call(ptg.children, function(y){ y.classList.toggle('sel', y === b); });
+      });
+      ptg.appendChild(b);
+    });
+    ptc.appendChild(ptg); body.appendChild(ptc);
     body.appendChild(el('div', 'label', 'Export'));
     var exr = el('div');
     exr.style.cssText = 'background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden';
@@ -4970,7 +4996,30 @@ MStore.ready.then(function(){
     c.querySelector('.dot').className = 'dot ' + ci.k;
     c.querySelector('.ctext').textContent = ci.short;
   }
-  $('conn').addEventListener('click', function(){ openSettings('lab'); });
+  function paintModelSheet(){
+    var sh = $('modelSheet'); sh.innerHTML = '';
+    var hd = el('div', 'psec'), gear = el('button', 'cp');
+    hd.appendChild(document.createTextNode('AI'));
+    gear.innerHTML = $('settingsBtn').innerHTML; gear.setAttribute('aria-label', 'AI settings');
+    gear.addEventListener('click', function(){ closePlus(); openSettings('lab'); });
+    hd.appendChild(gear); sh.appendChild(hd);
+    var st = el('div', 'xsub'); st.style.padding = '0 6px 6px'; st.textContent = connInfo().long; sh.appendChild(st);
+    function group(title, items){
+      sh.appendChild(el('div', 'psec', title));
+      var r = el('div', 'prow');
+      items.forEach(function(it){ var b = el('button', 'ptool' + (it[1] ? ' sel' : ''), it[0]); b.addEventListener('click', it[2]); r.appendChild(b); });
+      sh.appendChild(r);
+    }
+    function pick(fn){ return function(){ fn(); saveG(); paintConn(); paintModelSheet(); }; }
+    group('Provider', [['Gemini', !EX().on, pick(function(){ EX().on = false; })], ['OpenRouter', !!EX().on, pick(function(){ EX().on = true; })]]);
+    group('Model', [['Automatic', G.mode !== 'fixed', pick(function(){ G.mode = 'auto'; })], ['Fixed model', G.mode === 'fixed', pick(function(){ G.mode = 'fixed'; })]]);
+  }
+  $('conn').addEventListener('click', function(){
+    var sh = $('modelSheet'), was = sh.classList.contains('show');
+    closePlus();
+    if(was) return;
+    paintModelSheet(); sh.classList.add('show');
+  });
 
   /* ---- copy: selection is locked, so every message has its own copy button ---- */
   async function copyText(t){
@@ -5449,6 +5498,18 @@ MStore.ready.then(function(){
       var t = el('div'); t.style.cssText = 'line-height:1.55;font-size:15px;white-space:pre-wrap'; t.textContent = inf.textContent; body.appendChild(t);
     });
   }, true);
+  function rowBtn(label, fn){
+    var b = el('button', 'rowbtn'); b.appendChild(el('span', '', label));
+    b.insertAdjacentHTML('beforeend', ICON.chev); b.addEventListener('click', fn);
+    return b;
+  }
+  function closeX(){
+    var x = el('button');
+    x.innerHTML = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    x.setAttribute('aria-label', 'Close');
+    x.style.cssText = 'width:34px;height:34px;flex:none;border-radius:17px;display:flex;align-items:center;justify-content:center;background:var(--chip);border:1px solid var(--line-soft);color:var(--text)';
+    return x;
+  }
   function addInfo(card, text){
     var top = card.querySelector('.tool-top');
     if(!top){ card.appendChild(el('div', 'xsub', text)); return; }
@@ -5459,12 +5520,11 @@ MStore.ready.then(function(){
   var sheetClose = null;
   function bottomSheet(title, fill, onClose){
     if(sheetClose) sheetClose();
-    var bd = el('div'), sh = el('div'), top = el('div'), body = el('div'), x = el('button', 'btn solid', 'Close');
+    var bd = el('div'), sh = el('div'), top = el('div'), body = el('div'), x = closeX();
     bd.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:flex;align-items:flex-end';
     sh.style.cssText = 'width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))';
     top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px';
-    x.style.cssText = 'height:34px;min-height:0;padding:0 16px;font-size:14px;flex:none';
-    var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;font-weight:600';
     body.style.cssText = 'overflow:auto;display:flex;flex-direction:column;gap:6px';
     top.appendChild(tt); top.appendChild(x);
     fill(body);
@@ -6801,8 +6861,8 @@ MStore.ready.then(function(){
     read_xray:{ d:'Look back at your own recent steps in this project: replies, tool calls and errors.', p:{ limit:S('INTEGER', 'How many entries, default 5') } },
     write_doc:{ d:'Write or update a document the person can read, edit and export (a blueprint, spec, report or design). Use markdown unless another format fits better. Set replace to true to update an existing document.', p:{ title:STR('Document title'), text:STR('The document body, written in the chosen format (markdown by default)'), replace:S('BOOLEAN', 'True to replace an existing document with the same title'), kind:STR('What it is: blueprint, spec, report, notes or data. Use blueprint for a build plan the person will approve before code is written.'), format:STR('How the text is written: markdown, json, csv, yaml, mermaid, html, plain or code') }, req:['title', 'text'] },
     list_docs:{ d:'List the documents in this project.' },
-    list_test_files:{ d:'List the test files the person keeps in this project, with their groups.' },
-    read_test_file:{ d:'Read the text of one test file by name.', p:{ name:STR('File name, or part of it') }, req:['name'] },
+    list_references:{ d:'List the reference files the person keeps in this project (specs, samples, inputs, examples), with their groups.' },
+    read_reference:{ d:'Read the text of one reference file by name.', p:{ name:STR('File name, or part of it') }, req:['name'] },
     read_doc:{ d:'Read one document.', p:{ title:STR('Document title') }, req:['title'] },
     dataset_add:{ d:'Save one piece of gathered information to the dataset. One topic per record. Always give the source.', p:{ title:STR('Short title'), text:STR('The information, cleaned up or in your own words'), source:STR('Where it came from (URL or file)') }, req:['title', 'text'] },
     dataset_info:{ d:'See how many records the dataset holds and read a few. Pass query to search it.', p:{ query:STR('Optional word to search for') } },
@@ -6986,9 +7046,9 @@ MStore.ready.then(function(){
     var t = el('input', 'field'); t.type = 'password'; t.value = b.token; t.autocapitalize = 'off'; t.spellcheck = false;
     t.addEventListener('input', function(){ b.token = t.value.trim(); saveG(); });
     c.appendChild(t);
-    var row = el('div', 'btnrow');
-    row.appendChild(mkBtn('solid', 'Connect', '', function(){ blenderTest(); }));
-    row.appendChild(mkBtn('ghost', 'Download connector', '', downloadConnector));
+    var row = el('div'), bcon = mkBtn('solid', 'Connect', '', function(){ blenderTest(); }), brg = el('div', 'rowgroup');
+    bcon.style.cssText = 'width:100%;margin-top:12px'; brg.style.marginTop = '10px';
+    brg.appendChild(rowBtn('Download connector', downloadConnector)); row.appendChild(bcon); row.appendChild(brg);
     c.appendChild(row);
     var stat = el('div', 'hint', ''); c.appendChild(stat);
     c.appendChild(el('div', 'tool-info', 'Setup: download the connector to the computer. To try the whole chain without Blender, run it with Python using the --mock option. For real use, install it in Blender as an add-on, press N in the 3D view, open the Morpheus tab, press Start, and enter its token here. Each action is a tool with its own permission in every project.'));
@@ -7115,7 +7175,7 @@ MStore.ready.then(function(){
   async function txSendTests(p, names){
     var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
     rs = rs.filter(function(r){ return isTextFile(r) && (!names || !names.length || names.indexOf(r.name) >= 0); });
-    if(!rs.length) return { ok:false, error:'There are no text test files to send.' };
+    if(!rs.length) return { ok:false, error:'There are no text reference files to send.' };
     var files = [];
     for(var i = 0; i < rs.length && i < 200; i++) files.push({ path:rs[i].name, text:await rs[i].blob.text() });
     return txJson('/write', { project:txProject(p), files:files });
@@ -7152,13 +7212,13 @@ MStore.ready.then(function(){
     var t = el('input', 'field'); t.type = 'password'; t.value = b.token; t.autocapitalize = 'off'; t.spellcheck = false;
     t.addEventListener('input', function(){ b.token = t.value.trim(); saveG(); });
     c.appendChild(t);
-    var row = el('div', 'btnrow nowrapbtns');
-    row.appendChild(mkBtn('solid', 'Connect', '', function(){ txTest(); }));
-    row.appendChild(mkBtn('ghost', 'Copy setup command', '', async function(){
+    var row = el('div'), tcon = mkBtn('solid', 'Connect', '', function(){ txTest(); }), trg = el('div', 'rowgroup');
+    tcon.style.cssText = 'width:100%;margin-top:12px'; trg.style.marginTop = '10px'; row.appendChild(tcon); row.appendChild(trg);
+    trg.appendChild(rowBtn('Copy setup command', async function(){
       var ok = await copyText(txInstallCommand());
       UI.alert(ok ? 'Copied' : 'Could not copy', ok ? 'Open Termux, paste, and press Enter. It installs Node.js if needed, saves the script, and starts it. Next time, start it with: node ~/morpheus-bridge.js' : 'Use Download script instead.');
     }));
-    row.appendChild(mkBtn('ghost', 'Download script', '', txDownload));
+    trg.appendChild(rowBtn('Download script', txDownload));
     c.appendChild(row);
     var stat = el('div', 'hint', ''); c.appendChild(stat);
     c.appendChild(el('div', 'tool-info', 'Setup: tap Copy setup command, open Termux and paste. The bridge prints a token. Paste the token above and tap Connect. The first time, Chrome may ask to allow access to devices on your local network: allow it. Keep Termux open while you use this. For Python, run pkg install python in Termux once.'));
@@ -7183,9 +7243,12 @@ MStore.ready.then(function(){
   function renderTerminal(){
     var body = $('pageBody'), p = current; body.innerHTML = '';
     var proj = txProject(p), ctl = null, running = false;
-    var head = el('div', 'tool-top'), pill = el('span', 'spill', ''), stat = el('div', 'hint', '');
-    head.appendChild(pill); head.appendChild(mkBtn('ghost', 'Settings', '', function(){ openSettings('lab'); }));
-    body.appendChild(head); body.appendChild(stat);
+
+    /* status card: connection, folder, and one menu for everything secondary */
+    var hc = el('div', 'tool on'), ht = el('div', 'tool-top'), pill = el('span', 'spill', ''), stat = el('div', 'xsub', '');
+    ht.appendChild(el('div', 'tool-name', 'Termux')); ht.appendChild(pill);
+    var menuB = el('button', 'cp'); menuB.innerHTML = ICON.dots; menuB.setAttribute('aria-label', 'Terminal options');
+    ht.appendChild(menuB); hc.appendChild(ht); hc.appendChild(stat); body.appendChild(hc);
     function paintStat(){
       var s = INT.st.termux;
       pill.className = 'spill ' + (s ? (s.ok ? 'ok' : 'bad') : 'warn');
@@ -7195,41 +7258,34 @@ MStore.ready.then(function(){
     INT.repaintPage = function(){ if(curRoute === 'terminal') paintStat(); };
     paintStat(); if(!INT.st.termux || !INT.st.termux.ok) txTest();
 
-    body.appendChild(el('div', 'label', 'Command'));
+    /* command card: the field and one Run button, quick commands and the send switch underneath */
+    var cc = el('div', 'tool on'), ct = el('div', 'tool-top'); cc.style.marginTop = '12px';
+    ct.appendChild(el('div', 'tool-name', 'Command')); cc.appendChild(ct);
+    addInfo(cc, 'Runs in this project\u2019s folder in Termux. Only node, npm, npx, python and pip are allowed.');
+    var crow = el('div'); crow.style.cssText = 'display:flex;gap:10px;align-items:center;margin-top:10px';
     var cmdIn = el('input', 'field'); cmdIn.value = p.txCmd || (typeOf(p) === 'module' ? 'node index.js' : 'node -v');
     cmdIn.setAttribute('aria-label', 'Command'); cmdIn.autocapitalize = 'off'; cmdIn.spellcheck = false; cmdIn.setAttribute('enterkeyhint', 'go');
-    cmdIn.style.fontFamily = 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
-    body.appendChild(cmdIn);
-    var chips = el('div', 'prow'); chips.style.marginTop = '10px';
-    ['node -v', 'npm -v', 'python -V', 'pip install ', 'npm install', 'node index.js', 'python main.py'].forEach(function(x){
-      var b = el('button', 'ptool', x); b.addEventListener('mousedown', function(e){ e.preventDefault(); });
-      b.addEventListener('click', function(){ cmdIn.value = x; });
-      chips.appendChild(b);
-    });
-    body.appendChild(chips);
+    cmdIn.style.cssText = 'flex:1;min-width:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+    var runB = mkBtn('solid', 'Run', '', function(){ if(running){ if(ctl) ctl.abort(); } else run(); });
+    runB.style.flex = 'none';
+    crow.appendChild(cmdIn); crow.appendChild(runB); cc.appendChild(crow);
+    var opts = el('div', 'rowgroup'); opts.style.marginTop = '12px';
+    opts.appendChild(rowBtn('Quick commands', async function(){
+      var v = await UI.sheet('Quick commands', ['node -v', 'npm -v', 'python -V', 'python -m unittest', 'python -m pytest', 'pip install pytest', 'pip install ', 'npm install', 'node index.js', 'python main.py'].map(function(x){ return { label:x.trim(), value:x }; }));
+      if(!v) return;
+      cmdIn.value = v; cmdIn.focus(); try{ cmdIn.setSelectionRange(v.length, v.length); }catch(e){}
+    }));
     var cf = txCodeFile(p);
     if(p.txSend === undefined) p.txSend = !!cf.text.trim() && (typeOf(p) === 'module');
-    var sr = el('div', 'tool-top'); sr.style.marginTop = '14px';
-    sr.appendChild(el('div', '', 'Send the page to ' + cf.name + ' first'));
+    var sr = el('div', 'rowbtn'); sr.appendChild(el('span', '', 'Send the page to ' + cf.name + ' first'));
     var sw = el('button', 'sw' + (p.txSend ? ' on' : '')); sw.setAttribute('role', 'switch'); sw.setAttribute('aria-label', 'Send the page first'); sw.setAttribute('aria-checked', p.txSend ? 'true' : 'false');
     sw.addEventListener('click', function(){ p.txSend = !p.txSend; sw.classList.toggle('on', p.txSend); sw.setAttribute('aria-checked', p.txSend ? 'true' : 'false'); save(); });
-    sr.appendChild(sw); body.appendChild(sr);
+    sr.appendChild(sw); opts.appendChild(sr); cc.appendChild(opts); body.appendChild(cc);
 
-    var btns = el('div', 'btnrow nowrapbtns'), runB, stopB;
-    runB = mkBtn('solid', 'Run', '', function(){ run(); });
-    stopB = mkBtn('ghost', 'Stop', '', function(){ if(ctl) ctl.abort(); });
-    btns.appendChild(runB); btns.appendChild(stopB);
-    btns.appendChild(mkBtn('ghost', 'Clear', '', function(){ con.textContent = ''; }));
-    btns.appendChild(mkBtn('ghost', 'Copy output', '', async function(){ var ok = await copyText(con.textContent); if(!ok) UI.alert('Could not copy', 'Long-press the output and choose copy.'); }));
-    btns.appendChild(mkBtn('ghost', 'Send tests', '', async function(){
-      var s0 = INT.st.termux; if(!s0 || !s0.ok){ UI.alert('Not connected', 'Start the bridge in Termux and connect it in Settings first.'); return; }
-      var w = await txSendTests(p); p.txUsed = true;
-      add(w.ok ? 'Sent ' + w.written.length + ' test file' + (w.written.length === 1 ? '' : 's') + '\n' : w.error + '\n', w.ok ? 'm' : 'e'); listFiles();
-    }));
-    body.appendChild(btns);
-    var con = el('div', 'clog'); con.style.cssText = 'margin-top:12px;max-height:50vh;min-height:140px;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text';
+    var oh = el('div', 'label', 'Output'); oh.style.marginTop = '18px'; body.appendChild(oh);
+    var con = el('div', 'clog'); con.style.cssText = 'max-height:50vh;min-height:140px;white-space:pre-wrap;word-break:break-word;user-select:text;-webkit-user-select:text';
     body.appendChild(con);
-    function paintBtns(){ runB.disabled = running; stopB.disabled = !running; }
+    function paintBtns(){ var sp = runB.querySelector('span'); if(sp) sp.textContent = running ? 'Stop' : 'Run'; }
     function add(text, cls){
       var near = con.scrollHeight - con.scrollTop - con.clientHeight < 40;
       if(cls){ var sp = el('span', cls, text); con.appendChild(sp); } else con.appendChild(document.createTextNode(text));
@@ -7263,8 +7319,30 @@ MStore.ready.then(function(){
     }
     cmdIn.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); run(); } });
 
-    var fh = el('div', 'label', 'Workspace files'); fh.style.display = 'flex'; fh.style.alignItems = 'center'; fh.style.justifyContent = 'space-between';
-    fh.appendChild(mkBtn('ghost', 'Refresh', '', function(){ listFiles(); }));
+    menuB.addEventListener('click', async function(){
+      var a0 = await UI.sheet('Terminal', [
+        { label:'Connection settings', value:'settings' }, { label:'Send reference files to Termux', value:'send' },
+        { label:'Copy output', value:'copy' }, { label:'Clear output', value:'clear' },
+        { label:'Reset this project\u2019s workspace', value:'reset', danger:true }]);
+      if(!a0) return;
+      if(a0 === 'settings') openSettings('lab');
+      else if(a0 === 'copy'){ var ok = await copyText(con.textContent); if(!ok) UI.alert('Could not copy', 'Long-press the output and choose copy.'); }
+      else if(a0 === 'clear') con.textContent = '';
+      else if(a0 === 'send'){
+        var s0 = INT.st.termux; if(!s0 || !s0.ok){ UI.alert('Not connected', 'Start the bridge in Termux and connect it in Settings first.'); return; }
+        var w = await txSendTests(p); p.txUsed = true;
+        add(w.ok ? 'Sent ' + w.written.length + ' reference file' + (w.written.length === 1 ? '' : 's') + '\n' : w.error + '\n', w.ok ? 'm' : 'e'); listFiles();
+      }else if(a0 === 'reset'){
+        if(!(await UI.confirm('Reset the workspace?', 'The files and installed packages for this project are deleted from Termux. The project in the Lab is not touched.', { confirmText:'Reset', danger:true }))) return;
+        var j = await txJson('/reset', { project:proj });
+        add(j.ok ? 'Workspace reset.\n' : j.error + '\n', j.ok ? 'm' : 'e'); listFiles();
+      }
+    });
+
+    var fh = el('div', 'label'); fh.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-top:18px';
+    fh.appendChild(el('span', '', 'Workspace files'));
+    var rf = el('button', 'cp'); rf.innerHTML = '<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>'; rf.setAttribute('aria-label', 'Refresh files');
+    rf.addEventListener('click', function(){ listFiles(); }); fh.appendChild(rf);
     body.appendChild(fh);
     var fl = el('div'); body.appendChild(fl);
     async function listFiles(){
@@ -7274,23 +7352,24 @@ MStore.ready.then(function(){
       if(!j.ok){ fl.appendChild(el('div', 'proj-empty', j.error)); return; }
       if(!j.files.length){ fl.appendChild(el('div', 'proj-empty', 'No files yet')); return; }
       j.files.forEach(function(f){
-        var r = el('button', 'nav-item'); r.style.height = '44px';
-        r.appendChild(el('span', '', f.path + (f.dir ? '  \u00b7  ' + f.note : '  \u00b7  ' + fmtBytes(f.size))));
-        if(!f.dir) r.addEventListener('click', async function(){
+        var row = el('div', 'rrow'), b = el('button', 'rmain'), ic = el('span', 'rbadge'), tx = el('span', 'rtx');
+        ic.innerHTML = f.dir ? '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5"/></svg>';
+        tx.appendChild(el('b', '', f.path)); tx.appendChild(el('i', '', f.dir ? String(f.note || 'folder') : fmtBytes(f.size)));
+        b.appendChild(ic); b.appendChild(tx); row.appendChild(b); row.style.marginBottom = '8px';
+        if(!f.dir) b.addEventListener('click', async function(){
           var d = await txJson('/read?project=' + encodeURIComponent(proj) + '&path=' + encodeURIComponent(f.path));
-          add('\n\u2014 ' + f.path + ' \u2014\n' + (d.ok ? d.text + (d.truncated ? '\n[cut]' : '') : d.error) + '\n', d.ok ? '' : 'e');
+          var txt = d.ok ? d.text + (d.truncated ? '\n[cut]' : '') : d.error;
+          bottomSheet(f.path, function(sb){
+            sb.appendChild(mkBtn('ghost', 'Copy', '', function(){ copyText(txt); }));
+            var pr = el('pre', 'term-out', txt);
+            pr.style.cssText = 'max-height:none;overflow:visible;white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px';
+            sb.appendChild(pr);
+          });
         });
-        fl.appendChild(r);
+        fl.appendChild(row);
       });
     }
     listFiles();
-    var rs = el('button', 'danger', 'Reset this project\u2019s workspace'); rs.style.marginTop = '18px';
-    rs.addEventListener('click', async function(){
-      if(!(await UI.confirm('Reset the workspace?', 'The files and installed packages for this project are deleted from Termux. The project in the Lab is not touched.', { confirmText:'Reset', danger:true }))) return;
-      var j = await txJson('/reset', { project:proj });
-      add(j.ok ? 'Workspace reset.\n' : j.error + '\n', j.ok ? 'm' : 'e'); listFiles();
-    });
-    body.appendChild(rs);
   }
 
   /* tools: the AI can write files, run node and npm, and read the results, each run approved by the person */
@@ -7309,9 +7388,9 @@ MStore.ready.then(function(){
       d:'Copy the current page from code assembly into the Termux folder as index.js (module projects) or index.html.',
       desc:'Copies the current code assembly page into the Termux folder.',
       p:{ filename:STR('Optional file name') } },
-    { id:'terminal_send_test_files', name:'Send test files to Termux', perm:'ask',
-      d:'Copy the project\u2019s Test files (text files such as test scripts or fixtures) into the Termux folder, so they can be run there. Leave names empty to send all of them.',
-      desc:'Copies the project\u2019s text test files into the Termux folder.',
+    { id:'terminal_send_test_files', name:'Send reference files to Termux', perm:'ask',
+      d:'Copy the project\u2019s reference files (text files such as test scripts or fixtures) into the Termux folder, so they can be run there. Leave names empty to send all of them.',
+      desc:'Copies the project\u2019s text reference files into the Termux folder.',
       p:{ names:{ type:'ARRAY', description:'Optional file names; empty sends all', items:{ type:'STRING' } } } },
     { id:'terminal_read', name:'Read Termux files', perm:'allow', read:true, testOk:true,
       d:'List the files in this project\u2019s Termux folder, or read one of them. Leave path empty to list.',
@@ -7417,7 +7496,7 @@ MStore.ready.then(function(){
   });
   T('terminal_send_test_files', {
     icon:'code',
-    label:function(){ return 'Send test files to Termux'; },
+    label:function(){ return 'Send reference files to Termux'; },
     pre:txPre,
     run:function(p, a){
       p.txUsed = true;
@@ -8139,7 +8218,7 @@ MStore.ready.then(function(){
         R.push((has('propose_direction') ? 'For a big or uncertain piece of work, call propose_direction first and wait for the answer. ' : '') +
           (has('deliberate') ? 'When the person has to choose between ways, call deliberate, then stop and let them choose.' : ''));
       }
-      if(has('list_test_files')) R.push('The person keeps test files under Test files, sorted into groups. When they mention test data, sample input or a test file, call list_test_files, then read_test_file for the one you need.');
+      if(has('list_references')) R.push('The person keeps reference files under References: specs, sample data, inputs and examples, sorted into groups. When they mention one, or when you need to check your work against it, call list_references, then read_reference for the one you need.');
       if(has('write_doc')) R.push('Use write_doc for written designs, specs, blueprints and reports so the person can read, edit and export them. A design is a document, not an app. Set kind (blueprint, spec, report, note or data) and format (markdown, json, csv, yaml, mermaid, html, plain or code) to fit the content. When asked to build something, call list_docs first: a document marked approved is the blueprint to follow, and one that is not approved is only a draft, so say so before building from it.');
       if(has('write_note')) R.push('write_note is loaded because the person asked to remember something. Save only that, once.');
       if(has('start_task') || has('update_task')){
@@ -8324,13 +8403,16 @@ MStore.ready.then(function(){
       var note = '[Lab note, not from the person] The person already sees every step as a card, so do not list or retell the steps. In plain sentences: give the result in one or two sentences, say plainly if anything failed and why' + (bad.length ? ' (what failed: ' + bad.join('; ') + ')' : '') + ', then give the one next step you suggest. Do not call tools.';
       var lastC = c2[c2.length - 1];
       if(lastC && lastC.role === 'user') lastC.parts[0].text += '\n\n' + note; else c2.push({ role:'user', parts:[{ text:note }] });
+      var xe = { id:uid(), ts:Date.now(), inTok:approxTokens({ contents:c2 }), tools:0, calls:[] };
+      p.xray = p.xray || []; p.xray.push(xe); while(p.xray.length > 40) p.xray.shift();
       live = null;
       var t2 = '';
       try{
         var r2 = await generate({ systemInstruction:{ parts:[{ text:systemText(p, [], ch, m, ov, intent) }] }, contents:c2 }, { stream:true, onText:onText, onReset:onReset, signal:sig });
         t2 = cleanModelText((r2.parts || []).filter(function(x){ return typeof x.text === 'string' && !x.thought; }).map(function(x){ return x.text; }).join(''));
         m.model = r2.model || m.model;
-      }catch(e){ if(e && e.aborted) throw e; }
+        xe.ms = Date.now() - xe.ts; xe.model = r2.model; xe.out = t2.slice(0, 300);
+      }catch(e){ xe.err = errText(e); xe.ms = Date.now() - xe.ts; if(e && e.aborted) throw e; }
       if(live){
         if(t2){ live.t = t2; delete live.live; }
         else{ var wi = m.segs.indexOf(live); if(wi >= 0) m.segs.splice(wi, 1); }
@@ -8538,14 +8620,14 @@ MStore.ready.then(function(){
 
   /* ---- composer tools: the + button opens a bar attached to the composer ---- */
   var mode = null;
-  function closePlus(){ $('plusBar').classList.remove('show'); $('modeSheet').classList.remove('show'); $('plusBtn').classList.remove('open'); }
+  function closePlus(){ $('plusBar').classList.remove('show'); $('modeSheet').classList.remove('show'); $('modelSheet').classList.remove('show'); $('plusBtn').classList.remove('open'); }
   $('plusBtn').addEventListener('click', function(){
     var was = $('plusBar').classList.contains('show');
     closePlus();
     if(!was){ $('plusBar').classList.add('show'); $('plusBtn').classList.add('open'); }
   });
   document.addEventListener('pointerdown', function(e){
-    if(($('plusBar').classList.contains('show') || $('modeSheet').classList.contains('show')) && !e.target.closest('#plusBar, #modeSheet, #plusBtn, #modeChip')) closePlus();
+    if(($('plusBar').classList.contains('show') || $('modeSheet').classList.contains('show') || $('modelSheet').classList.contains('show')) && !e.target.closest('#plusBar, #modeSheet, #modelSheet, #plusBtn, #modeChip, #conn')) closePlus();
   }, true);
   /* ---- the tester: opens the app out of sight, taps and types into every control, reports in plain words ---- */
   function explorerFn(){
@@ -8724,8 +8806,8 @@ MStore.ready.then(function(){
     var w = el('div'); w.id = 'councilOv';
     w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
     var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
-    top.appendChild(el('div', 'tool-name', title || 'Council'));
-    var x = el('button', 'btn solid', 'Close'); x.style.cssText = 'height:34px;min-height:0;padding:0 16px;font-size:14px'; x.addEventListener('click', function(){ w.remove(); });
+    var ct = el('div', 'tool-name', title || 'Council'); ct.style.cssText = 'font-size:17px;font-weight:600'; top.appendChild(ct);
+    var x = closeX(); x.addEventListener('click', function(){ w.remove(); });
     top.appendChild(x); w.appendChild(top);
     var qb = el('div'); qb.style.cssText = 'color:var(--muted);font-size:13px;margin-bottom:12px;white-space:pre-wrap'; qb.textContent = q; w.appendChild(qb);
     document.body.appendChild(w);
@@ -10254,8 +10336,8 @@ MStore.ready.then(function(){
       done(r); c.checked = Date.now(); hfSave(c); tb.disabled = lb.disabled = ub.disabled = false; paint();
     }
     tb = mkBtn('solid', 'Test connection', '', function(){ if(need()) run(hfTest, function(r){ c.ok = r.ok ? Date.now() : 0; if(!r.ok) c.large = 0; }); });
-    lb = mkBtn('ghost', 'Test large upload', '', function(){ if(need()) run(hfLargeTest, function(r){ c.large = r.ok ? Date.now() : 0; }); });
-    ub = mkBtn('ghost', 'Check usage', '', async function(){
+    lb = rowBtn('Test large upload', function(){ if(need()) run(hfLargeTest, function(r){ c.large = r.ok ? Date.now() : 0; }); });
+    ub = rowBtn('Check usage', async function(){
       if(!need()) return;
       ub.disabled = true; steps.innerHTML = ''; var ln = el('div', 'hint', 'Usage \u00b7 checking'); steps.appendChild(ln);
       try{
@@ -10264,8 +10346,8 @@ MStore.ready.then(function(){
       }catch(e){ ln.textContent = 'Usage \u00b7 ' + hfNetMsg(e, 'Hugging Face'); }
       ub.disabled = false;
     });
-    row.appendChild(tb); row.appendChild(lb); card.appendChild(row);
-    var row2 = el('div', 'btnrow'); row2.appendChild(ub); card.appendChild(row2); card.appendChild(steps);
+    tb.style.cssText = 'width:100%;margin-top:12px'; card.appendChild(tb);
+    var hg = el('div', 'rowgroup'); hg.style.marginTop = '10px'; hg.appendChild(lb); hg.appendChild(ub); card.appendChild(hg); card.appendChild(steps);
     var stat = el('div', 'hint', ''); card.appendChild(stat);
     function paint(){
       pill.className = 'spill ' + (c.ok ? 'ok' : c.checked ? 'bad' : 'warn');
@@ -10718,6 +10800,30 @@ MStore.ready.then(function(){
     card:function(m, seg){ return slim('note', seg.res || 'Read a document'); }
   });
 
+  /* documents and journal entries: a plain preview on the card, the rendered text in a sheet */
+  function mdPlain(t){
+    return String(t || '').replace(/```[\s\S]*?```/g, ' ').replace(/^#{1,6}\s*/gm, '').replace(/(\*\*|__|`|~~)/g, '').replace(/^\s*[-*+]\s+/gm, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/\s+/g, ' ').trim();
+  }
+  function previewEl(t){
+    var v = el('div', 'xsub', mdPlain(t).slice(0, 300)); v.style.cssText = 'margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden';
+    return v;
+  }
+  function readerSheet(title, text, fmt, meta, rows){
+    bottomSheet(title, function(b){
+      var doc = el('div'); doc.style.cssText = 'line-height:1.6;font-size:15.5px;color:var(--text);padding-bottom:6px;overflow-wrap:anywhere';
+      if(fmt && fmt !== 'markdown' && fmt !== 'plain'){
+        var pr = el('pre', 'term-out', String(text || '')); pr.style.cssText = 'max-height:none;overflow:auto;white-space:pre;margin:0;font-size:13px'; doc.appendChild(pr);
+      }else if(fmt === 'plain'){ doc.style.whiteSpace = 'pre-wrap'; doc.textContent = String(text || ''); }
+      else fillRich(doc, String(text || ''), null);
+      b.appendChild(doc);
+      if(meta){ var mt = el('div', 'xsub', meta); mt.style.marginTop = '6px'; b.appendChild(mt); }
+      if(rows && rows.length){
+        var g = el('div', 'rowgroup'); g.style.marginTop = '12px';
+        rows.forEach(function(r){ var rb = rowBtn(r[0], function(){ sheetClose(); r[1](); }); if(r[2]) rb.style.color = '#e5645a'; g.appendChild(rb); });
+        b.appendChild(g);
+      }
+    });
+  }
   function renderDocs(){
     var body = $('pageBody'), p = current;
     body.innerHTML = '';
@@ -10764,17 +10870,9 @@ MStore.ready.then(function(){
     body.classList.toggle('pe', !ds.length);
     if(!ds.length) body.appendChild(el('div', 'proj-empty page-empty', 'No documents yet'));
     ds.forEach(function(d){
-      var card = el('div', 'tool on'), top = el('div', 'tool-top');
-      top.appendChild(el('div', 'tool-name', d.title));
-      if(d.approved) top.appendChild(el('span', 'spill', 'Approved'));
-      top.appendChild(el('span', 'spill', kindLabel(docKind(d)) + (docFmt(d) === 'markdown' ? '' : ' \u00b7 ' + fmtLabel(docFmt(d)))));
-      var info = el('button', 'info', '?'); info.addEventListener('click', function(){ card.classList.toggle('open'); });
-      top.appendChild(info); card.appendChild(top);
-      var inf = el('div', 'tool-info'), tx = el('div', '', d.text); tx.style.whiteSpace = 'pre-wrap';
-      inf.appendChild(tx);
-      var mt = el('div', 'xsub', 'Updated ' + taskStamp(d.mod)); mt.style.marginTop = '8px'; inf.appendChild(mt);
-      var row = el('div', 'tool-top'); row.style.marginTop = '10px';
-      row.appendChild(mkBtn('ghost', 'Edit', '', function(){ editor(d); host.scrollIntoView({ block:'start' }); }));
+      var card = el('div', 'tool on'), top = el('div', 'tool-top'), nm = el('div', 'tool-name', d.title);
+      nm.style.cssText = 'min-width:0;white-space:normal;overflow:visible;text-overflow:clip';
+      top.appendChild(nm);
       var dm = el('button', 'dots'); dm.innerHTML = ICON.dots; dm.setAttribute('aria-label', 'Options for ' + d.title);
       dm.addEventListener('click', async function(){
         var opts = [];
@@ -10795,8 +10893,21 @@ MStore.ready.then(function(){
           if(await UI.confirm('Delete this document?', '', { confirmText:'Delete', danger:true })){ p.docs = p.docs.filter(function(x){ return x !== d; }); save(); renderDocs(); }
         }
       });
-      row.appendChild(dm);
-      inf.appendChild(row); card.appendChild(inf); body.appendChild(card);
+      top.appendChild(dm); card.appendChild(top);
+      var pr = el('div'); pr.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px';
+      if(d.approved) pr.appendChild(el('span', 'spill', 'Approved'));
+      pr.appendChild(el('span', 'spill', kindLabel(docKind(d)) + (docFmt(d) === 'markdown' ? '' : ' \u00b7 ' + fmtLabel(docFmt(d)))));
+      var up = el('span', 'xsub', 'Updated ' + taskStamp(d.mod)); pr.appendChild(up); card.appendChild(pr);
+      card.appendChild(previewEl(d.text));
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', function(e){
+        if(e.target.closest && e.target.closest('button')) return;
+        readerSheet(d.title, d.text, docFmt(d), 'Updated ' + taskStamp(d.mod), [
+          ['Edit', function(){ editor(d); host.scrollIntoView({ block:'start' }); }],
+          ['Copy', async function(){ var ok = await copyText(d.text); if(!ok) UI.alert('Could not copy', 'The browser did not allow it.'); }],
+          ['Export', function(){ exportDocRec(d); }]]);
+      });
+      body.appendChild(card);
     });
   }
   /* =====================================================================
@@ -10834,10 +10945,10 @@ MStore.ready.then(function(){
     var gs = tfGroups(p), total = recs.reduce(function(a, r){ return a + r.size; }, 0);
     body.innerHTML = '';
     body.appendChild(el('div', 'summary', recs.length + ' file' + (recs.length === 1 ? '' : 's') + ' · ' + fmtBytes(total) + (gs.length ? ' · ' + gs.length + ' group' + (gs.length === 1 ? '' : 's') : '')));
-    var bar = el('div', 'prow'); bar.style.margin = '14px 0 8px';
+    var bar = el('div'); bar.style.cssText = 'display:flex;gap:10px;align-items:center;margin:14px 0 8px';
     var note = el('div', 'hint'); note.style.display = 'none';
     function say(t){ note.style.display = t ? '' : 'none'; note.textContent = t; }
-    bar.appendChild(mkBtn('solid', 'Add files', '', async function(){
+    var addB = mkBtn('solid', 'Add files', '', async function(){
       var gid = '';
       if(gs.length){
         var pick = await UI.sheet('Add to', [{ label:'No group', value:'-' }].concat(gs.map(function(g){ return { label:g.name, value:g.id }; })));
@@ -10853,15 +10964,20 @@ MStore.ready.then(function(){
         if(r.big.length) UI.alert('Some files were not saved', r.big.join(', ') + ' (over 25 MB or could not be stored).');
       });
       inp.click();
-    }));
-    bar.appendChild(mkBtn('ghost', 'New group', '', async function(){
+    });
+    addB.style.flex = '1'; bar.appendChild(addB);
+    var moreB = el('button', 'cp'); moreB.innerHTML = ICON.dots; moreB.setAttribute('aria-label', 'Reference options');
+    moreB.addEventListener('click', async function(){
+      var a0 = await UI.sheet('References', [{ label:'New group', value:'group' }]);
+      if(a0 !== 'group') return;
       var v = await UI.prompt('New group', { confirmText:'Create', maxLength:40 });
       if(!v || !String(v).trim()) return;
       gs.push({ id:uid(), name:String(v).trim().slice(0, 40) }); save(); renderTestFiles();
-    }));
+    });
+    bar.appendChild(moreB);
     body.appendChild(bar); body.appendChild(note);
     body.classList.toggle('pe', !recs.length && !gs.length);
-    if(!recs.length && !gs.length) body.appendChild(el('div', 'proj-empty page-empty', 'No test files yet. Add files, then sort them into groups such as valid inputs, bad inputs or sample data.'));
+    if(!recs.length && !gs.length) body.appendChild(el('div', 'proj-empty page-empty', 'No reference files yet. Add specs, sample data, inputs or examples, then sort them into groups.'));
     function groupBlock(gid, name){
       var mine = recs.filter(function(r){ return (r.gid || '') === gid; }).sort(function(a, b){ return a.name.localeCompare(b.name); });
       if(!gid && !mine.length) return;
@@ -10873,7 +10989,8 @@ MStore.ready.then(function(){
       tg.addEventListener('click', function(){ tfShut[pid + ':' + gid] = !shut; renderTestFiles(); });
       head.appendChild(tg);
       if(gid){
-        var mb = mkBtn('ghost', 'Group', '', async function(){
+        var mb = el('button', 'cp'); mb.innerHTML = ICON.dots; mb.setAttribute('aria-label', 'Group options');
+        mb.addEventListener('click', async function(){
           var a = await UI.sheet(name, [{ label:'Rename group', value:'rename' }, { label:'Delete group, keep its files', value:'ungroup' }, { label:'Delete group and its files', value:'wipe', danger:true }]);
           var g = gs.filter(function(x){ return x.id === gid; })[0];
           if(!a || !g) return;
@@ -10899,75 +11016,76 @@ MStore.ready.then(function(){
     }
     gs.forEach(function(g){ groupBlock(g.id, g.name); });
     groupBlock('', gs.length ? 'No group' : 'Files');
-    function fileCard(r){
-      var card = el('div', 'tool on'), top = el('div', 'tool-top');
-      top.appendChild(el('div', 'tool-name', r.name));
-      top.appendChild(el('span', 'spill', (extOf(r.name) || 'file').toUpperCase() + ' · ' + fmtBytes(r.size)));
-      var info = el('button', 'info', '?');
-      var d = el('div', 'tool-info'), loaded = false;
-      info.addEventListener('click', function(){
-        card.classList.toggle('open');
-        if(loaded) return; loaded = true;
-        if(isTextFile(r)){
-          d.insertBefore(filePreview(r.name, function(){ return r.blob.text(); }, [addToDatasetBtn(r.name, function(){ return r.blob.text(); })]), d.firstChild);
-          d.firstChild.style.margin = '0 0 10px';
-        }else if(/^image\//.test(r.type || '')){
+    function fileSheet(r){
+      bottomSheet(r.name, function(b){
+        if(isTextFile(r)) b.appendChild(filePreview(r.name, function(){ return r.blob.text(); }, [addToDatasetBtn(r.name, function(){ return r.blob.text(); })]));
+        else if(/^image\//.test(r.type || '')){
           var im = document.createElement('img'); im.src = URL.createObjectURL(r.blob); im.alt = r.name;
-          im.style.cssText = 'display:block;max-width:100%;max-height:240px;border-radius:12px;margin-bottom:10px;border:1px solid var(--edge)';
-          d.insertBefore(im, d.firstChild);
-        }else d.insertBefore(el('div', 'xsub', 'No preview for this kind of file. You can still download or move it.'), d.firstChild);
-      });
-      top.appendChild(info); card.appendChild(top);
-      var row = el('div', 'prow'); row.style.marginTop = '10px';
-      if(isTextFile(r)){
-        var cb = mkBtn('ghost', 'Copy', '', async function(){
-          var ok = await copyText(await r.blob.text()), s0 = cb.querySelector('span');
-          s0.textContent = ok ? 'Copied' : 'Could not copy'; setTimeout(function(){ s0.textContent = 'Copy'; }, 1400);
-        });
-        row.appendChild(cb);
-        row.appendChild(mkBtn('ghost', 'Attach to chat', '', async function(){
-          if(attached.length >= 6){ UI.alert('Too many attachments', 'Send the current ones first, or remove one.'); return; }
-          var t = await r.blob.text(); attachText(r.name, t); go('chat'); comp.focus();
+          im.style.cssText = 'display:block;max-width:100%;max-height:240px;border-radius:12px;border:1px solid var(--edge)';
+          b.appendChild(im);
+        }else b.appendChild(el('div', 'xsub', 'No preview for this kind of file.'));
+        var g = el('div', 'rowgroup'); g.style.marginTop = '10px';
+        if(isTextFile(r)){
+          g.appendChild(rowBtn('Attach to chat', async function(){
+            if(attached.length >= 6){ UI.alert('Too many attachments', 'Send the current ones first, or remove one.'); return; }
+            var t = await r.blob.text(); sheetClose(); attachText(r.name, t); go('chat'); comp.focus();
+          }));
+          var cpy = rowBtn('Copy', async function(){
+            var ok = await copyText(await r.blob.text()), s0 = cpy.firstChild;
+            s0.textContent = ok ? 'Copied' : 'Could not copy'; setTimeout(function(){ s0.textContent = 'Copy'; }, 1400);
+          });
+          g.appendChild(cpy);
+        }
+        g.appendChild(rowBtn('Download', function(){ saveBlob(r.name, r.blob); }));
+        g.appendChild(rowBtn('Move', async function(){
+          var opts = [{ label:'No group', value:'-', selected:!r.gid }].concat(gs.map(function(x){ return { label:x.name, value:x.id, selected:r.gid === x.id }; }));
+          if(opts.length < 2){ UI.alert('No groups yet', 'Create a group first from the menu next to Add files.'); return; }
+          sheetClose();
+          var v = await UI.sheet('Move to', opts);
+          if(v === null || v === undefined) return;
+          r.gid = v === '-' ? '' : v; await LOCAL.put(r); renderTestFiles();
         }));
-      }
-      row.appendChild(mkBtn('ghost', 'Download', '', function(){ saveBlob(r.name, r.blob); }));
-      row.appendChild(mkBtn('ghost', 'Move', '', async function(){
-        var opts = [{ label:'No group', value:'-', selected:!r.gid }].concat(gs.map(function(g){ return { label:g.name, value:g.id, selected:r.gid === g.id }; }));
-        if(opts.length < 2){ UI.alert('No groups yet', 'Create a group first with New group.'); return; }
-        var v = await UI.sheet('Move to', opts);
-        if(v === null || v === undefined) return;
-        r.gid = v === '-' ? '' : v; await LOCAL.put(r); renderTestFiles();
-      }));
-      row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
-        if(!(await UI.confirm('Delete this file?', r.name, { confirmText:'Delete', danger:true }))) return;
-        await LOCAL.remove(r.id); p.tfCount = Math.max(0, (p.tfCount || 1) - 1); save(); renderTestFiles();
-      }));
-      d.appendChild(row);
-      if(r.sha){ var ck = el('div', 'xsub', 'SHA-256 ' + r.sha.slice(0, 16) + '… · added ' + taskStamp(r.ts)); ck.style.marginTop = '8px'; d.appendChild(ck); }
-      card.appendChild(d);
+        var del = rowBtn('Delete', async function(){
+          sheetClose();
+          if(!(await UI.confirm('Delete this file?', r.name, { confirmText:'Delete', danger:true }))) return;
+          await LOCAL.remove(r.id); p.tfCount = Math.max(0, (p.tfCount || 1) - 1); save(); renderTestFiles();
+        });
+        del.style.color = '#e5645a'; g.appendChild(del);
+        b.appendChild(g);
+        if(r.sha){ var ck = el('div', 'xsub', 'SHA-256 ' + r.sha.slice(0, 16) + '\u2026 \u00b7 added ' + taskStamp(r.ts)); ck.style.marginTop = '8px'; b.appendChild(ck); }
+      });
+    }
+    function fileCard(r){
+      var card = el('div', 'rrow'), b = el('button', 'rmain'), ic = el('span', 'rbadge'), tx = el('span', 'rtx');
+      ic.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5"/></svg>';
+      tx.appendChild(el('b', '', r.name)); tx.appendChild(el('i', '', (extOf(r.name) || 'file').toUpperCase() + ' \u00b7 ' + fmtBytes(r.size)));
+      b.appendChild(ic); b.appendChild(tx); b.addEventListener('click', function(){ fileSheet(r); });
+      var d = el('button', 'dots'); d.innerHTML = ICON.dots; d.setAttribute('aria-label', 'Options for ' + r.name);
+      d.addEventListener('click', function(){ fileSheet(r); });
+      card.appendChild(b); card.appendChild(d); card.style.marginBottom = '8px';
       return card;
     }
   }
-  T('list_test_files', {
+  T('list_references', {
     icon:'note', read:true,
-    label:function(){ return 'List test files'; },
+    label:function(){ return 'List references'; },
     run:async function(p){
       var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
       var gs = tfGroups(p);
-      return { ok:true, res:'Read test files (' + rs.length + ')', result:{ files:rs.map(function(r){
+      return { ok:true, res:'Read references (' + rs.length + ')', result:{ files:rs.map(function(r){
         var g = gs.filter(function(x){ return x.id === r.gid; })[0];
         return { name:r.name, group:g ? g.name : '', bytes:r.size, text:isTextFile(r) };
       }) } };
     },
-    card:function(m, seg){ return slim('note', seg.res || 'List test files'); }
+    card:function(m, seg){ return slim('note', seg.res || 'List references'); }
   });
-  T('read_test_file', {
+  T('read_reference', {
     icon:'note', read:true,
-    label:function(a){ return 'Read test file: ' + short(a.name || '', 40); },
+    label:function(a){ return 'Read reference: ' + short(a.name || '', 40); },
     run:async function(p, a){
       var rs = []; try{ rs = await LOCAL.list(p.id, 'test'); }catch(e){}
       var f = findTestFile(rs, a.name);
-      if(!f) return terr('No single test file matches that name. Use list_test_files.');
+      if(!f) return terr('No single test file matches that name. Use list_references.');
       if(!isTextFile(f)) return terr('That file is not text, so it cannot be read here.');
       var t = await f.blob.text();
       return { ok:true, res:'Read “' + short(f.name, 30) + '”', result:{ name:f.name, text:short(t, 20000), truncated:t.length > 20000 } };
@@ -11081,10 +11199,13 @@ MStore.ready.then(function(){
     var fs = pickField('Category', [['', 'All categories']].concat(JTYPES), jFilter, function(v){ jFilter = v; renderJournal(); });
     fs.style.flex = '1';
     bar.appendChild(fs);
-    bar.appendChild(mkBtn('ghost', jLedger ? 'List' : 'Ledger', '', function(){ jLedger = !jLedger; renderJournal(); }));
-    bar.appendChild(mkBtn('solid', 'New entry', '', function(){ editor(null); }));
-    bar.appendChild(mkBtn('ghost', 'Export', '', function(){ exportJournal(current); }));
-    body.appendChild(bar);
+    var jm = el('button', 'cp'); jm.innerHTML = ICON.dots; jm.setAttribute('aria-label', 'Journal options');
+    jm.addEventListener('click', async function(){
+      var a0 = await UI.sheet('Journal', [{ label:jLedger ? 'Show as a list' : 'Show as a ledger', value:'view' }, { label:'Export journal', value:'export' }]);
+      if(a0 === 'view'){ jLedger = !jLedger; renderJournal(); } else if(a0 === 'export') exportJournal(current);
+    });
+    bar.appendChild(jm); body.appendChild(bar);
+    var neB = mkBtn('solid', 'New entry', '', function(){ editor(null); }); neB.style.cssText = 'width:100%;margin:6px 0 4px'; body.appendChild(neB);
     var host = el('div'); body.appendChild(host);
     var list = el('div'); body.appendChild(list);
     function fld(label, node){ host.lastChild.appendChild(el('div', 'label', label)); host.lastChild.appendChild(node); }
@@ -11116,15 +11237,9 @@ MStore.ready.then(function(){
     list.style.cssText = shown.length ? '' : 'flex:1;display:flex;flex-direction:column';
     if(!shown.length) list.appendChild(el('div', 'proj-empty page-empty', 'No entries'));
     shown.forEach(function(e){
-      var card = el('div', 'tool on'), top = el('div', 'tool-top');
-      top.appendChild(el('div', 'tool-name', e.title));
-      top.appendChild(el('span', 'spill', jLabel(e.type)));
-      var info = el('button', 'info', '?');
-      info.addEventListener('click', function(){ card.classList.toggle('open'); });
-      top.appendChild(info);
-      card.appendChild(top);
-      var d = el('div', 'tool-info'), tx = el('div', '', e.text); tx.style.whiteSpace = 'pre-wrap';
-      d.appendChild(tx);
+      var card = el('div', 'tool on'), top = el('div', 'tool-top'), nm = el('div', 'tool-name', e.title);
+      nm.style.cssText = 'min-width:0;white-space:normal;overflow:visible;text-overflow:clip';
+      top.appendChild(nm); top.appendChild(el('span', 'spill', jLabel(e.type))); card.appendChild(top);
       var tk = e.task ? tasksOf(current).filter(function(t){ return t.id === e.task; })[0] : null;
       var cc = e.chat ? (current.chats || []).filter(function(c){ return c.id === e.chat; })[0] : null;
       var meta = [taskStamp(e.ts)];
@@ -11137,17 +11252,18 @@ MStore.ready.then(function(){
       if(jd) meta.push('From ' + short(jd.title, 30));
       if(tk) meta.push('Task #' + tk.seq + ' ' + short(tk.title, 30));
       if(cc) meta.push('Chat ' + short(cc.title || 'Chat', 30));
-      var mt = el('div', 'xsub', meta.join(' \u00b7 ')); mt.style.marginTop = '8px'; d.appendChild(mt);
-      var row = el('div', 'tool-top'); row.style.marginTop = '10px';
-      if(e.type === 'question' && e.status) row.appendChild(mkBtn('ghost', e.status === 'open' ? 'Mark resolved' : 'Reopen', '', function(){ e.status = e.status === 'open' ? 'resolved' : 'open'; e.mod = Date.now(); save(); renderJournal(); }));
-      row.appendChild(mkBtn('ghost', 'Edit', '', function(){ editor(e); host.scrollIntoView({ block:'start' }); }));
-      row.appendChild(mkBtn('ghost', 'Delete', '', async function(){
+      var mt = el('div', 'xsub', meta.join(' \u00b7 ')); mt.style.marginTop = '6px'; card.appendChild(mt);
+      card.appendChild(previewEl(e.text));
+      card.style.cursor = 'pointer';
+      var rows = [];
+      if(e.type === 'question' && e.status) rows.push([e.status === 'open' ? 'Mark resolved' : 'Reopen', function(){ e.status = e.status === 'open' ? 'resolved' : 'open'; e.mod = Date.now(); save(); renderJournal(); }]);
+      rows.push(['Edit', function(){ editor(e); host.scrollIntoView({ block:'start' }); }]);
+      rows.push(['Delete', async function(){
         if(await UI.confirm('Delete this entry?', '', { confirmText:'Delete', danger:true })){
           current.journal = current.journal.filter(function(x){ return x !== e; }); save(); renderJournal();
         }
-      }));
-      d.appendChild(row);
-      card.appendChild(d);
+      }, true]);
+      card.addEventListener('click', function(){ readerSheet(e.title, e.text, 'markdown', meta.join(' \u00b7 '), rows); });
       list.appendChild(card);
     });
   }
@@ -11179,7 +11295,7 @@ MStore.ready.then(function(){
   }
   function setOpMode(m){
     if(!current) return;
-    if(m === 'auto'){ current.opAuto = true; current.opMode = typeBase(current); }
+    if(m === 'auto'){ current.opAuto = true; current.opMode = typeBase(current); current.autoMode = typeBase(current); }
     else{ current.opAuto = false; current.opMode = m; }
     save(); paintOpMode(); closePlus();
   }
