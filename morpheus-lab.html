@@ -705,6 +705,9 @@ svg{display:block;pointer-events:none}
 #modeSheet .ptool.sel,#modelSheet .ptool.sel{background:var(--hover);color:var(--text)}
 #modeSheet .ptool.sel::after,#modelSheet .ptool.sel::after{content:'\2713';margin-left:auto;font-weight:700}
 #modelSheet .psec .cp{width:30px;height:30px}
+#plusBar,#modeSheet,#modelSheet{left:10px;right:10px;width:auto;max-width:none;padding:10px 8px 8px;border-radius:26px;background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03)),var(--card);border:1px solid var(--line);box-shadow:0 10px 26px rgba(0,0,0,.34)}
+#plusBar .ptool,#modeSheet .ptool,#modelSheet .ptool{padding:0 14px}
+#plusBar .psec,#modeSheet .psec,#modelSheet .psec{padding:6px 14px 4px}
 .ptool svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 #modeBar{display:none;align-items:center;gap:10px;margin:-4px 8px 10px -8px;padding:8px 6px 8px 12px;border-radius:14px;background:var(--chip);border:1px solid var(--line-soft)}
 #composerCard.inspect #modeBar{display:flex}
@@ -5489,14 +5492,29 @@ MStore.ready.then(function(){
   var groupOpen = new WeakMap();
   document.addEventListener('click', function(e){
     var b = e.target.closest && e.target.closest('button.info');
-    var card = b && b.closest('.tool');
-    var inf = card && card.querySelector(':scope > .tool-info');
-    if(!inf || inf.children.length) return;
+    if(!b) return;
+    var card = b.closest('.tool'), inf = card && card.querySelector(':scope > .tool-info'), title = 'About', src = null;
+    if(inf){
+      var nm = card.querySelector('.tool-name'); if(nm) title = nm.textContent;
+      e.stopImmediatePropagation(); e.preventDefault();
+      bottomSheet(title, function(body){
+        inf.style.cssText = 'display:block;margin:0;padding:0;font-size:15px;line-height:1.55;color:var(--text);white-space:pre-wrap';
+        body.appendChild(inf);
+      }, function(){ inf.style.cssText = ''; card.appendChild(inf); });
+      return;
+    }
+    if(b.id === 'modeInfo'){ src = $('modeHelp').cloneNode(true); src.removeAttribute('id'); title = 'Modes'; }
+    else{
+      var par = b.parentNode, n = 0;
+      while(par && n < 3 && !src){
+        var hid = Array.prototype.filter.call(par.querySelectorAll('.hint, .fnote'), function(x){ return !x.contains(b) && x.style.display === 'none'; })[0];
+        if(hid){ src = el('div'); src.textContent = hid.textContent; }
+        par = par.parentNode; n++;
+      }
+    }
+    if(!src) return;
     e.stopImmediatePropagation(); e.preventDefault();
-    var nm = card.querySelector('.tool-name');
-    bottomSheet(nm ? nm.textContent : 'About', function(body){
-      var t = el('div'); t.style.cssText = 'line-height:1.55;font-size:15px;white-space:pre-wrap'; t.textContent = inf.textContent; body.appendChild(t);
-    });
+    bottomSheet(title, function(body){ src.style.cssText = 'display:block;margin:0;padding:0;font-size:15px;line-height:1.6;color:var(--text);white-space:pre-wrap'; body.appendChild(src); });
   }, true);
   function rowBtn(label, fn){
     var b = el('button', 'rowbtn'); b.appendChild(el('span', '', label));
@@ -5518,10 +5536,11 @@ MStore.ready.then(function(){
   }
   /* a bottom sheet for long content, so steps and output open over the chat instead of stretching it */
   var sheetClose = null, sheetTitle = null, stepsLive = null;
+  function layerHost(){ var u = document.getElementById('ui'); return (u && u.parentNode) || document.body; }
   function bottomSheet(title, fill, onClose){
     if(sheetClose) sheetClose();
     var bd = el('div'), sh = el('div'), top = el('div'), body = el('div'), x = closeX();
-    bd.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:flex;align-items:flex-end';
+    bd.style.cssText = 'position:absolute;inset:0;z-index:95;background:rgba(0,0,0,.5);display:flex;align-items:flex-end';
     sh.style.cssText = 'width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))';
     top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px';
     var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;font-weight:600'; sheetTitle = tt;
@@ -5531,7 +5550,7 @@ MStore.ready.then(function(){
     function close(){ if(onClose) onClose(); bd.remove(); sheetClose = null; sheetTitle = null; }
     x.addEventListener('click', close);
     bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
-    sh.appendChild(top); sh.appendChild(body); bd.appendChild(sh); document.body.appendChild(bd);
+    sh.appendChild(top); sh.appendChild(body); bd.appendChild(sh); layerHost().appendChild(bd);
     sheetClose = close;
   }
   function toolGroup(run){
@@ -7072,7 +7091,7 @@ MStore.ready.then(function(){
     capHead.style.display = 'flex'; capHead.style.alignItems = 'center'; capHead.style.justifyContent = 'space-between';
     capHead.appendChild(el('span', '', 'What the AI can do')); capHead.appendChild(capInfo);
     capInfo.setAttribute('aria-label', 'What the AI can do');
-    capInfo.addEventListener('click', function(){ caps.style.display = caps.style.display === 'none' ? '' : 'none'; });
+    capInfo.addEventListener('click', function(){ bottomSheet('What the AI can do', function(b){ BL.forEach(function(A){ b.appendChild(el('div', '', A.name + ' \u00b7 ' + (A.read ? 'only looks' : 'changes things'))); }); }); });
     c.appendChild(capHead);
     caps.style.display = 'none';
     BL.forEach(function(A){ caps.appendChild(el('div', 'hint', A.name + ' \u00b7 ' + (A.read ? 'only looks' : 'changes things'))); });
@@ -8819,18 +8838,19 @@ MStore.ready.then(function(){
   /* ---- council: the same question to several models, then a plain comparison ---- */
   function councilView(q, title){
     var w = el('div'); w.id = 'councilOv';
-    w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
+    w.style.cssText = 'position:absolute;inset:0;z-index:94;background:var(--bg);color:var(--text);overflow:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 14px 28px';
     var top = el('div'); top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px';
     var ct = el('div', 'tool-name', title || 'Council'); ct.style.cssText = 'font-size:17px;font-weight:600'; top.appendChild(ct);
     var x = closeX(); x.addEventListener('click', function(){ w.remove(); });
     top.appendChild(x); w.appendChild(top);
     var qb = el('div'); qb.style.cssText = 'color:var(--muted);font-size:13px;margin-bottom:12px;white-space:pre-wrap'; qb.textContent = q; w.appendChild(qb);
-    document.body.appendChild(w);
-    var addCard = function(title, text, muted){
+    layerHost().appendChild(w);
+    var addCard = function(title, text, muted, md){
       var c = el('div'); c.style.cssText = 'background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px';
       var h = el('div', 'tool-name', title), b = el('div');
       b.style.cssText = 'white-space:pre-wrap;margin-top:6px;line-height:1.5;font-size:14px;color:' + (muted ? 'var(--muted)' : 'var(--text)');
-      b.textContent = text; c.appendChild(h); c.appendChild(b); w.appendChild(c);
+      if(md){ b.style.whiteSpace = 'normal'; fillRich(b, String(text), null); } else b.textContent = text;
+      c.appendChild(h); c.appendChild(b); w.appendChild(c);
       return { t:h, b:b };
     };
     addCard.root = w; return addCard;
@@ -8856,8 +8876,8 @@ MStore.ready.then(function(){
     var d = current && current.council;
     if(!d){ UI.alert('No council yet', 'Ask the council a question first. The latest result is kept here.'); return; }
     var add = councilView(d.q);
-    if(d.summary) add('Where they agree and differ', d.summary);
-    d.answers.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t); });
+    if(d.summary) add('Where they agree and differ', d.summary, false, true);
+    d.answers.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t, !!r.t); });
     councilActions(add, d);
   }
   async function askCouncil(){
@@ -8868,7 +8888,7 @@ MStore.ready.then(function(){
     var q = comp.value.trim() || await UI.prompt('Ask the council', { multi:true, maxLength:2000, confirmText:'Ask' });
     if(!q) return;
     var add = councilView(q), st = add('Asking ' + models.length + ' models', 'This takes a few seconds.', true);
-    var sys = 'You are one member of a council of AIs advising on a project called "' + (current ? current.name : 'untitled') + '"' + (current && current.desc ? ' (' + current.desc + ')' : '') + '. Give your recommendation first, then the main reasons, in under 150 words, in plain language.';
+    var sys = 'You are one member of a council of AIs advising on a project called "' + (current ? current.name : 'untitled') + '"' + (current && current.desc ? ' (' + current.desc + ')' : '') + '. Give your recommendation first, then the main reasons, in under 150 words, in plain language, using simple markdown. Facts about the Lab where this project lives, and the only features you may rely on: a phone workspace where an AI plans and builds small web projects; a chat whose AI edits code in one HTML page and in project files, with ES modules across files; a preview that runs browser HTML, CSS and JavaScript only (there is no built-in physics engine, 3D engine, node editor or analytics); tasks; a journal and ledger for hypotheses and results; documents; reference files; a Test my app tool; a terminal that runs node, npm, python and pip through Termux; and an optional Blender connector. If an idea needs anything else, say it would have to be written as code.';
     async function ask(model, system, text, cap){
       var body = { systemInstruction:{ parts:[{ text:system }] }, contents:[{ role:'user', parts:[{ text:text }] }], generationConfig:{ maxOutputTokens:cap } };
       for(var i = 0; i < 2; i++){
@@ -8888,10 +8908,10 @@ MStore.ready.then(function(){
       try{
         var cmp = await ask(models[0], 'You compare answers from several AIs. Reply in plain language with three short parts headed Agree, Disagree and Best next step. Name the models when they differ. Under 160 words.',
           'Question:\n' + q + '\n\n' + ok.map(function(r){ return '[' + r.m + ']\n' + r.t; }).join('\n\n'), 1200);
-        st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; sumText = cmp.text.trim(); st.b.textContent = sumText || 'No comparison came back.';
+        st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; sumText = cmp.text.trim(); st.b.textContent = ''; st.b.style.whiteSpace = 'normal'; fillRich(st.b, sumText || 'No comparison came back.', null);
       }catch(err){ st.t.textContent = 'Comparison failed'; st.b.textContent = (err && err.message) || 'Could not compare. Read the answers below.'; }
     }else{ st.t.textContent = 'Not enough answers to compare'; st.b.textContent = ok.length ? 'Only one model answered.' : 'No model answered. Check the model names and your provider key.'; }
-    res.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t); });
+    res.forEach(function(r){ add(r.m, r.t || ('Failed: ' + r.err), !r.t, !!r.t); });
     var data = { q:q, ts:Date.now(), summary:sumText, answers:res.map(function(r){ return { m:r.m, t:r.t || '', err:r.err || '' }; }) };
     if(current){ current.council = data; save(); }
     councilActions(add, data);
