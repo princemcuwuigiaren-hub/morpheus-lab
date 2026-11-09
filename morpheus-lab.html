@@ -629,7 +629,7 @@ svg{display:block;pointer-events:none}
 .ui-rows .k{font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:10px}
 .ui-rows .v{font-size:14.5px;line-height:1.45;white-space:pre-wrap;word-break:break-word}
 .tic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.ttx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ttx{flex:1;min-width:0;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow-wrap:anywhere}
 .spill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:12px;flex:none;background:var(--chip);color:var(--muted)}
 .spill.ok{color:var(--ok)}
 .spill.warn{color:var(--warn)}
@@ -857,10 +857,10 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .rlist{display:flex;flex-direction:column;gap:8px}
 .rrow{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding-right:2px;transition:background .15s}
 .rrow:active{background:var(--press)}
-.rrow .rmain{flex:1;min-width:0;display:flex;align-items:center;gap:14px;height:62px;padding:0 14px;text-align:left;color:var(--text)}
+.rrow .rmain{flex:1;min-width:0;display:flex;align-items:center;gap:14px;min-height:62px;padding:10px 14px;text-align:left;color:var(--text)}
 .rrow .rmain>svg{width:22px;height:22px;flex:none;stroke:var(--icon);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .rrow .rtx{min-width:0;display:flex;flex-direction:column;gap:2px}
-.rrow .rtx b{font-weight:500;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rrow .rtx b{font-weight:500;font-size:17px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow-wrap:anywhere;line-height:1.25}
 .rrow .rtx i{font-style:normal;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rall{align-self:center;padding:8px 14px;font-size:14px;color:var(--muted)}
 .rowgroup{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
@@ -5517,18 +5517,18 @@ MStore.ready.then(function(){
     top.appendChild(b); card.appendChild(el('div', 'tool-info', text));
   }
   /* a bottom sheet for long content, so steps and output open over the chat instead of stretching it */
-  var sheetClose = null;
+  var sheetClose = null, sheetTitle = null, stepsLive = null;
   function bottomSheet(title, fill, onClose){
     if(sheetClose) sheetClose();
     var bd = el('div'), sh = el('div'), top = el('div'), body = el('div'), x = closeX();
     bd.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.5);display:flex;align-items:flex-end';
     sh.style.cssText = 'width:100%;max-height:80vh;display:flex;flex-direction:column;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:0;padding:14px 14px calc(14px + env(safe-area-inset-bottom,0px))';
     top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px';
-    var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;font-weight:600';
+    var tt = el('div', 'tool-name', title); tt.style.cssText = 'min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;font-weight:600'; sheetTitle = tt;
     body.style.cssText = 'overflow:auto;display:flex;flex-direction:column;gap:6px';
     top.appendChild(tt); top.appendChild(x);
     fill(body);
-    function close(){ if(onClose) onClose(); bd.remove(); sheetClose = null; }
+    function close(){ if(onClose) onClose(); bd.remove(); sheetClose = null; sheetTitle = null; }
     x.addEventListener('click', close);
     bd.addEventListener('click', function(e){ if(e.target === bd) close(); });
     sh.appendChild(top); sh.appendChild(body); bd.appendChild(sh); document.body.appendChild(bd);
@@ -5541,8 +5541,8 @@ MStore.ready.then(function(){
       if(ic){ var c = el('span', 'tic'); c.innerHTML = ic.innerHTML; ics.appendChild(c); }
     });
     if(run.length > 4) ics.appendChild(el('span', 'tgmore', '+' + (run.length - 4)));
-    run.forEach(function(r){ var d = r.node.querySelector('.dot'); if(d) String(d.className).split(/\s+/).forEach(function(k){ kinds[k] = 1; }); });
-    var kind = kinds.busy ? 'busy' : kinds.bad ? 'bad' : kinds.warn ? 'warn' : 'ok';
+    var ld = run[run.length - 1].node.querySelector('.dot'), kc = ld ? String(ld.className) : '';
+    var kind = /\bbusy\b/.test(kc) ? 'busy' : (/\bbad\b/.test(kc) ? 'bad' : (/\bwarn\b/.test(kc) ? 'warn' : 'ok'));
     var lb = run[0].node.querySelector('.ttx');
     var chev = el('span', 'tgchev'); chev.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>';
     head.appendChild(ics);
@@ -5551,8 +5551,18 @@ MStore.ready.then(function(){
     head.appendChild(chev);
     var gb = el('div', 'tgbody');
     run.forEach(function(r){ gb.appendChild(r.node); });
+    if(stepsLive && stepsLive.first === first) stepsLive.fill(run, gb);
     head.addEventListener('click', function(){
-      bottomSheet(run.length + ' steps', function(b){ run.forEach(function(r){ b.appendChild(r.node); }); }, function(){ run.forEach(function(r){ gb.appendChild(r.node); }); });
+      bottomSheet(run.length + ' steps', function(b){
+        run.forEach(function(r){ b.appendChild(r.node); });
+        stepsLive = { first:first, cur:{ run:run, gb:gb }, fill:function(nr, ngb){
+          var near = b.scrollHeight - b.scrollTop - b.clientHeight < 80;
+          b.innerHTML = ''; nr.forEach(function(r){ b.appendChild(r.node); });
+          stepsLive.cur = { run:nr, gb:ngb };
+          if(sheetTitle) sheetTitle.textContent = nr.length + ' steps';
+          if(near) b.scrollTop = b.scrollHeight;
+        } };
+      }, function(){ var c = stepsLive && stepsLive.cur; if(c) c.run.forEach(function(r){ c.gb.appendChild(r.node); }); stepsLive = null; });
     });
     wrap.appendChild(head); wrap.appendChild(gb);
     return wrap;
@@ -5737,7 +5747,12 @@ MStore.ready.then(function(){
      Allow runs it, Ask shows an approval card first, Deny hides it.
      ===================================================================== */
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  function short(t, n){ t = String(t == null ? '' : t); return t.length > n ? t.slice(0, n) + '\u2026' : t; }
+  function short(t, n){
+    t = String(t == null ? '' : t);
+    if(t.length <= n) return t;
+    var cut = t.slice(0, n), sp = cut.lastIndexOf(' ');
+    return (sp > n * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:(\[-]+$/, '') + '\u2026';
+  }
   function mkBtn(cls, label, icon, fn){
     var b = el('button', 'btn ' + cls + ' sm');
     b.innerHTML = (icon || '') + '<span>' + esc(label) + '</span>';
@@ -8854,18 +8869,25 @@ MStore.ready.then(function(){
     if(!q) return;
     var add = councilView(q), st = add('Asking ' + models.length + ' models', 'This takes a few seconds.', true);
     var sys = 'You are one member of a council of AIs advising on a project called "' + (current ? current.name : 'untitled') + '"' + (current && current.desc ? ' (' + current.desc + ')' : '') + '. Give your recommendation first, then the main reasons, in under 150 words, in plain language.';
-    function ask(model, system, text, cap){
-      return extCall({ systemInstruction:{ parts:[{ text:system }] }, contents:[{ role:'user', parts:[{ text:text }] }], generationConfig:{ maxOutputTokens:cap } }, { ms:90000, model:model });
+    async function ask(model, system, text, cap){
+      var body = { systemInstruction:{ parts:[{ text:system }] }, contents:[{ role:'user', parts:[{ text:text }] }], generationConfig:{ maxOutputTokens:cap } };
+      for(var i = 0; i < 2; i++){
+        try{
+          var r = await extCall(body, { ms:90000, model:model });
+          if(r.text && r.text.trim()) return r;
+          if(i === 1) throw new Error(r.thought ? 'It only produced hidden thinking.' : 'It sent no text back.');
+        }catch(err){ if(i === 1) throw err; await new Promise(function(res){ setTimeout(res, 2500); }); }
+      }
     }
     var res = await Promise.all(models.map(function(m){
-      return ask(m, sys, q, 600).then(function(r){ return { m:m, t:r.text.trim() }; }, function(err){ return { m:m, err:(err && err.message) || 'Failed' }; });
+      return ask(m, sys, q, 1500).then(function(r){ return { m:m, t:r.text.trim() }; }, function(err){ return { m:m, err:(err && err.message) || 'Failed' }; });
     }));
     var ok = res.filter(function(r){ return r.t; }), sumText = '';
     if(ok.length >= 2){
       st.t.textContent = 'Comparing the answers'; 
       try{
         var cmp = await ask(models[0], 'You compare answers from several AIs. Reply in plain language with three short parts headed Agree, Disagree and Best next step. Name the models when they differ. Under 160 words.',
-          'Question:\n' + q + '\n\n' + ok.map(function(r){ return '[' + r.m + ']\n' + r.t; }).join('\n\n'), 500);
+          'Question:\n' + q + '\n\n' + ok.map(function(r){ return '[' + r.m + ']\n' + r.t; }).join('\n\n'), 1200);
         st.t.textContent = 'Where they agree and differ'; st.b.style.color = 'var(--text)'; sumText = cmp.text.trim(); st.b.textContent = sumText || 'No comparison came back.';
       }catch(err){ st.t.textContent = 'Comparison failed'; st.b.textContent = (err && err.message) || 'Could not compare. Read the answers below.'; }
     }else{ st.t.textContent = 'Not enough answers to compare'; st.b.textContent = ok.length ? 'Only one model answered.' : 'No model answered. Check the model names and your provider key.'; }
