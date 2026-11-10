@@ -6126,13 +6126,13 @@ MStore.ready.then(function(){
   }
   /* Tavily: a search service built for AI tools. The key stays in this browser and goes only to Tavily. */
   function tavilyFail(msg){ var e = new Error(msg); e.tavily = true; return e; }
-  async function tavilySearch(q){
+  async function tavilySearch(q, deep){
     var ctl = new AbortController(), timer = setTimeout(function(){ ctl.abort(); }, 25000), r;
     try{
       try{
         r = await fetch('https://api.tavily.com/search', {
           method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + G.tavily }, signal:ctl.signal,
-          body:JSON.stringify({ query:q, search_depth:'basic', max_results:5, include_answer:true })
+          body:JSON.stringify({ query:q, search_depth:deep ? 'advanced' : 'basic', max_results:deep ? 6 : 5, include_answer:true })
         });
       }catch(e){
         throw tavilyFail(e && e.name === 'AbortError' ? 'Tavily did not answer within 25 seconds.' : 'The browser could not reach Tavily. Check the connection. If it is fine, the browser is blocking the request (CORS) and a small proxy is needed.');
@@ -6146,7 +6146,7 @@ MStore.ready.then(function(){
       }
       var res = (j && Array.isArray(j.results)) ? j.results : [], parts = [];
       if(j && j.answer) parts.push(String(j.answer));
-      res.slice(0, 5).forEach(function(x){ if(x && x.content) parts.push((x.title || x.url || 'Result') + ': ' + short(String(x.content), 600)); });
+      res.slice(0, deep ? 6 : 5).forEach(function(x){ if(x && x.content) parts.push((x.title || x.url || 'Result') + ': ' + short(String(x.content), 600)); });
       if(!parts.length) throw tavilyFail('Tavily returned nothing for that search.');
       return { text:short(parts.join('\n\n'), 6000), sources:res.filter(function(x){ return x && x.url; }).map(function(x){ return { title:String(x.title || x.url), url:String(x.url) }; }), model:'Tavily' };
     }finally{ clearTimeout(timer); }
@@ -6176,12 +6176,14 @@ MStore.ready.then(function(){
       var q = String(a.query || '').slice(0, 300), whys = [], why = '', r;
       var instr = 'Use this to answer, and name the source for each fact.';
       /* 1. Tavily when a key is saved, 2. Google Search through the Gemini key, 3. Wikipedia */
+      /* while a dissection is testing its claims, search deeper: 2 Tavily credits instead of 1 */
+      var dzNow = dzActive(p), deep = !!(dzNow && dzNow.stripOk);
       if(G.tavily){
         try{
-          r = await tavilySearch(q);
-          seg.data = { q:short(a.query || '', 120), sources:r.sources, provider:'Tavily' };
+          r = await tavilySearch(q, deep);
+          seg.data = { q:short(a.query || '', 120), sources:r.sources, provider:deep ? 'Tavily deep' : 'Tavily' };
           return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
-            result:{ answer:r.text, sources:r.sources, provider:'Tavily', instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
+            result:{ answer:r.text, sources:r.sources, provider:deep ? 'Tavily deep' : 'Tavily', instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
         }catch(e){
           if(e && e.aborted) throw e;
           whys.push(String((e && e.message) || errText(e)));
