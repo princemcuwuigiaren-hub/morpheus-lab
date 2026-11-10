@@ -1003,6 +1003,20 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qbadge{border:1px solid var(--b2,var(--m2));color:var(--b1,var(--m1))}
 .nowrapbtns{flex-wrap:wrap}
 .nowrapbtns>button{white-space:nowrap}
+/* idea dissection card */
+.dz-strip{display:flex;gap:4px;margin-bottom:10px}
+.dz-seg{flex:1;min-width:0}
+.dz-bar{display:block;height:4px;border-radius:2px;background:var(--line)}
+.dz-seg.on .dz-bar{background:var(--ok)}
+.dz-nm{display:block;font-size:10px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dz-seg.on .dz-nm{color:var(--text)}
+.dz-row{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line-soft);font-size:13px;line-height:1.45}
+.dz-rows .dz-row:first-child{border-top:0;padding-top:0}
+.dz-k{flex:none;width:84px;color:var(--muted)}
+.dz-v{flex:1;min-width:0;color:var(--text);overflow-wrap:anywhere}
+.dz-v.hard{color:var(--bad)}
+.dz-v.eng{color:var(--warn)}
+.dz-v.okc{color:var(--ok)}
 </style>
 </head>
 <body>
@@ -2686,7 +2700,11 @@ MStore.ready.then(function(){
     {id:'save_finding', group:'Journal', name:'Save finding', perm:'allow',
      desc:'Research mode only. Records a finding with its source and how sure the AI is.'},
     {id:'log_decision', group:'Journal', name:'Log decision', perm:'allow',
-     desc:'Design mode only. Records what was chosen, why, and what was rejected.'}
+     desc:'Design mode only. Records what was chosen, why, and what was rejected.'},
+    {id:'dissect_idea', group:'Discovery', name:'Dissect idea', perm:'allow',
+     desc:'Turns a fictional idea into its closest real-world version in fixed stages: strip into claims, anchor in real science, check blockers, resolve, output. You approve the claims and the final result, and the lab refuses any stage out of order.'},
+    {id:'read_attachment', group:'References', name:'Read attachment', perm:'allow',
+     desc:'Lets the AI read the rest of a long file or pasted text you attached. The chat only sends the first 40,000 characters, so this reads the whole file in pieces.'}
   ];
   var PERMS = [['allow','Allow'],['ask','Ask'],['deny','Deny']];
 
@@ -2701,14 +2719,14 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['read_attachment', 'web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
   /* while a group is in focus or a task is active, the status tools stay loaded whatever mode Auto picks, so work is never left half-recorded */
   var TASK_KEEP = ['start_task', 'update_task', 'block_task', 'fail_task', 'complete_task'];
   function taskKeep(p, id){ return TASK_KEEP.indexOf(id) >= 0 && !!(p && (focusGroup(p) || activeTask(p))); }
   /* each of these exists in exactly one mode; the shared toolset is untouched */
   var MODE_ONLY = { capture_idea:'discovery', park_question:'discovery', save_finding:'research', log_decision:'design' };
   var MODE_SETS = {
-    discovery:M_READ.concat(['capture_idea', 'park_question', 'log_hypothesis']),
+    discovery:M_READ.concat(['capture_idea', 'park_question', 'log_hypothesis', 'dissect_idea']),
     research:M_READ.concat(['analyze_code', 'dataset_add', 'write_doc', 'save_finding', 'log_hypothesis']),
     design:M_READ.concat(['analyze_code', 'propose_direction', 'add_task', 'update_task', 'start_task', 'focus_group', 'block_task', 'fail_task', 'complete_task', 'write_doc', 'log_decision', 'log_hypothesis', 'plan_experiment']),
     test:M_READ.concat(['analyze_code', 'run_sandbox', 'update_task', 'start_task', 'focus_group', 'block_task', 'fail_task', 'complete_task', 'plan_experiment', 'log_result']),
@@ -2721,6 +2739,7 @@ MStore.ready.then(function(){
   var AUTO_PLAN2 = /\b(?:design|sketch|structure|wireframe|flow ?chart)\b/i;
   var AUTO_RESEARCH = /\b(?:research|investigate|gather|collect|look (?:it |this |that )?up|search for|find (?:out|sources?|papers?|data|info(?:rmation)?)|sources?|compare|survey)\b/i;
   var AUTO_IDEAS = /\b(?:brainstorm|ideas?|what if|theor(?:y|ies)|explore|imagine|hypothes[ie]s|possibilit(?:y|ies)|concepts?|speculate|think (?:about|through))\b/i;
+  var AUTO_DISSECT = /\b(?:dissect\w*|real[- ]world (?:version|equivalent|analogue|analog|basis)|turn (?:it|this|that) into (?:something )?real|fictional (?:idea|power|technology|tech|system|creature|mechanic))\b/i;
   function typeBase(p){ return TYPE_MODE[typeOf(p)] || 'build'; }
   function classifyAuto(p, t){
     t = String(t || '').trim();
@@ -2728,6 +2747,7 @@ MStore.ready.then(function(){
     var ty = typeOf(p), codeish = ty === 'app' || ty === 'module';
     var codeWord = /\b(?:code|script|function|program|app|page|html|javascript|module|class|button|screen|css|python|pytest|tests?|npm|node|sqlite|schema|bot)\b|\.py\b/i.test(t);
     var tx = false; try{ tx = intgUp('termux'); }catch(e){}
+    if(AUTO_DISSECT.test(t) || (dzActive(p) && !codeWord)) return 'discovery';
     if(AUTO_BUILD.test(t) && (codeish || codeWord)) return 'build';
     if((codeish || tx || codeWord) && /\b(?:re-?run|execute|run (?:it|them|that|this|the|my|a)\b|run\b.*\b(?:tests?|script|file|command)s?)\b/i.test(t)) return 'test';
     if((codeish || tx || codeWord) && AUTO_TEST.test(t)) return 'test';
@@ -2790,7 +2810,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['read_attachment', 'dissect_idea', 'capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -6121,7 +6141,7 @@ MStore.ready.then(function(){
       }
       try{
         var w = await wikiSearch(q);
-        seg.data = { q:short(a.query || '', 120), sources:w.sources, via:'Wikipedia' };
+        seg.data = { q:short(a.query || '', 120), sources:w.sources, via:'Wikipedia', why:why };
         return { ok:true, res:'Searched \u00b7 Wikipedia only \u00b7 ' + w.sources.length + ' source' + (w.sources.length === 1 ? '' : 's'),
           result:{ answer:w.text, sources:w.sources, note:'Google Search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
       }catch(e2){
@@ -6132,6 +6152,7 @@ MStore.ready.then(function(){
     card:function(m, seg){
       var d = seg.data || {}, srcs = d.sources || [];
       var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's'), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
+      if(d.via && d.why) c.body.appendChild(el('div', 'txt dim', 'Google Search did not work: ' + d.why));
       srcs.forEach(function(x){
         var a = el('a', 'hint', short(x.title, 60)); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block'; a.style.textDecoration = 'underline';
         c.body.appendChild(a);
@@ -6655,6 +6676,283 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){ return slim('note', seg.res || 'Logged a result', 'ok'); }
   });
+  /* ---- idea dissection: a staged pipeline with stored state ----
+     One tool, dissect_idea, with an action per stage. The state lives on the project (p.dz), every claim keeps its id
+     from Strip to Output, a stage cannot run before the one it depends on, and the lab refuses to finish while any
+     claim has no anchor result, no blocker check or no verdict. The person approves after Strip and before Output. */
+  var DZ_ACTIONS = ['start', 'strip', 'anchor', 'blockers', 'resolve', 'finish', 'status', 'drop'];
+  var DZ_STAGES = ['Intake', 'Strip', 'Anchor', 'Blockers', 'Resolve', 'Output'];
+  var DZ_AREAS = ['energy', 'information', 'biology_materials', 'scale_time', 'control'];
+  var DZ_AREA_NAME = { energy:'Energy', information:'Information', biology_materials:'Biology and materials', scale_time:'Scale and time', control:'Control and safety' };
+  var DZ_KINDS = ['hard_limit', 'engineering', 'none'];
+  var DZ_KIND_NAME = { hard_limit:'Hard limit', engineering:'Engineering problem', none:'No blocker' };
+  var DZ_VERDICTS = ['exists_now', 'possible_later', 'stays_fiction'];
+  var DZ_VERDICT_NAME = { exists_now:'Exists now', possible_later:'Possible later', stays_fiction:'Stays fiction' };
+  var DZ_OWN_SRC = /^(?:own|my own|general|common) knowledge\b|^(?:training data|memory|inferred|inference|none|unknown|n\/a|na|model knowledge)\b/i;
+  function dzList(p){ if(!Array.isArray(p.dz)) p.dz = []; return p.dz; }
+  function dzActive(p){
+    var l = dzList(p);
+    for(var i = l.length - 1; i >= 0; i--){ if(!l[i].done && !l[i].dropped) return l[i]; }
+    return null;
+  }
+  function dzTxt(v){ return String(v == null ? '' : v).trim(); }
+  function dzArr(v){ return Array.isArray(v) ? v : (v == null || v === '' ? [] : [v]); }
+  function dzClaim(d, id){
+    id = dzTxt(id).toUpperCase();
+    return d.claims.filter(function(c){ return c.id === id; })[0] || null;
+  }
+  function dzIds(list){ return list.map(function(c){ return c.id; }).join(', '); }
+  function dzProg(d){
+    var cs = d.claims, all = function(f){ return cs.length > 0 && cs.every(f); };
+    return [true, !!d.stripOk, !!d.stripOk && all(function(c){ return c.anchored; }), !!d.stripOk && all(function(c){ return c.checked; }), !!d.stripOk && all(function(c){ return !!c.verdict; }), !!d.done];
+  }
+  function dzStageIx(d){
+    var pr = dzProg(d), i = 0;
+    while(i < pr.length && pr[i]) i++;
+    return Math.min(i, DZ_STAGES.length - 1);
+  }
+  function dzNext(d){
+    if(d.done) return 'The dissection is finished.';
+    if(!d.stripOk) return 'Next: submit the claims with action strip. The person has to approve them.';
+    var a = d.claims.filter(function(c){ return !c.anchored; });
+    if(a.length) return 'Next: anchor ' + dzIds(a) + ' with action anchor, after a web_search for each.';
+    var b = d.claims.filter(function(c){ return !c.checked; });
+    if(b.length) return 'Next: check blockers for ' + dzIds(b) + ' with action blockers, covering all five areas.';
+    var r = d.claims.filter(function(c){ return !c.verdict; });
+    if(r.length) return 'Next: give a verdict for ' + dzIds(r) + ' with action resolve.';
+    return 'Next: every claim has a verdict. Call action finish with the closest real version, assembled from the claims that survive.';
+  }
+  /* a claim's anchors count as checked only when a web search ran after the last anchor (or after the start) */
+  function dzSearchCount(p){
+    var ch = null; try{ ch = chatOf(p); }catch(e){}
+    var n = 0;
+    if(ch) ch.msgs.forEach(function(m){ (m.segs || []).forEach(function(sg){ if(sg.k === 'tool' && sg.name === 'web_search' && sg.st === 'ok') n++; }); });
+    return n;
+  }
+  function dzAnchors(v){
+    return dzArr(v).map(function(x){
+      if(x && typeof x === 'object') return { what:dzTxt(x.what), source:dzTxt(x.source), url:dzTxt(x.url) };
+      return { what:dzTxt(x), source:'', url:'' };
+    }).filter(function(x){ return x.what || x.source; });
+  }
+  function dzChecks(v){
+    return dzArr(v).map(function(x){
+      x = x && typeof x === 'object' ? x : {};
+      return { area:dzTxt(x.area).toLowerCase().replace(/[^a-z_]+/g, '_'), finding:dzTxt(x.finding), kind:dzTxt(x.kind).toLowerCase().replace(/[^a-z_]+/g, '_'), scale:dzTxt(x.scale) };
+    });
+  }
+  function dzCheck(p, a){
+    var ac = dzTxt(a.action).toLowerCase(), d = dzActive(p), i;
+    if(DZ_ACTIONS.indexOf(ac) < 0) return 'action must be one of: ' + DZ_ACTIONS.join(', ') + '.';
+    if(ac === 'start'){
+      if(dzTxt(a.idea).length < 15) return 'Give the idea in the person\u2019s own words, at least a full sentence.';
+      if(d) return 'A dissection is already in progress (stage ' + DZ_STAGES[dzStageIx(d)] + ': ' + short(d.idea, 50) + '). Carry on with it, or use action drop if the person wants to discard it. ' + dzNext(d);
+      return '';
+    }
+    if(!d) return 'No dissection is in progress. Start one with action start.';
+    if(ac === 'status' || ac === 'drop') return '';
+    if(ac === 'strip'){
+      var cl = dzArr(a.claims).map(dzTxt).filter(Boolean);
+      if(cl.length < 1 || cl.length > 12) return 'Give between 1 and 12 claims. Each claim is one thing the idea does, needs or costs, written as a full sentence.';
+      for(i = 0; i < cl.length; i++){ if(cl[i].length < 12) return 'Claim ' + (i + 1) + ' is too short to test. Write it as a full sentence.'; }
+      return '';
+    }
+    if(!d.stripOk) return 'The claims are not approved yet. Submit them with action strip and wait for the person\u2019s approval.';
+    if(ac === 'finish'){
+      var open = d.claims.filter(function(c){ return !c.verdict; });
+      if(open.length) return 'Cannot finish: ' + dzIds(open) + ' still ' + (open.length === 1 ? 'has' : 'have') + ' no verdict. ' + dzNext(d);
+      if(dzTxt(a.summary).length < 40) return 'Give the closest real version as a short paragraph (summary), assembled from the claims that survive.';
+      return '';
+    }
+    var c = dzClaim(d, a.claim);
+    if(!c) return 'Name the claim by its id. The claims are: ' + dzIds(d.claims) + '.';
+    if(ac === 'anchor'){
+      var an = dzAnchors(a.anchors), none = dzTxt(a.no_anchor);
+      if(!an.length && none.length < 15) return 'Give at least one real anchor (what and source), or set no_anchor with the reason none was found.';
+      for(i = 0; i < an.length; i++){
+        if(an[i].what.length < 10) return 'Anchor ' + (i + 1) + ' needs a description of the real science or engineering, at least a sentence.';
+        if(!an[i].source) return 'Every anchor needs a source: a paper, a standard, an organisation or a web address. If you have none, leave the anchor out and use no_anchor.';
+        if(DZ_OWN_SRC.test(an[i].source)) return 'A source cannot be your own knowledge. Run web_search and use what it returns, or use no_anchor.';
+      }
+      return '';
+    }
+    if(!c.anchored) return 'Anchor ' + c.id + ' first. ' + dzNext(d);
+    if(ac === 'blockers'){
+      var ck = dzChecks(a.checks), seen = {};
+      for(i = 0; i < ck.length; i++){
+        if(DZ_AREAS.indexOf(ck[i].area) < 0) return 'Check ' + (i + 1) + ' has an unknown area. The areas are: ' + DZ_AREAS.join(', ') + '.';
+        if(DZ_KINDS.indexOf(ck[i].kind) < 0) return 'Check ' + (i + 1) + ' needs kind to be hard_limit, engineering or none.';
+        if(ck[i].finding.length < 10) return 'Check ' + (i + 1) + ' needs a finding of at least a sentence, with the reason.';
+        seen[ck[i].area] = 1;
+      }
+      var miss = DZ_AREAS.filter(function(x){ return !seen[x]; });
+      if(miss.length) return 'Every claim is checked against all five areas. Missing: ' + miss.join(', ') + '.';
+      return '';
+    }
+    if(!c.checked) return 'Check the blockers for ' + c.id + ' first. ' + dzNext(d);
+    var vd = dzTxt(a.verdict).toLowerCase(), hard = c.checks.some(function(x){ return x.kind === 'hard_limit'; });
+    if(DZ_VERDICTS.indexOf(vd) < 0) return 'verdict must be exists_now, possible_later or stays_fiction.';
+    if(dzTxt(a.changes).length < 15) return 'Say in changes what had to be different from the fictional version (or what stays exactly as written).';
+    if(vd !== 'stays_fiction'){
+      if(dzTxt(a.real_version).length < 15) return 'Describe the real version of this claim in real_version.';
+      var cn = parseInt(a.confidence, 10);
+      if(!(cn >= 1 && cn <= 10)) return 'Give your confidence in this verdict as a whole number from 1 to 10.';
+    }
+    if(vd === 'exists_now' && !c.anchors.some(function(x){ return x.verified; })) return 'exists_now needs at least one anchor that was checked with a web search. Run web_search for ' + c.id + ' and anchor it again, or choose possible_later.';
+    if(vd === 'exists_now' && hard) return c.id + ' has a hard-limit blocker, so it cannot exist now as written. Choose possible_later if your real version avoids the limit, or stays_fiction.';
+    if(vd === 'possible_later' && dzTxt(a.prediction).length < 12) return 'possible_later needs a prediction: what would be observed if the real version works. It goes into the ledger.';
+    return '';
+  }
+  function dzProgText(d){
+    var pr = dzProg(d);
+    return DZ_STAGES.map(function(n, i){ return n + (pr[i] ? ' done' : ''); }).join(' / ');
+  }
+  function dzLab(a){
+    var ac = dzTxt(a.action).toLowerCase(), c = dzTxt(a.claim).toUpperCase();
+    return ({ start:'Start dissection', strip:'Strip into claims', anchor:'Anchor ' + (c || 'claim'), blockers:'Check blockers ' + (c || ''), resolve:'Resolve ' + (c || 'claim'), finish:'Finish dissection', status:'Check dissection progress', drop:'Drop dissection' })[ac] || 'Dissect idea';
+  }
+  function dzStrip(prog){
+    var w = el('div', 'dz-strip');
+    DZ_STAGES.forEach(function(n, i){
+      var s = el('div', 'dz-seg' + (prog[i] ? ' on' : ''));
+      s.appendChild(el('span', 'dz-bar')); s.appendChild(el('span', 'dz-nm', n));
+      w.appendChild(s);
+    });
+    return w;
+  }
+  function dzRows(rows){
+    var w = el('div', 'dz-rows');
+    (rows || []).forEach(function(r){
+      var row = el('div', 'dz-row');
+      row.appendChild(el('span', 'dz-k', r[0]));
+      row.appendChild(el('span', 'dz-v' + (r[2] ? ' ' + r[2] : ''), r[1]));
+      w.appendChild(row);
+    });
+    return w;
+  }
+  function dzDone(p, seg, d, rows, res, msg){
+    seg.snap = dzProg(d); seg.dzv = rows;
+    return { ok:true, res:res, result:{ ok:true, message:msg, progress:dzProgText(d), next:dzNext(d) } };
+  }
+  T('dissect_idea', {
+    icon:'note', follow:true, approveText:'Approve', denyText:'Needs changes',
+    label:function(a){ return dzLab(a); },
+    force:function(p, a){ var ac = dzTxt(a.action).toLowerCase(); return ac === 'strip' || ac === 'finish' || ac === 'drop'; },
+    pre:function(p, a){ return dzCheck(p, a); },
+    preview:function(seg){
+      var a = seg.args || {}, ac = dzTxt(a.action).toLowerCase(), w = el('div'), d = current ? dzActive(current) : null;
+      if(ac === 'strip'){
+        var rows = dzArr(a.claims).map(dzTxt).filter(Boolean).map(function(t, i){ return ['C' + (i + 1), t]; });
+        w.appendChild(el('div', 'txt', 'These are the claims every later stage will test. Approve them only if they say what the idea really does.'));
+        w.appendChild(dzRows(rows));
+        var dr = dzArr(a.dressing).map(dzTxt).filter(Boolean);
+        if(dr.length) w.appendChild(dzRows([['Dropped', dr.join('; ')]]));
+        if(d && d.stripOk && d.claims.length) w.appendChild(el('div', 'txt', 'This replaces the approved claims and clears every anchor, check and verdict so far.'));
+      }else if(ac === 'finish'){
+        w.appendChild(el('div', 'txt', 'Approving saves the result to the journal and logs each possible-later claim in the ledger.'));
+        w.appendChild(dzRows([['Real version', dzTxt(a.summary)]].concat(d ? d.claims.map(function(c){ return [c.id, (DZ_VERDICT_NAME[c.verdict] || 'No verdict') + ': ' + short(c.text, 90), c.verdict === 'stays_fiction' ? 'hard' : (c.verdict === 'exists_now' ? 'okc' : 'eng')]; }) : [])));
+      }else w.appendChild(el('div', 'txt', 'The idea, its claims and everything found so far will be discarded.'));
+      return w;
+    },
+    run:function(p, a, seg){
+      var ac = dzTxt(a.action).toLowerCase(), d = dzActive(p), c, rows;
+      if(ac === 'start'){
+        d = { id:uid(), ts:Date.now(), sb:dzSearchCount(p), idea:dzTxt(a.idea), origin:dzTxt(a.origin), claims:[], dressing:[], stripOk:false, done:false, dropped:false };
+        dzList(p).push(d); save();
+        return dzDone(p, seg, d, [['Idea', short(d.idea, 200)], ['Origin', d.origin || 'Not given']], 'Dissection started', 'Dissection started. Nothing is tested yet.');
+      }
+      if(ac === 'status'){
+        seg.snap = dzProg(d);
+        seg.dzv = d.claims.map(function(x){ return [x.id, short(x.text, 90) + (x.verdict ? ' (' + DZ_VERDICT_NAME[x.verdict] + ')' : '')]; });
+        return { ok:true, res:'Dissection progress', result:{ idea:d.idea, progress:dzProgText(d), approved:d.stripOk, claims:d.claims.map(function(x){ return { id:x.id, text:x.text, anchored:x.anchored, checked:x.checked, verdict:x.verdict || null }; }), next:dzNext(d) } };
+      }
+      if(ac === 'drop'){
+        d.dropped = true; save();
+        seg.snap = dzProg(d); seg.dzv = [['Idea', short(d.idea, 120)]];
+        return { ok:true, res:'Dissection dropped', result:{ ok:true, message:'Dropped. Start a new one with action start when the person gives an idea.' } };
+      }
+      if(ac === 'strip'){
+        d.claims = dzArr(a.claims).map(dzTxt).filter(Boolean).map(function(t, i){ return { id:'C' + (i + 1), text:t, anchors:[], anchored:false, noAnchor:'', checks:[], checked:false, verdict:'', real:'', changes:'', conf:0, prediction:'' }; });
+        d.dressing = dzArr(a.dressing).map(dzTxt).filter(Boolean);
+        d.stripOk = true; save();
+        rows = d.claims.map(function(x){ return [x.id, x.text]; });
+        if(d.dressing.length) rows.push(['Dropped', d.dressing.join('; ')]);
+        return dzDone(p, seg, d, rows, 'Claims approved \u00b7 ' + d.claims.length, 'The person approved ' + d.claims.length + ' claims: ' + dzIds(d.claims) + '. From here, work claim by claim.');
+      }
+      if(ac === 'finish'){
+        var made = 0, lines = [];
+        d.summary = dzTxt(a.summary); d.fiction = dzTxt(a.stays_fiction);
+        d.claims.forEach(function(x){
+          lines.push(x.id + ' ' + DZ_VERDICT_NAME[x.verdict] + ': ' + x.text + (x.real ? '\n  Real version: ' + x.real : '') + (x.changes ? '\n  Changed: ' + x.changes : ''));
+          if(x.verdict === 'possible_later'){
+            var r = jAdd(p, 'hypothesis', 'Real version of ' + x.id + ': ' + short(x.text, 80), 'Why: ' + x.real + '\n\nPrediction: ' + x.prediction, { conf:String(x.conf), status:'open' });
+            if(!r.err){ r.e.trail = [{ ts:Date.now(), conf:x.conf, v:'start' }]; made++; }
+          }
+        });
+        d.ledger = made;
+        jAdd(p, 'idea', 'Dissected: ' + short(d.idea, 90), 'Idea: ' + d.idea + '\n\nClosest real version: ' + d.summary + (d.fiction ? '\n\nStays fiction: ' + d.fiction : '') + '\n\nClaims:\n' + lines.join('\n'), {});
+        d.done = true; save();
+        rows = [['Real version', d.summary]].concat(d.claims.map(function(x){ return [x.id, DZ_VERDICT_NAME[x.verdict] + ': ' + short(x.text, 90), x.verdict === 'stays_fiction' ? 'hard' : (x.verdict === 'exists_now' ? 'okc' : 'eng')]; }));
+        if(d.fiction) rows.push(['Stays fiction', d.fiction]);
+        rows.push(['Ledger', made + ' hypothesis' + (made === 1 ? '' : 'es') + ' logged']);
+        return dzDone(p, seg, d, rows, 'Dissection finished', 'Saved to the journal. ' + made + ' hypothes' + (made === 1 ? 'is' : 'es') + ' logged in the ledger.');
+      }
+      c = dzClaim(d, a.claim);
+      if(ac === 'anchor'){
+        var nowS = dzSearchCount(p), searched = nowS > (d.sb || 0), an = dzAnchors(a.anchors);
+        d.sb = nowS;
+        c.anchors = an.map(function(x){ x.verified = searched; return x; });
+        c.noAnchor = an.length ? '' : dzTxt(a.no_anchor);
+        c.anchored = true; c.checked = false; c.checks = []; c.verdict = ''; c.real = ''; c.changes = ''; c.conf = 0; c.prediction = ''; save();
+        rows = an.length ? c.anchors.map(function(x){ return [x.verified ? 'Checked' : 'Unchecked', x.what + ' (' + x.source + ')', x.verified ? 'okc' : 'eng']; }) : [['No anchor', c.noAnchor, 'hard']];
+        return dzDone(p, seg, d, [[c.id, c.text]].concat(rows), 'Anchored ' + c.id, an.length ? (searched ? c.id + ' anchored with ' + an.length + ' source' + (an.length === 1 ? '' : 's') + '.' : c.id + ' anchored, but no web search has run in this dissection, so the anchors are marked unchecked. Run web_search for this claim and anchor it again to mark them checked. Each claim needs its own search.') : c.id + ' has no real anchor. That is recorded as it is.');
+      }
+      if(ac === 'blockers'){
+        c.checks = dzChecks(a.checks); c.checked = true; c.verdict = ''; c.real = ''; c.changes = ''; c.conf = 0; c.prediction = ''; save();
+        rows = c.checks.map(function(x){ return [DZ_AREA_NAME[x.area], DZ_KIND_NAME[x.kind] + ': ' + x.finding + (x.scale ? ' (' + x.scale + ')' : ''), x.kind === 'hard_limit' ? 'hard' : (x.kind === 'engineering' ? 'eng' : 'okc')]; });
+        var nh = c.checks.filter(function(x){ return x.kind === 'hard_limit'; }).length, ne = c.checks.filter(function(x){ return x.kind === 'engineering'; }).length;
+        return dzDone(p, seg, d, [[c.id, c.text]].concat(rows), 'Blockers checked ' + c.id, c.id + ' checked: ' + nh + ' hard limit' + (nh === 1 ? '' : 's') + ', ' + ne + ' engineering problem' + (ne === 1 ? '' : 's') + '.');
+      }
+      c.verdict = dzTxt(a.verdict).toLowerCase(); c.real = dzTxt(a.real_version); c.changes = dzTxt(a.changes); c.conf = parseInt(a.confidence, 10) || 0; c.prediction = dzTxt(a.prediction); save();
+      rows = [[c.id, c.text], ['Verdict', DZ_VERDICT_NAME[c.verdict] + (c.conf ? ' (confidence ' + c.conf + ' of 10)' : ''), c.verdict === 'stays_fiction' ? 'hard' : (c.verdict === 'exists_now' ? 'okc' : 'eng')]];
+      if(c.real) rows.push(['Real version', c.real]);
+      rows.push(['Changed', c.changes]);
+      return dzDone(p, seg, d, rows, 'Resolved ' + c.id + ' \u00b7 ' + DZ_VERDICT_NAME[c.verdict], c.id + ' resolved as ' + c.verdict + '.');
+    },
+    card:function(m, seg){
+      var ac = dzTxt((seg.args || {}).action).toLowerCase(), prog = seg.snap || [true, false, false, false, false, false];
+      var c = tcard('note', 'Idea dissection', dzLab(seg.args || {}), [ac === 'finish' ? 'Finished' : DZ_STAGES[Math.min((function(){ var i = 0; while(i < prog.length && prog[i]) i++; return i; })(), 5)], ac === 'finish' ? 'ok' : '']);
+      c.body.appendChild(dzStrip(prog));
+      if(seg.dzv && seg.dzv.length) c.body.appendChild(dzRows(seg.dzv));
+      return c.root;
+    }
+  });
+  /* the AI is sent the first 40,000 characters of an attached or pasted file; this lets it read the rest, in pieces */
+  T('read_attachment', {
+    icon:'code', read:true,
+    label:function(a){ return a.name ? 'Read ' + short(a.name, 40) : 'List attached files'; },
+    run:async function(p, a){
+      var ch = chatOf(p), all = [];
+      ch.msgs.forEach(function(m){ (m.files || []).forEach(function(f){ all.push(f); }); });
+      if(!all.length) return { ok:true, res:'No attached files', result:{ files:[], note:'No file or pasted text has been attached in this chat.' } };
+      var q = String(a.name || '').trim().toLowerCase();
+      var f = q ? (all.filter(function(x){ return String(x.name).toLowerCase() === q; }).pop() || all.filter(function(x){ return String(x.name).toLowerCase().indexOf(q) >= 0; }).pop()) : null;
+      if(!f) return { ok:true, res:'Listed ' + all.length + ' attached file' + (all.length === 1 ? '' : 's'), result:{ files:all.map(function(x){ return { name:x.name, lines:x.lines, characters:x.size, first_40000_characters_only_in_chat:!!x.truncated }; }), note:q ? 'No attached file matches that name. Pick one of these.' : 'Name one of these files to read it.' } };
+      var text = '', stored = false;
+      try{ var r = await LOCAL.get(f.id); if(r && r.blob){ text = await r.blob.text(); stored = true; } }catch(e){}
+      if(!stored) text = String(f.text || '');
+      var L = text.split('\n'), from = Math.max(1, parseInt(a.from_line, 10) || 1), to = from - 1, n = 0;
+      if(from > L.length) return terr('That file has only ' + L.length + ' lines.');
+      while(to < L.length && n + L[to].length + 1 <= 30000){ n += L[to].length + 1; to++; }
+      if(to < from){ to = from; }
+      var out = L.slice(from - 1, to).join('\n');
+      var res = { name:f.name, total_lines:L.length, from_line:from, to_line:to, text:out, more:to < L.length };
+      if(to < L.length) res.next_from_line = to + 1;
+      if(!stored && f.truncated) res.warning = 'The full file is no longer stored on this device, so only its first 40,000 characters exist here. Tell the person the rest could not be read.';
+      return { ok:true, res:'Read ' + short(f.name, 30) + ' lines ' + from + '\u2013' + to + ' of ' + L.length, result:res };
+    },
+    card:function(m, seg){ return slim('code', seg.res || 'Read an attached file'); }
+  });
   T('journal_list', {
     icon:'note', read:true,
     label:function(){ return 'Read the journal'; },
@@ -6904,6 +7202,25 @@ MStore.ready.then(function(){
     edit_lines:{ d:'Replace a range of lines of the page with new code. Get the line numbers from read_assembly first. Use code with no text to delete the lines.', p:{ name:STR('Plain-language name of what is changing'), from:S('INTEGER', 'First line to replace'), to:S('INTEGER', 'Last line to replace'), code:STR('The new code for those lines') }, req:['name', 'from', 'to', 'code'] },
     journal_save:{ d:'Propose a Discovery Journal entry. Only when the person wants something kept. A hypothesis is not a fact and an observation is not a conclusion, so choose the category carefully.', p:{ type:STR('One of: hypothesis, question, method, observation, result, insight, decision, assumption, idea'), title:STR('Short title'), text:STR('The entry'), task:STR('Optional related task number or title') }, req:['type', 'title', 'text'] },
     focus_group:{ d:'Switch the task group you are working on. The lab already moves to the next group by itself when one finishes; use this only to switch on purpose, for example when the person asks for a different group.', p:{ group:STR('Name of the group') }, req:['group'] },
+    read_attachment:{ d:'Read a file or pasted text the person attached in this chat. Without a name it lists them. The chat only contains the first 40,000 characters of a long one, so use this to read the rest in pieces: pass from_line, then next_from_line from the result.', p:{ name:STR('The attached file name, for example pasted-text-1.txt'), from_line:S('INTEGER', 'First line to read, default 1') } },
+    dissect_idea:{ d:'Dissect a fictional idea into its closest real-world version, in stages: start, strip, anchor, blockers, resolve, finish. The lab stores the state, refuses a stage that is out of order, and asks the person to approve the claims after strip and the result at finish. Read the next field in every result. status shows where things stand and drop discards it.', p:{
+      action:STR('start, strip, anchor, blockers, resolve, finish, status or drop'),
+      idea:STR('start: the idea in the person\u2019s own words'),
+      origin:STR('start: whose idea it is, for example their own fiction or a named series'),
+      claims:LIST('strip: the numbered claims as full sentences, each one thing the idea does, needs or costs. The lab numbers them C1, C2 and so on'),
+      dressing:LIST('strip: story elements you dropped because they do no mechanical work, such as names, lore and drama'),
+      claim:STR('anchor, blockers, resolve: the claim id, for example C1'),
+      anchors:{ type:'ARRAY', description:'anchor: real science or engineering that touches this claim', items:{ type:'OBJECT', properties:{ what:STR('What the real work shows'), source:STR('The paper, standard, organisation or page it came from, taken from a web search'), url:STR('Web address if there is one') }, required:['what', 'source'] } },
+      no_anchor:STR('anchor: use instead of anchors when nothing real touches this claim, and say what was searched'),
+      checks:{ type:'ARRAY', description:'blockers: exactly one check for each of the five areas', items:{ type:'OBJECT', properties:{ area:STR('energy, information, biology_materials, scale_time or control'), finding:STR('What stops or limits it here, with the reason'), kind:STR('hard_limit (physics or biology says no), engineering (solvable with effort) or none'), scale:STR('A rough size, such as an order of magnitude, if there is one') }, required:['area', 'finding', 'kind'] } },
+      verdict:STR('resolve: exists_now, possible_later or stays_fiction'),
+      real_version:STR('resolve: the real version of this claim, unless it stays fiction'),
+      changes:STR('resolve: what had to be different from the fictional version, or that nothing changed'),
+      confidence:S('INTEGER', 'resolve: how sure you are of the verdict, 1 to 10, unless it stays fiction'),
+      prediction:STR('resolve, possible_later only: what would be observed if the real version works'),
+      summary:STR('finish: the closest real version as a short paragraph, assembled from the claims that survive'),
+      stays_fiction:STR('finish: what stays fiction and why, in a sentence or two')
+    }, req:['action'] },
     log_hypothesis:{ d:'Log a hypothesis in the ledger: one testable claim, why it might be true, the prediction that would confirm it, and your confidence from 1 to 10. A hypothesis is a guess to test, not a fact.', p:{ claim:STR('The hypothesis as one testable claim'), why:STR('Why it might be true'), prediction:STR('What would be observed if it is true'), confidence:S('INTEGER', 'How sure you are, 1 to 10') }, req:['claim', 'prediction', 'confidence'] },
     plan_experiment:{ d:'Plan an experiment against a logged hypothesis: how it will be tested and what result would count as success. Use task to link the work that runs it.', p:{ hypothesis:STR('Title of the hypothesis it tests'), method:STR('How it will be tested'), success:STR('What result would support the hypothesis'), title:STR('Optional short name for the experiment'), task:STR('Optional related task number or title') }, req:['hypothesis', 'method', 'success'] },
     log_result:{ d:'Record the result of an experiment. It needs a verdict and real evidence (test output, numbers, a file or version), and it updates your confidence in the hypothesis. Without evidence it is refused.', p:{ experiment:STR('Title of the experiment (leave empty and name the hypothesis if none was planned)'), hypothesis:STR('Optional: title of the hypothesis'), outcome:STR('What happened, in plain words'), verdict:STR('supports, refutes or inconclusive'), evidence:STR('What shows it: test output, numbers, the file or version'), confidence:S('INTEGER', 'Updated confidence in the hypothesis, 1 to 10') }, req:['outcome', 'verdict', 'evidence', 'confidence'] },
@@ -8066,7 +8383,7 @@ MStore.ready.then(function(){
     if(!m.files || !m.files.length) return '';
     return m.files.map(function(f){
       if(!full) return '[The person attached ' + f.name + ' (' + (f.lines || '?') + ' lines) earlier in the chat.]';
-      return 'The person attached the file ' + f.name + ':\n```\n' + f.text + '\n```' + (f.truncated ? '\n[This file is longer. Only its first ' + f.text.length.toLocaleString('en-US') + ' characters were provided, so say so if the missing part matters.]' : '');
+      return 'The person attached the file ' + f.name + ':\n```\n' + f.text + '\n```' + (f.truncated ? '\n[This file is longer. Only its first ' + f.text.length.toLocaleString('en-US') + ' characters were provided, so say so if the missing part matters. The whole file (' + (f.lines || '?') + ' lines) is kept: call read_attachment with the name ' + f.name + ' and from_line to read the rest.]' : '');
     }).join('\n\n');
   }
   /* images: what the model really receives is decided here, so the chat never claims more than was sent */
@@ -8219,6 +8536,10 @@ MStore.ready.then(function(){
     if(p.explain === 'teach') return 'The person is learning. Use plain, friendly language. After the work, explain in a few short sentences why you chose that approach, define any technical word the first time you use it, and suggest one thing to try next. Never go through code line by line.';
     return 'The person is not a programmer. Use plain, friendly language, keep replies short, and never explain code line by line.';
   }
+  /* the honesty rule goes in every prompt, with or without tools */
+  function honestyText(offered){
+    return 'HONESTY ABOUT ACTIONS (this overrides everything else here): you have only done something if a step card in this conversation shows it as Done. If a tool call fails, is declined, is not loaded, is not allowed in this mode, or you cannot call tools in this reply (for example because a model was rate limited and you were switched to a plain reply), say so plainly in your own words: name what you could not do and say that it did not happen. Never write that you saved, ran, checked, changed, fixed, added or sent something unless a Done card shows it. Never invent a result, a source or a tool output. When it is true, \u201cI could not do that, because...\u201d is always the right answer.' + (offered && offered.length ? '' : ' No tools are loaded for this reply, so you cannot take any action in it.');
+  }
   function systemText(p, offered, ch, skip, ov, intent){
     var st = toolState(p), src = existingSrc(p), FENCE = '```';
     var has = function(id){ return offered.indexOf(id) >= 0; };
@@ -8231,6 +8552,7 @@ MStore.ready.then(function(){
     t += modeText(mo, ov) + '\n\n';
     t += capText(p, ov, gateOf(ch), intent) + '\n\n';
     if(typeText(p)) t += typeText(p) + '\n\n';
+    t += honestyText(offered) + '\n\n';
     t += 'HOW TO TALK: Read what the person wrote and answer it directly, in complete natural sentences, before anything else. Give the answer the question needs, as long or as short as that takes, and never reply in fragments. Questions, ideas and opinions get a conversation, not tools. After you use tools, always finish with a plain-words reply: what you did or found, and what they can do next. Never leave them with only cards.\n\n';
     if(intent === 'resume'){
       var ra = activeTask(p);
@@ -8259,6 +8581,7 @@ MStore.ready.then(function(){
         R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work through every task in the focus group, in order, and finish each before the next. Never skip a task, leave one half done, or start a task from another group or an ungrouped one unless the person asks. Starting a task is only an attempt. Do its work with tools, then check it against \u201cDone when\u201d: a task is complete only when the work was really performed and each criterion is met, and complete_task is refused if no work was recorded. If it was tried and did not pass, call fail_task with what went wrong. If it cannot continue, or the person declined a step it needs, call block_task with the reason, then say so plainly and either carry on with a task that does not wait on it or stop and ask. A group is finished only when every task in it is completed; when it is, report briefly and stop, and ask which group is next instead of starting one. Before you stop, save progress with update_task (checkpoint = what is done and the next step). A task never overrides what the person just asked.');
       }
       if(has('read_assembly')) R.push('How you work, every time. (1) Understand: if the request is unclear, ask one question with ask_user, otherwise carry on. If the person names a file or shows an error from one, work on exactly that file first. (2) Plan: for more than one small change, add tasks grouped by theme. The lab focuses the group for you and moves to the next one itself; switch on purpose with focus_group. (3) Look before you change: read the lines or file you will edit, and read a failing output from the first error down. (4) Change small: one change per step with the narrowest edit tool, never a rewrite for a small fix. (5) Check: run it after each change and read the result. (6) If a run fails, fix the first error only. Never repeat an edit you already made, and after two failed attempts at the same error stop and tell the person what you know. (7) Finish: complete the task with evidence, and use the ledger when you are testing an idea. (8) Reply briefly: the result, why anything failed, and one next step.');
+      if(has('dissect_idea')) R.push('Idea dissection: when the person brings a fictional idea (a power, technology, creature or system) and wants its real-world version, use dissect_idea and follow the stages in order. The lab stores the state and refuses a stage that is out of order. (1) action start with the idea in their words. (2) action strip: split it into numbered claims, each one thing it does, needs or costs, and list the story dressing you dropped (names, lore, drama). The person must approve the claims; if they decline, ask what is wrong and submit again. (3) For each claim run web_search, then action anchor with the real science or engineering that touches it and a source taken from the results; if nothing real exists, use no_anchor and say what was searched. Never use your own memory as a source. (4) For each claim, action blockers: check all five areas (energy, information, biology_materials, scale_time, control) and tag each one hard_limit (physics or biology says no), engineering (solvable with effort) or none, with a rough size where you can. (5) action resolve for each claim: exists_now, possible_later or stays_fiction, and what had to change; possible_later also needs a prediction and a confidence. (6) action finish with the closest real version assembled from the surviving claims; the person approves it. Do not skip a claim. Read the next field in every result. If a step is refused or fails, tell the person plainly and do not describe it as done.');
       if(has('log_hypothesis')) R.push('Ledger: when a claim can be tested, log it with log_hypothesis (claim, why, prediction, confidence 1 to 10). Plan how to test it with plan_experiment and link the task that does the work. When it has run, call log_result with the verdict and real evidence, never a hope: a hypothesis is only supported or refuted by a result you actually observed.');
       if(has('capture_idea')) R.push('Discovery: when an idea is worth keeping, call capture_idea; when a question cannot be settled yet, call park_question. Both save straight to the Discovery Journal, so use them for what the person would want to find again, not every thought. Keep exploring in words as well.');
       if(has('save_finding')) R.push('Research: when you establish something, call save_finding with the claim, its source and your confidence (high, medium or low). Use a source from web_search, a document or a file. Without a checkable source the confidence is low. Do not save guesses as findings.');
@@ -8373,7 +8696,7 @@ MStore.ready.then(function(){
     if(stopCtl) stopCtl.abort();
     Object.keys(waiters).forEach(function(k){ try{ waiters[k]('no'); }catch(e){} });
   }
-  var CLAIM = /\b(?:i(?:'ve| have)?\s+(?:just\s+|now\s+)?(?:read|checked|ran|run|tested|verified|looked at|inspected|updated|saved|created|wrote|fixed|changed|added|installed|sent)|(?:all )?(?:the )?(?:tests?|checks?) (?:have )?(?:passed|succeeded))\b/i;
+  var CLAIM = /\b(?:i(?:'ve| have)?\s+(?:just\s+|now\s+)?(?:read|checked|ran|run|tested|verified|looked at|inspected|updated|saved|created|wrote|fixed|changed|added|installed|sent|removed|deleted|applied|completed|finished|exported|generated|logged|recorded|searched)|(?:all )?(?:the )?(?:tests?|checks?) (?:have )?(?:passed|succeeded))\b/i;
   var ANNOUNCE = /\b(i will|i'll|i am (?:about|going) to|i'm (?:about|going) to|let me|let's|now i|i can now|going to|about to|next,? i)\b/i;
   /* a turn that stopped at the step limit leaves a checkpoint on the active task, so the next turn resumes from it */
   function pauseAtCheckpoint(p, m){
@@ -8426,6 +8749,21 @@ MStore.ready.then(function(){
       if(live){ var i = m.segs.indexOf(live); if(i >= 0) m.segs.splice(i, 1); live = null; draw(); }
     }
     /* the person always gets words: if the tools ran out of steps or the model stayed silent, ask it to say what happened */
+    var toolsDown = false;
+    var ADMITS = /\b(?:could(?: not|n['\u2019]t)|can(?:not|['\u2019]t)|did(?: not|n['\u2019]t)|was(?: not|n['\u2019]t) able|wasn['\u2019]t|unable|failed|fail(?:s|ing)?|not (?:done|saved|run|available|possible|allowed)|declined|rate.?limit|refused|did not work|didn['\u2019]t work)\b/i;
+    var SUCCESS = /\b(?:done|completed?|finished|all set|successfully|saved|created|updated|fixed|added|applied|works now|is ready|have been (?:saved|created|updated)|has been (?:saved|created|updated))\b/i;
+    /* steps that failed or were refused and were not later redone with the same tool */
+    function unresolved(){
+      var segs = m ? m.segs : [], out = [];
+      segs.forEach(function(sg, i){
+        if(sg.k !== 'tool' || sg.st === 'run' || sg.st === 'ask' || sg.st === 'ok' || sg.st === 'undone') return;
+        var later = segs.slice(i + 1).some(function(x){ return x.k === 'tool' && x.name === sg.name && x.st === 'ok'; });
+        if(!later) out.push((IMPL[sg.name] ? IMPL[sg.name].label(sg.args || {}) : sg.name) + (sg.st === 'denied' ? ' (declined or not allowed)' : (sg.res ? ' (' + short(sg.res, 90) + ')' : '')));
+      });
+      return out;
+    }
+    function lastTextOf(){ for(var i = m.segs.length - 1; i >= 0; i--){ if(m.segs[i].k === 't') return m.segs[i].t || ''; } return ''; }
+    function labNote(t){ m.segs.push({ k:'t', t:t }); m.t = textOfMsg(m); save(); draw(); }
     async function wrapUp(){
       var did = m.segs.filter(function(sg){ return sg.k === 'tool' && sg.st !== 'run' && sg.st !== 'ask'; }).map(function(sg){
         return (IMPL[sg.name] ? IMPL[sg.name].label(sg.args || {}) : sg.name) + ': ' + (sg.st === 'ok' ? (sg.res || 'done') : sg.st === 'denied' ? 'the person declined it' : 'did not work' + (sg.res ? ' (' + short(sg.res, 80) + ')' : ''));
@@ -8435,6 +8773,7 @@ MStore.ready.then(function(){
         return (IMPL[sg.name] ? IMPL[sg.name].label(sg.args || {}) : sg.name) + (sg.res ? ' (' + short(sg.res, 100) + ')' : '');
       });
       var note = '[Lab note, not from the person] The person already sees every step as a card, so do not list or retell the steps. In plain sentences: give the result in one or two sentences, say plainly if anything failed and why' + (bad.length ? ' (what failed: ' + bad.join('; ') + ')' : '') + ', then give the one next step you suggest. Do not call tools.';
+      note += ' Never say that a step which failed or was declined worked or happened.';
       var lastC = c2[c2.length - 1];
       if(lastC && lastC.role === 'user') lastC.parts[0].text += '\n\n' + note; else c2.push({ role:'user', parts:[{ text:note }] });
       var xe = { id:uid(), ts:Date.now(), inTok:approxTokens({ contents:c2 }), tools:0, calls:[] };
@@ -8452,7 +8791,12 @@ MStore.ready.then(function(){
         else{ var wi = m.segs.indexOf(live); if(wi >= 0) m.segs.splice(wi, 1); }
         live = null;
       }else if(t2) m.segs.push({ k:'t', t:t2 });
-      if(!t2) m.segs.push({ k:'t', t:bad.length ? 'The last step did not work: ' + short(bad[bad.length - 1], 140) + '. Tell me how you want to go on.' : 'Done. Tell me what you would like next.' });
+      if(!t2){
+        var why = xe.err ? String(xe.err).replace(/\.$/, '') : '';
+        m.segs.push({ k:'t', t: why
+          ? 'I could not finish my reply (' + why + '). ' + (bad.length ? 'These steps did not work: ' + bad.join('; ') + '. ' : '') + 'Only the steps shown above as Done actually ran.'
+          : (bad.length ? 'The last step did not work: ' + short(bad[bad.length - 1], 140) + '. Tell me how you want to go on.' : 'That is as far as I got this turn. Only the steps shown above as Done actually ran. Tell me what you would like next.') });
+      }
       m.t = textOfMsg(m); save(); draw();
     }
     draw();
@@ -8481,7 +8825,7 @@ MStore.ready.then(function(){
             if(e.aborted) throw e;
             /* a model that cannot use tools: fall back to plain replies with a code block */
             if(body.tools && e.status === 400 && /function|tool/i.test(e.message || '')){
-              useTools = false; delete body.tools; delete body.toolConfig; onReset();
+              useTools = false; toolsDown = true; delete body.tools; delete body.toolConfig; onReset();
               body.systemInstruction = { parts:[{ text:systemText(p, [], ch, m, ov, intent) }] };
               r = await generate(body, opts);
             }else throw e;
@@ -8510,6 +8854,15 @@ MStore.ready.then(function(){
         });
         m.t = textOfMsg(m); save(); draw();
         if(!segsNow.length){
+          var badNow = unresolved();
+          if(badNow.length && nudges < 2 && text && !ADMITS.test(text) && (CLAIM.test(text) || SUCCESS.test(text))){
+            nudges++;
+            for(var zi = m.segs.length - 1; zi >= 0; zi--){ if(m.segs[zi].k === 't'){ m.segs.splice(zi, 1); break; } }
+            m.t = textOfMsg(m); draw();
+            contents.push({ role:'model', parts:parts });
+            contents.push({ role:'user', parts:[{ text:'[Lab note, not from the person] These steps failed or did not happen: ' + badNow.join('; ') + '. Your last message did not say so, and it was removed. Tell the person plainly which steps did not happen and why, then give one next step. Do not say they worked.' }] });
+            continue;
+          }
           /* it said what it would do and then stopped: push it to actually do it */
           if(offered.length && intent !== 'talk' && (ov || opModeOf(p) === 'build') && nudges < 2 && text && !/\?\s*$/.test(text) && ANNOUNCE.test(text)){
             nudges++; force = true;
@@ -8572,6 +8925,9 @@ MStore.ready.then(function(){
       }
       if(capped || !lastRoundText.trim()) await wrapUp();
       if(capped) pauseAtCheckpoint(p, m);
+      var badEnd = unresolved(), endTx = lastTextOf();
+      if(badEnd.length && !ADMITS.test(endTx) && (CLAIM.test(endTx) || SUCCESS.test(endTx))) labNote('Lab note: these steps did not work, so they are not done: ' + badEnd.join('; ') + '.');
+      else if(toolsDown && CLAIM.test(endTx) && !ADMITS.test(endTx)) labNote('Lab note: this model could not use tools in this reply, so nothing was changed, saved or run.');
     }catch(e){
       if(e && e.aborted){
         /* Stop: keep what was written so far */
@@ -8584,7 +8940,13 @@ MStore.ready.then(function(){
         if(m && !m.segs.length) ch.msgs.splice(ch.msgs.indexOf(m), 1);
       }else{
         lastErr = { proj:p, chat:ch, text:errText(e) };
+        if(live){
+          var cl2 = cleanModelText(live.t);
+          if(cl2){ live.t = cl2; delete live.live; }
+          else{ var di2 = m.segs.indexOf(live); if(di2 >= 0) m.segs.splice(di2, 1); }
+        }
         if(m && !m.segs.length) ch.msgs.splice(ch.msgs.indexOf(m), 1);
+        else if(m) m.segs.push({ k:'t', t:'Lab note: this reply stopped early (' + errText(e).replace(/\.$/, '') + '). Only the steps shown above as Done actually ran.' });
       }
       if(m) m.t = textOfMsg(m);
       save();
@@ -8601,8 +8963,8 @@ MStore.ready.then(function(){
     if(busy && mode === 'inspect') return;
     var t = comp.value.trim();
     if(mode === 'inspect' && importBuf && !busy && current){
-      var ib = importBuf.text;
-      comp.value = ''; sizeComposer(); setMode(null); inspectCode(current, ib);
+      var ib = importBuf.text, ibf = importBuf.files;
+      comp.value = ''; sizeComposer(); setMode(null); inspectCode(current, ib, false, ibf);
       return;
     }
     if((!t && !attached.length && !imgs.length) || !current) return;
@@ -9103,8 +9465,8 @@ MStore.ready.then(function(){
     }
     if(!got.length){ UI.alert('Could not attach', 'Pick text or code files such as .html, .js, .py, .json, .csv or .md (up to 5 MB each).'); return; }
     if(mode === 'inspect'){
-      var mg = mergeFiles(got), text = mg.text.slice(0, 120000);
-      importBuf = { text:text, names:got.map(function(g){ return g.name; }).join(', '), lines:text.split('\n').length,
+      var mg = mergeFiles(got), text = mg.text;
+      importBuf = { text:text, files:got.map(function(g){ return { name:g.name, text:g.text }; }), names:got.map(function(g){ return g.name; }).join(', '), lines:text.split('\n').length,
         note:[mg.note, skipped ? 'skipped ' + skipped : ''].filter(Boolean).join(' · ') };
       comp.value = ''; sizeComposer(); paintMode(); syncSend();
       return;
@@ -11401,6 +11763,157 @@ MStore.ready.then(function(){
     save();
     return true;
   }
+  /* ---- where inspected code goes: the main page, a project file, or a new file ----
+     Each inspection carries a plan with one item per piece of code (name, target, mode). A named file that matches a
+     project file replaces that file; anything else defaults to the main page, as before. The person can change any
+     target before applying. Applying is checked first and then done in one go, and every step can be undone. */
+  var INSP_VIEW = 120000, INSP_KEEP = 1000000;
+  function inspAutoTarget(p, name, multi){
+    var path = normPath(name || '');
+    if(path){
+      var ex = findFile(p, path);
+      if(ex) return { target:ex.path, mode:'replace' };
+      if(isMainPath(p, path)) return { target:'::main', mode:'merge' };
+      var bn = path.split('/').pop().toLowerCase();
+      var hit = filesOf(p).filter(function(x){ return x.path.split('/').pop().toLowerCase() === bn; });
+      if(hit.length === 1) return { target:hit[0].path, mode:'replace' };
+      if(multi && filesOf(p).length) return { target:'::new', mode:'replace', newPath:path };
+    }
+    return { target:'::main', mode:'merge' };
+  }
+  function inspItems(p, code, files){
+    var out = [];
+    if(files && files.length && (files.length === 1 || filesOf(p).length)){
+      files.forEach(function(f){
+        var t = inspAutoTarget(p, f.name, files.length > 1);
+        out.push({ name:f.name, code:f.text, target:t.target, mode:t.mode, newPath:t.newPath || '' });
+      });
+    }else out.push({ name:'', code:code, target:'::main', mode:'merge' });
+    return out;
+  }
+  function itemCode(sg, it, useFix){
+    if(useFix && sg.fix && (sg.plan || []).length <= 1) return sg.fix;
+    return it.code != null ? it.code : sg.code;
+  }
+  function inspLines(sg){
+    var pl = sg.plan || [];
+    if(pl.length > 1) return pl.reduce(function(n, it){ return n + String(it.code || '').split('\n').length; }, 0);
+    return String(sg.code || '').split('\n').length;
+  }
+  function inspTargetLine(p, sg, it, done){
+    if(it.target === '::main'){
+      var c0 = String(it.code != null ? it.code : sg.code).slice(0, 4000);
+      if(sg.kind === 'page' || /<!doctype html|<html[\s>]/i.test(c0)) return (done ? 'Replaced' : 'Replaces') + ' the main page (' + mainFileName(p) + ')';
+      var w = ({ body:'body', style:'styles', script:'script', head:'head' })[it.where || sg.where] || 'body';
+      return (done ? 'Merged' : 'Goes') + ' into the ' + w + ' of the main page';
+    }
+    if(it.target === '::new') return (done ? 'Created ' : 'New file ') + (normPath(it.newPath) || '(name needed)');
+    if(it.mode === 'append') return 'Added to the end of ' + it.target;
+    return (done ? 'Replaced ' : 'Replaces ') + it.target;
+  }
+  /* applies the whole plan, or nothing: every step is checked before the first one is done */
+  function applyInspPlan(p, sg, useFix){
+    var items = sg.plan || [], steps = [], i, creating = 0;
+    for(i = 0; i < items.length; i++){
+      var it = items[i], code = itemCode(sg, it, useFix), nm = it.name ? it.name + ': ' : '';
+      if(it.target === '::main'){
+        var pl = inspPlan(p, code, it.where || sg.where);
+        if(pl.err){ UI.alert('Cannot apply', nm + pl.err); return false; }
+        steps.push({ main:true, pl:pl });
+      }else{
+        var path = it.target === '::new' ? normPath(it.newPath || it.name) : it.target;
+        if(!path){ UI.alert('Cannot apply', 'Give ' + (it.name || 'this code') + ' a valid file name first.'); return false; }
+        if(it.target === '::new' && isMainPath(p, path)){ UI.alert('Cannot apply', path + ' is the main page. Choose the main page as the target instead.'); return false; }
+        var f = findFile(p, path);
+        if(!f && it.target !== '::new'){ UI.alert('Cannot apply', 'The project file ' + path + ' no longer exists.'); return false; }
+        if(!f && !steps.some(function(s){ return s.path === path; })){
+          creating++;
+          if(filesOf(p).length + creating > 60){ UI.alert('Cannot apply', 'The project already has 60 files.'); return false; }
+        }
+        var text = (f && it.mode === 'append') ? f.text.replace(/\s+$/, '') + '\n\n' + code + '\n' : code;
+        if(text.length > 400000){ UI.alert('Cannot apply', path + ' would be over 400,000 characters, which is too large for a project file.'); return false; }
+        steps.push({ path:path, create:!f, text:text });
+      }
+    }
+    var data = { items:[], add:0, del:0 };
+    steps.forEach(function(s){
+      if(s.main){
+        var id = commitSrc(p, s.pl.src2);
+        data.items.push({ main:true, id:id }); data.add += s.pl.add; data.del += s.pl.del;
+      }else{
+        var f2 = findFile(p, s.path), old = f2 ? f2.text : '', created = !f2;
+        if(!f2){ f2 = { path:s.path, text:'', lang:langOfPath(s.path), ts:Date.now() }; filesOf(p).push(f2); }
+        else snap(f2, 'text', 'Inspection');
+        var h = f2.hist && f2.hist[f2.hist.length - 1], ds = diffStat(old, s.text);
+        f2.text = s.text; f2.mod = Date.now();
+        data.items.push({ path:s.path, created:created, id:(!created && h && h.src === old) ? h.id : '', wasEmpty:!created && !old });
+        data.add += ds.add; data.del += ds.del;
+      }
+    });
+    sg.st = 'applied'; sg.data = data;
+    save(); if(INT.repaintFiles) INT.repaintFiles();
+    return true;
+  }
+  function canUndoPlan(sg){ return !!(sg.data && sg.data.items && sg.data.items.length); }
+  function undoInspPlan(p, sg){
+    var its = sg.data.items, c = codeOf(p), i, x;
+    for(i = 0; i < its.length; i++){
+      x = its[i];
+      if(x.main){
+        if(!(c.hist || []).some(function(h){ return h.id === x.id; })){ UI.alert('Cannot undo', 'The earlier version of the main page is no longer saved.'); return false; }
+      }else if(!x.created){
+        var f = findFile(p, x.path);
+        if(!f){ UI.alert('Cannot undo', x.path + ' no longer exists.'); return false; }
+        if(x.id ? !(f.hist || []).some(function(h){ return h.id === x.id; }) : !x.wasEmpty){ UI.alert('Cannot undo', 'The earlier version of ' + x.path + ' is no longer saved.'); return false; }
+      }
+    }
+    for(i = its.length - 1; i >= 0; i--){
+      x = its[i];
+      if(x.main){
+        var hm = (c.hist || []).filter(function(h){ return h.id === x.id; })[0];
+        pushHist(c, c.src); c.src = hm.src;
+        c.stack = (c.stack || []).filter(function(s){ return s !== x.id; });
+      }else if(x.created){
+        p.files = filesOf(p).filter(function(q){ return q.path !== x.path; });
+      }else{
+        var f2 = findFile(p, x.path), hf = x.id ? (f2.hist || []).filter(function(h){ return h.id === x.id; })[0] : null;
+        snap(f2, 'text', 'Before undo');
+        f2.text = hf ? hf.src : ''; f2.mod = Date.now();
+      }
+    }
+    sg.st = 'new'; delete sg.data;
+    save(); if(INT.repaintFiles) INT.repaintFiles();
+    return true;
+  }
+  /* lets the person move one piece of code to another file (or a new one) before applying */
+  async function chooseInspTarget(p, sg){
+    var pl = sg.plan || [], idx = 0;
+    if(pl.length > 1){
+      var vi = await UI.sheet('Which file?', pl.map(function(it, i){ return { label:it.name + ' \u2192 ' + inspTargetLine(p, sg, it, false), value:String(i) }; }));
+      if(vi == null || vi === '') return false;
+      idx = parseInt(vi, 10);
+    }
+    var it = pl[idx], single = pl.length <= 1, items = [{ label:mainFileName(p) + ' (main page)', value:'::main' }];
+    filesOf(p).forEach(function(f){
+      items.push({ label:'Replace ' + f.path, value:'replace:' + f.path });
+      if(single && sg.kind !== 'page') items.push({ label:'Add to end of ' + f.path, value:'append:' + f.path });
+    });
+    items.push({ label:'New file...', value:'::new' });
+    var v = await UI.sheet('Apply ' + (it.name || 'this code') + ' to', items);
+    if(!v) return false;
+    if(v === '::main'){ it.target = '::main'; it.mode = 'merge'; }
+    else if(v === '::new'){
+      var nm = await UI.prompt('New file name', { value:it.name || '', confirmText:'Use', maxLength:120 });
+      var path = normPath(nm);
+      if(!path){ if(nm) UI.alert('Not a valid name', 'Use a name like app.js or src/utils.js.'); return false; }
+      it.target = '::new'; it.mode = 'replace'; it.newPath = path;
+    }else{
+      var k = v.indexOf(':');
+      it.mode = v.slice(0, k); it.target = v.slice(k + 1);
+    }
+    save();
+    return true;
+  }
   function inspectPrompt(p, code, found, cur){
     var FENCE = '```';
     var t = 'You are the code inspector inside a workspace app. The person is not a programmer and is bringing in code from outside. Tell them, in plain words, whether it is safe to add to their page.\n\n' +
@@ -11417,12 +11930,19 @@ MStore.ready.then(function(){
     else t += 'The current page is big (' + cur.split('\n').length + ' lines). A map of it:\n' + outlineOf(cur);
     return t;
   }
-  async function inspectCode(p, code, again){
+  async function inspectCode(p, code, again, files){
     if(busy) return;
     var ch = chatOf(p), FENCE = '```';
-    code = code.slice(0, 120000);
+    var items = inspItems(p, code, files), multi = items.length > 1;
+    var whole = multi ? items.map(function(it){ return '=== FILE: ' + it.name + ' ===\n' + it.code; }).join('\n\n') : items[0].code;
+    /* nothing is cut off silently: too big to keep means no inspection, and a long one is read in part and says so */
+    if(whole.length > INSP_KEEP){
+      UI.alert('Too large to inspect', 'That is ' + whole.length.toLocaleString('en-US') + ' characters. Inspect it in smaller parts, up to ' + INSP_KEEP.toLocaleString('en-US') + ' characters at a time.');
+      return;
+    }
+    var view = whole.length > INSP_VIEW ? whole.slice(0, INSP_VIEW) : whole, partialView = view.length < whole.length;
     if(!again){
-      ch.msgs.push({ r:'u', kind:'inspect', t:code, ts:Date.now() });
+      ch.msgs.push({ r:'u', kind:'inspect', t:whole, ts:Date.now() });
       if(ch.title === NEW_CHAT && !ch.named) ch.title = titleFrom(ch.msgs);
       save(); renderSide();
     }
@@ -11433,12 +11953,22 @@ MStore.ready.then(function(){
     p.xray = p.xray || []; p.xray.push(ent);
     while(p.xray.length > 40) p.xray.shift();
     try{
-      var full = /<!doctype html|<html[\s>]/i.test(code);
-      var found = analyzeSrc(code, (!full && cur.trim()) ? cur : '');
-      var sys = inspectPrompt(p, code, found, cur);
+      var full = !multi && /<!doctype html|<html[\s>]/i.test(items[0].code), found = [];
+      if(multi){
+        items.forEach(function(it){
+          if(/\.html?$/i.test(it.name)) analyzeSrc(it.code, '').forEach(function(f){ found.push({ sev:f.sev, t:it.name + ': ' + f.t }); });
+        });
+      }else{
+        found = analyzeSrc(items[0].code, (!full && cur.trim() && items[0].target === '::main') ? cur : '');
+      }
+      var sys = inspectPrompt(p, view, found, cur);
+      if(multi) sys += '\n\nSeveral files were brought in, each starting with \u201c=== FILE: name ===\u201d. Judge them together as one change. Set \u201cwhere\u201d to whole_file and leave \u201cfix\u201d empty.';
+      else if(items[0].target !== '::main' && items[0].target !== '::new') sys += '\n\nThis code is meant for the project file ' + items[0].target + ', not the main page, so judge it as that file.';
+      if(filesOf(p).length) sys += '\n\nThe project also has these files: ' + filesOf(p).map(function(f){ return f.path; }).join(', ') + '.';
+      if(partialView) sys += '\n\nThe code was too long to send whole. You are seeing the first ' + view.length.toLocaleString('en-US') + ' of ' + whole.length.toLocaleString('en-US') + ' characters. Say in the summary that the rest was not read.';
       var body = {
         systemInstruction:{ parts:[{ text:sys }] },
-        contents:[{ role:'user', parts:[{ text:'Inspect this code:\n' + FENCE + '\n' + code + '\n' + FENCE }] }],
+        contents:[{ role:'user', parts:[{ text:'Inspect this code:\n' + FENCE + '\n' + view + '\n' + FENCE }] }],
         generationConfig:{ responseMimeType:'application/json' }
       };
       ent.inTok = approxTokens(body) + Math.ceil(sys.length / 3.6);
@@ -11452,16 +11982,19 @@ MStore.ready.then(function(){
       ((j && j.findings) || []).slice(0, 6).forEach(function(f){
         if(f && f.text && !findings.some(function(x){ return x.text === f.text; })) findings.push({ sev:f.sev === 'bad' ? 'bad' : f.sev === 'warn' ? 'warn' : 'info', text:String(f.text) });
       });
-      var where = full ? 'whole_file' : (j && ['body', 'style', 'script', 'head'].indexOf(j.where) >= 0 ? j.where : guessWhere(code));
-      var fix = j && typeof j.fix === 'string' && j.fix.trim() && j.fix.trim() !== code.trim() ? j.fix.slice(0, 120000) : '';
+      if(partialView) findings.push({ sev:'warn', text:'Only the first ' + view.length.toLocaleString('en-US') + ' of ' + whole.length.toLocaleString('en-US') + ' characters were read by the inspector. The rest was not checked.' });
+      var where = (full || multi) ? 'whole_file' : (j && ['body', 'style', 'script', 'head'].indexOf(j.where) >= 0 ? j.where : guessWhere(items[0].code));
+      var fix = (!multi && !partialView && j && typeof j.fix === 'string' && j.fix.trim() && j.fix.trim() !== items[0].code.trim()) ? j.fix.slice(0, INSP_KEEP) : '';
       var summary = (j && j.summary) ? String(j.summary) : (j ? (verdict === 'ok' ? 'Nothing wrong was found.' : 'Something here needs your attention.') : 'The AI\u2019s reply could not be read, so these are the automatic checks only.');
-      var seg = { k:'insp', verdict:verdict, summary:summary, findings:findings.slice(0, 10), kind:full ? 'page' : 'piece', where:where, code:code, fix:fix, st:'new' };
+      var seg = { k:'insp', verdict:verdict, summary:summary, findings:findings.slice(0, 10), kind:multi ? 'files' : (full ? 'page' : 'piece'), where:where, code:multi ? '' : items[0].code, fix:fix, st:'new',
+        plan:items.map(function(it){ return { name:it.name, code:multi ? it.code : undefined, target:it.target, mode:it.mode, newPath:it.newPath, where:multi ? '' : where }; }) };
+      if(partialView) seg.partial = { seen:view.length, total:whole.length };
       ent.calls.push({ name:'code_inspection', st:verdict }); ent.out = summary.slice(0, 300);
       ch.msgs.push({ r:'m', t:summary, segs:[seg], model:r.model, ts:Date.now() });
       save();
     }catch(e){
       ent.err = errText(e); ent.ms = Date.now() - ent.ts;
-      lastErr = { proj:p, chat:ch, text:errText(e), retry:function(){ inspectCode(p, code, true); } };
+      lastErr = { proj:p, chat:ch, text:errText(e), retry:function(){ inspectCode(p, code, true, files); } };
       save();
     }
     busy = false; pending = null; syncSend(); paintConn(); draw();
@@ -11478,12 +12011,21 @@ MStore.ready.then(function(){
   }
   function inspCard(m, sg){
     var p = current, V = INSP[sg.verdict] || INSP.warning, applied = sg.st === 'applied', d = sg.data || {};
-    var c = tcard('search', applied ? 'Applied to Code assembly' : V[0], '', null);
+    var plan = sg.plan || null, multiDone = !!(applied && d.items);
+    var where = '';
+    if(multiDone){
+      var names = d.items.map(function(x){ return x.main ? 'main page' : x.path; });
+      where = names.length > 3 ? names.length + ' files' : names.join(', ');
+    }
+    var c = tcard('search', applied ? (multiDone ? 'Applied to ' + where : 'Applied to Code assembly') : V[0], '', null);
     var ic = c.root.querySelector('.act-ic'), sub = c.root.querySelector('.act-sub');
     ic.className = 'sig ' + (applied ? 'ok' : V[1]);
     ic.innerHTML = ICON[applied ? 'tick' : V[2]];
-    if(applied) sub.appendChild(statNode(d.add || 0, d.del || 0, d.total || 0));
-    else sub.textContent = 'Code inspection \u00b7 ' + sg.code.split('\n').length + ' lines';
+    if(applied && !multiDone) sub.appendChild(statNode(d.add || 0, d.del || 0, d.total || 0));
+    else if(applied){
+      sub.appendChild(el('span', 'add', '+' + (d.add || 0))); sub.appendChild(document.createTextNode(' '));
+      sub.appendChild(el('span', 'del', '\u2212' + (d.del || 0))); sub.appendChild(document.createTextNode(' lines'));
+    }else sub.textContent = 'Code inspection \u00b7 ' + inspLines(sg) + ' lines' + (plan && plan.length > 1 ? ' in ' + plan.length + ' files' : '');
     c.body.appendChild(el('div', 'txt', sg.summary));
     (sg.findings || []).forEach(function(f){
       var r = el('div', 'issue');
@@ -11491,27 +12033,41 @@ MStore.ready.then(function(){
       r.appendChild(el('span', '', f.text));
       c.body.appendChild(r);
     });
-    var pl = inspPlan(p, sg.code, sg.where), has = !!existingSrc(p).trim();
+    var legacy = !plan || (plan.length === 1 && plan[0].target === '::main' && !multiDone);
+    var mainItem = plan ? plan.filter(function(it){ return it.target === '::main'; })[0] : null;
     var primary = (sg.verdict === 'issue' && sg.fix) ? sg.fix : sg.code;
-    function doApply(useFix){ if(applyInsp(p, sg, useFix)) renderThread(true); }
+    function doApply(useFix){
+      var ok = legacy ? applyInsp(p, sg, useFix) : applyInspPlan(p, sg, useFix);
+      if(ok) renderThread(true);
+    }
     function preview(){
-      var q = inspPlan(p, primary, sg.where);
+      if(!mainItem){ UI.alert('Nothing to preview', 'None of this goes into the main page, so there is no page to preview.'); return; }
+      var q = inspPlan(p, mainItem.code != null ? mainItem.code : primary, mainItem.where || sg.where);
       if(q.err) UI.alert('Nothing to preview', q.err); else openPreview(q.src2);
     }
     if(applied){
+      if(plan && d.items) c.body.appendChild(dzRows(plan.map(function(it, i){ return [it.name || 'Code', inspTargetLine(p, sg, it, true)]; })));
       c.row.appendChild(mkBtn('solid', 'Open editor', ICON.code, function(){ go('code'); }));
-      if(canUndo(sg)) c.row.appendChild(mkBtn('ghost', 'Undo', '', function(){
-        if(undoBrick(p, sg)){ sg.st = 'new'; delete sg.data; save(); renderThread(true); }
+      var can = d.items ? canUndoPlan(sg) : canUndo(sg);
+      if(can) c.row.appendChild(mkBtn('ghost', 'Undo', '', function(){
+        if(d.items){ if(undoInspPlan(p, sg)) renderThread(true); }
+        else if(undoBrick(p, sg)){ sg.st = 'new'; delete sg.data; save(); renderThread(true); }
       }));
-      c.row.appendChild(mkBtn('ghost', 'Preview', ICON.play, function(){ openPreview(existingSrc(p)); }));
+      if(!d.items || d.items.some(function(x){ return x.main; })) c.row.appendChild(mkBtn('ghost', 'Preview', ICON.play, function(){ openPreview(existingSrc(p)); }));
       return c.root;
     }
-    if(pl.err){
-      c.body.appendChild(el('div', 'txt dim', pl.err));
+    var perr = '';
+    (plan || [{ target:'::main', where:sg.where }]).forEach(function(it){
+      if(perr || it.target !== '::main') return;
+      var q = inspPlan(p, it.code != null ? it.code : sg.code, it.where || sg.where);
+      if(q.err) perr = q.err;
+    });
+    if(sg.partial) c.body.appendChild(el('div', 'txt dim', 'The inspector read the first ' + sg.partial.seen.toLocaleString('en-US') + ' of ' + sg.partial.total.toLocaleString('en-US') + ' characters. Applying puts in all of it.'));
+    if(perr){
+      c.body.appendChild(el('div', 'txt dim', perr));
     }else{
-      c.body.appendChild(el('div', 'txt dim', sg.kind === 'page'
-        ? (has ? 'A full page. Applying replaces what is in Code assembly, and you can undo it.' : 'A full page. It becomes your page in Code assembly.')
-        : 'A piece. It goes into the ' + ({ body:'body', style:'styles', script:'script', head:'head' }[sg.where] || 'body') + ' of your page, and you can undo it.'));
+      if(plan) c.body.appendChild(dzRows(plan.map(function(it){ return [it.name || 'Code', inspTargetLine(p, sg, it, false)]; })));
+      else c.body.appendChild(el('div', 'txt dim', 'It goes into your page, and you can undo it.'));
       if(sg.verdict === 'issue' && sg.fix){
         c.row.appendChild(mkBtn('solid', 'Apply fixed version', '', function(){ doApply(true); }));
         c.row.appendChild(mkBtn('ghost', 'Apply anyway', '', function(){ doApply(false); }));
@@ -11519,9 +12075,10 @@ MStore.ready.then(function(){
         c.row.appendChild(mkBtn('solid', sg.verdict === 'issue' ? 'Apply anyway' : 'Apply', '', function(){ doApply(false); }));
         if(sg.fix) c.row.appendChild(mkBtn('ghost', 'Apply fixed version', '', function(){ doApply(true); }));
       }
-      c.row.appendChild(mkBtn('ghost', 'Preview', ICON.play, preview));
+      if(plan) c.row.appendChild(mkBtn('ghost', 'Change target', '', async function(){ if(await chooseInspTarget(p, sg)) renderThread(true); }));
+      if(mainItem) c.row.appendChild(mkBtn('ghost', 'Preview', ICON.play, preview));
     }
-    c.row.appendChild(copyBtn(function(){ return sg.fix || sg.code; }, 'Copy code'));
+    c.row.appendChild(copyBtn(function(){ return sg.fix || sg.code || (plan || []).map(function(it){ return '=== ' + it.name + ' ===\n' + it.code; }).join('\n\n'); }, 'Copy code'));
     return c.root;
   }
 
