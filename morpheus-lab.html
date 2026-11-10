@@ -1017,6 +1017,28 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .dz-v.hard{color:var(--bad)}
 .dz-v.eng{color:var(--warn)}
 .dz-v.okc{color:var(--ok)}
+
+/* tighter cards */
+.act{padding:10px 12px;border-radius:16px;box-shadow:0 4px 14px var(--shadow)}
+.act-head{gap:10px}
+.act-ic{width:30px;height:30px;border-radius:9px}
+.act-ic svg{width:16px;height:16px}
+.act-name{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act-sub{font-size:12px;margin-top:1px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.act-head .spill{flex:none;white-space:nowrap}
+.act-body{margin-top:8px}
+.act-row{margin-top:8px}
+.sig{width:30px;height:30px;border-radius:15px}
+.sig svg{width:16px;height:16px}
+.act.src .act-head{cursor:pointer}
+.act-src{display:none}
+.act.open .act-src{display:block}
+.act-src a{display:block;padding:3px 0;font-size:13px;text-decoration:underline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.act.src:not(.open) .act-body{margin-top:0}
+.act.src:not(.open) .act-body>.txt{margin-top:8px}
+.dz-strip{margin-bottom:8px}
+.dz-row{padding:5px 0;font-size:12.5px;line-height:1.4;gap:8px}
+.dz-k{width:70px}
 </style>
 </head>
 <body>
@@ -6213,12 +6235,19 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){
       var d = seg.data || {}, srcs = d.sources || [];
-      var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's') + (d.provider ? ' \u00b7 ' + d.provider : ''), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
+      var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', (d.provider ? d.provider + ' \u00b7 ' : '') + short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's'), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
       if(d.why) c.body.appendChild(el('div', 'txt dim', (d.via ? 'The main search did not work: ' : 'Tavily did not work, so this used Google: ') + d.why));
-      srcs.forEach(function(x){
-        var a = el('a', 'hint', short(x.title, 60)); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block'; a.style.textDecoration = 'underline';
-        c.body.appendChild(a);
-      });
+      /* the sources stay folded until the card is tapped, so a search takes one line of the chat */
+      if(srcs.length){
+        var box = el('div', 'act-src');
+        srcs.forEach(function(x){
+          var a = el('a', 'hint', short(x.title, 70)); a.href = x.url; a.target = '_blank'; a.rel = 'noopener';
+          box.appendChild(a);
+        });
+        c.body.appendChild(box);
+        c.root.classList.add('src');
+        c.root.firstChild.addEventListener('click', function(){ c.root.classList.toggle('open'); });
+      }
       return c.root;
     }
   });
@@ -8644,6 +8673,8 @@ MStore.ready.then(function(){
       }
       if(has('read_assembly')) R.push('How you work, every time. (1) Understand: if the request is unclear, ask one question with ask_user, otherwise carry on. If the person names a file or shows an error from one, work on exactly that file first. (2) Plan: for more than one small change, add tasks grouped by theme. The lab focuses the group for you and moves to the next one itself; switch on purpose with focus_group. (3) Look before you change: read the lines or file you will edit, and read a failing output from the first error down. (4) Change small: one change per step with the narrowest edit tool, never a rewrite for a small fix. (5) Check: run it after each change and read the result. (6) If a run fails, fix the first error only. Never repeat an edit you already made, and after two failed attempts at the same error stop and tell the person what you know. (7) Finish: complete the task with evidence, and use the ledger when you are testing an idea. (8) Reply briefly: the result, why anything failed, and one next step.');
       if(has('dissect_idea')) R.push('Idea dissection: when the person brings a fictional idea (a power, technology, creature or system) and wants its real-world version, use dissect_idea and follow the stages in order. The lab stores the state and refuses a stage that is out of order. (1) action start with the idea in their words. (2) action strip: split it into numbered claims, each one thing it does, needs or costs, and list the story dressing you dropped (names, lore, drama). The person must approve the claims; if they decline, ask what is wrong and submit again. (3) For each claim run web_search, then action anchor with the real science or engineering that touches it and a source taken from the results; if nothing real exists, use no_anchor and say what was searched. Never use your own memory as a source. (4) For each claim, action blockers: check all five areas (energy, information, biology_materials, scale_time, control) and tag each one hard_limit (physics or biology says no), engineering (solvable with effort) or none, with a rough size where you can. (5) action resolve for each claim: exists_now, possible_later or stays_fiction, and what had to change; possible_later also needs a prediction and a confidence. (6) action finish with the closest real version assembled from the surviving claims; the person approves it. Do not skip a claim. Read the next field in every result. If a step is refused or fails, tell the person plainly and do not describe it as done.');
+      var dzs = dzActive(p);
+      if(has('dissect_idea') && dzs) R.push('A dissection is in progress: ' + short(dzs.idea, 160) + '. Progress: ' + dzProgText(dzs) + '. Claims: ' + (dzs.claims.length ? dzs.claims.map(function(c){ return c.id + ' ' + short(c.text, 60) + ' [' + (c.verdict || (c.checked ? 'checked' : c.anchored ? 'anchored' : 'open')) + ']'; }).join('; ') : 'none yet') + '. ' + dzNext(dzs) + ' Keep going stage by stage without stopping to chat. The person is only asked at the strip and finish approvals.');
       if(has('log_hypothesis')) R.push('Ledger: when a claim can be tested, log it with log_hypothesis (claim, why, prediction, confidence 1 to 10). Plan how to test it with plan_experiment and link the task that does the work. When it has run, call log_result with the verdict and real evidence, never a hope: a hypothesis is only supported or refuted by a result you actually observed.');
       if(has('capture_idea')) R.push('Discovery: when an idea is worth keeping, call capture_idea; when a question cannot be settled yet, call park_question. Both save straight to the Discovery Journal, so use them for what the person would want to find again, not every thought. Keep exploring in words as well.');
       if(has('save_finding')) R.push('Research: when you establish something, call save_finding with the claim, its source and your confidence (high, medium or low). Use a source from web_search, a document or a file. Without a checkable source the confidence is low. Do not save guesses as findings.');
@@ -8867,7 +8898,9 @@ MStore.ready.then(function(){
       var contents = buildContents(p, ch);
       m = { r:'m', t:'', segs:[], ts:Date.now() };
       ch.msgs.push(m);
-      for(var step = 0; step < 6; step++){
+      var dzTurn = false, dzPush = 0;
+      for(var step = 0; step < (dzTurn ? 30 : 6); step++){
+        if(dzActive(p)) dzTurn = true;
         var offered = useTools ? offeredTools(p, ov, intent, gate) : [];
         ctx.allowed = offered;
         lastRoundText = '';
@@ -8925,6 +8958,20 @@ MStore.ready.then(function(){
             contents.push({ role:'user', parts:[{ text:'[Lab note, not from the person] These steps failed or did not happen: ' + badNow.join('; ') + '. Your last message did not say so, and it was removed. Tell the person plainly which steps did not happen and why, then give one next step. Do not say they worked.' }] });
             continue;
           }
+          /* a dissection runs by itself between its two approvals: if the model stops to chat mid-way, put it back on the next stage */
+          var dzc = dzActive(p);
+          if(dzc && dzc.stripOk && offered.length && dzPush < 8){
+            var lu = '';
+            for(var qi = ch.msgs.length - 1; qi >= 0; qi--){ if(ch.msgs[qi].r === 'u'){ lu = ch.msgs[qi].t || ''; break; } }
+            if(!/\b(?:stop|cancel|drop|never ?mind|pause|hold on|wait)\b/i.test(lu)){
+              dzPush++; force = true;
+              for(var zj = m.segs.length - 1; zj >= 0; zj--){ if(m.segs[zj].k === 't'){ m.segs.splice(zj, 1); break; } }
+              m.t = textOfMsg(m); draw();
+              contents.push({ role:'model', parts:parts });
+              contents.push({ role:'user', parts:[{ text:'[Lab note, not from the person] The dissection is not finished. ' + dzNext(dzc) + ' Do not stop to talk or ask the person anything. Call dissect_idea or web_search for the next stage now. The person is only asked again at finish.' }] });
+              continue;
+            }
+          }
           /* it said what it would do and then stopped: push it to actually do it */
           if(offered.length && intent !== 'talk' && (ov || opModeOf(p) === 'build') && nudges < 2 && text && !/\?\s*$/.test(text) && ANNOUNCE.test(text)){
             nudges++; force = true;
@@ -8957,6 +9004,7 @@ MStore.ready.then(function(){
           follow = true;
           save(); draw();
         }
+        if(dzActive(p)) dzTurn = true;
         if(segsNow.some(function(sg){ return sg.st === 'ok' && CODE_EDITS[sg.name]; })) turnSeen = {};
         /* after a change that worked, look at the page before anyone says it is done */
         var edited = segsNow.some(function(sg){ return sg.st === 'ok' && CODE_EDITS[sg.name]; });
@@ -8982,10 +9030,14 @@ MStore.ready.then(function(){
           if(bookRounds >= 2){ lastRoundText = ''; break; }
           results[results.length - 1].functionResponse.response = Object.assign({}, results[results.length - 1].functionResponse.response, { instruction:'Task notes are saved. Do not call any more task or note tools this turn. Either do the actual work with a code or file tool now, or answer the person in words.' });
         }else bookRounds = 0;
-        if(step === 5) capped = true;
+        if(step === (dzTurn ? 29 : 5)) capped = true;
         contents.push({ role:'user', parts:results });
       }
-      if(capped || !lastRoundText.trim()) await wrapUp();
+      var dzEnd = dzActive(p);
+      if(capped && dzEnd){
+        m.segs.push({ k:'t', t:'Paused at the step limit. The dissection is at ' + DZ_STAGES[dzStageIx(dzEnd)] + ' (' + dzProgText(dzEnd) + '). Say continue to pick it up.' });
+        m.t = textOfMsg(m);
+      }else if(capped || !lastRoundText.trim()) await wrapUp();
       if(capped) pauseAtCheckpoint(p, m);
       var badEnd = unresolved(), endTx = lastTextOf();
       if(badEnd.length && !ADMITS.test(endTx) && (CLAIM.test(endTx) || SUCCESS.test(endTx))) labNote('Lab note: these steps did not work, so they are not done: ' + badEnd.join('; ') + '.');
@@ -9074,6 +9126,11 @@ MStore.ready.then(function(){
   send.addEventListener('click', function(){ try{ if(navigator.vibrate) navigator.vibrate(12); }catch(_){} });
   send.addEventListener('click', sendMsg);
   send.addEventListener('pointerdown', function(e){ e.preventDefault(); });
+  ['plusBtn', 'modeChip', 'conn'].forEach(function(id){
+    var b = $(id);
+    b.addEventListener('pointerdown', function(e){ e.preventDefault(); });
+    b.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  });
   document.addEventListener('visibilitychange', function(){ if(document.hidden){ flushCode(); save(); MStore.flush(); } });
 
   /* ---- composer tools: the + button opens a bar attached to the composer ---- */
