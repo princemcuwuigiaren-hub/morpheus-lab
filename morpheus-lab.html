@@ -6204,6 +6204,7 @@ MStore.ready.then(function(){
         try{
           r = await tavilySearch(q, deep);
           seg.data = { q:short(a.query || '', 120), sources:r.sources, provider:deep ? 'Tavily deep' : 'Tavily' };
+          dzLogSearch(p, { q:q, ok:true, provider:deep ? 'Tavily deep' : 'Tavily', answer:r.text, sources:r.sources });
           return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
             result:{ answer:r.text, sources:r.sources, provider:deep ? 'Tavily deep' : 'Tavily', instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
         }catch(e){
@@ -6215,6 +6216,7 @@ MStore.ready.then(function(){
         try{
           r = await searchWeb(q);
           seg.data = { q:short(a.query || '', 120), sources:r.sources, model:r.model, provider:'Google Search', why:whys.join(' ') };
+          dzLogSearch(p, { q:q, ok:true, provider:'Google Search', why:whys.join(' '), answer:r.text, sources:r.sources });
           return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
             result:{ answer:r.text, sources:r.sources, model:r.model, instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') + (whys.length ? ' Tavily failed (' + whys.join(' ') + '), so this came from Google Search instead. Tell the person that.' : '') } };
         }catch(e){
@@ -6226,9 +6228,11 @@ MStore.ready.then(function(){
       try{
         var w = await wikiSearch(q);
         seg.data = { q:short(a.query || '', 120), sources:w.sources, via:'Wikipedia', why:why };
+        dzLogSearch(p, { q:q, ok:true, provider:'Wikipedia', via:'Wikipedia', why:why, answer:w.text, sources:w.sources });
         return { ok:true, res:'Searched \u00b7 Wikipedia only \u00b7 ' + w.sources.length + ' source' + (w.sources.length === 1 ? '' : 's'),
           result:{ answer:w.text, sources:w.sources, note:'The web search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
       }catch(e2){
+        dzLogSearch(p, { q:q, ok:false, why:why + ' Wikipedia: ' + errText(e2) });
         var msg = 'Search did not work: ' + why + ' The Wikipedia backup also found nothing (' + errText(e2) + '). Answer from what you know and say it is unverified.';
         return { ok:false, res:'Search did not work: ' + short(why, 120), result:{ error:msg } };
       }
@@ -6771,7 +6775,7 @@ MStore.ready.then(function(){
      One tool, dissect_idea, with an action per stage. The state lives on the project (p.dz), every claim keeps its id
      from Strip to Output, a stage cannot run before the one it depends on, and the lab refuses to finish while any
      claim has no anchor result, no blocker check or no verdict. The person approves after Strip and before Output. */
-  var DZ_ACTIONS = ['start', 'strip', 'anchor', 'blockers', 'resolve', 'finish', 'status', 'drop'];
+  var DZ_ACTIONS = ['start', 'strip', 'anchor', 'blockers', 'resolve', 'finish', 'report', 'status', 'drop'];
   var DZ_STAGES = ['Intake', 'Strip', 'Anchor', 'Blockers', 'Resolve', 'Output'];
   var DZ_AREAS = ['energy', 'information', 'biology_materials', 'scale_time', 'control'];
   var DZ_AREA_NAME = { energy:'Energy', information:'Information', biology_materials:'Biology and materials', scale_time:'Scale and time', control:'Control and safety' };
@@ -6832,9 +6836,116 @@ MStore.ready.then(function(){
       return { area:dzTxt(x.area).toLowerCase().replace(/[^a-z_]+/g, '_'), finding:dzTxt(x.finding), kind:dzTxt(x.kind).toLowerCase().replace(/[^a-z_]+/g, '_'), scale:dzTxt(x.scale) };
     });
   }
+
+  /* ---- the record: every search, every rejected step, and a report document built from them, not from the AI's memory ---- */
+  function dzNormUrl(u){ return String(u || '').toLowerCase().replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/+$/, ''); }
+  /* an anchor counts as checked only when its source matches something a search in this dissection actually returned */
+  function dzVerifiedBy(d, an){
+    var pool = [];
+    (d.log || []).forEach(function(l){ if(l.ok) (l.sources || []).forEach(function(s){ pool.push(s); }); });
+    var src = dzTxt(an.source).toLowerCase(), u = dzNormUrl(an.url);
+    if(!u){ var m = src.match(/https?:\/\/\S+/); if(m) u = dzNormUrl(m[0]); }
+    return pool.some(function(s){
+      var su = dzNormUrl(s.url), st = String(s.title || '').toLowerCase(), dom = su.split('/')[0];
+      if(u && su && (su === u || su.indexOf(u) === 0 || u.indexOf(su) === 0)) return true;
+      if(src.length >= 12 && st.length >= 12 && (st.indexOf(src) >= 0 || src.indexOf(st) >= 0)) return true;
+      return !!dom && dom.length > 3 && src.indexOf(dom) >= 0;
+    });
+  }
+  function dzLogSearch(p, o){
+    var d = dzActive(p);
+    if(!d) return;
+    d.log = d.log || [];
+    d.log.push({ ts:Date.now(), q:o.q, provider:o.provider || '', ok:!!o.ok, via:o.via || '', why:o.why || '', answer:short(o.answer || '', 1500), sources:(o.sources || []).slice(0, 8).map(function(s){ return { title:short(s.title || '', 120), url:s.url || '' }; }) });
+    while(d.log.length > 40) d.log.shift();
+    save();
+  }
+  function dzDate(ts){ try{ return new Date(ts).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }catch(e){ return ''; } }
+  function dzCell(t){ return String(t == null ? '' : t).replace(/\|/g, '/').replace(/\s*\n\s*/g, ' '); }
+  function dzFlags(d){
+    var fl = [];
+    (d.claims || []).forEach(function(c){
+      (c.anchors || []).forEach(function(x){ if(!x.verified) fl.push(c.id + ': the anchor \u201c' + short(x.what, 80) + '\u201d (' + x.source + ') does not match any source a search in this dissection returned.'); });
+      if(c.anchored && !(c.anchors || []).length) fl.push(c.id + ': no real anchor was found. ' + short(c.noAnchor, 160));
+      var hard = (c.checks || []).some(function(k){ return k.kind === 'hard_limit'; });
+      if(hard && c.verdict === 'exists_now') fl.push(c.id + ': rated Exists now although the fictional version has a hard-limit blocker. The verdict is about the real version: ' + short(c.changes, 160));
+      if(hard && c.verdict === 'possible_later' && c.conf >= 9) fl.push(c.id + ': confidence ' + c.conf + ' of 10 despite a hard-limit blocker. Treat it with care.');
+      if(!c.verdict) fl.push(c.id + ': no verdict yet.');
+    });
+    var bad = (d.log || []).filter(function(l){ return l.via || !l.ok; }).length;
+    if(bad) fl.push(bad + ' search' + (bad === 1 ? '' : 'es') + ' did not use the main provider or failed. See the search log.');
+    var rj = (d.rejects || []).length;
+    if(rj) fl.push(rj + ' step' + (rj === 1 ? ' was' : 's were') + ' rejected by the lab and had to be redone. See the rejected steps.');
+    if(!(d.log || []).length) fl.push('No search was recorded in this dissection, so every anchor is unchecked.');
+    return fl;
+  }
+  function dzReportText(p, d){
+    var L = [], cs = d.claims || [], fl = dzFlags(d);
+    L.push('# Dissection report: ' + short(d.idea, 90), '');
+    L.push('Started ' + dzDate(d.ts) + ' \u00b7 ' + (d.done ? 'Finished' : d.dropped ? 'Dropped' : 'In progress (' + DZ_STAGES[dzStageIx(d)] + ')') + (d.origin ? ' \u00b7 Origin: ' + d.origin : ''), '');
+    L.push('## The idea', '', d.idea, '');
+    if(d.dressing && d.dressing.length) L.push('Dropped as story dressing: ' + d.dressing.join('; '), '');
+    if(cs.length){
+      L.push('## Result at a glance', '', '| Claim | Verdict | Confidence | Closest real version |', '| --- | --- | --- | --- |');
+      cs.forEach(function(c){ L.push('| ' + c.id + ' ' + dzCell(short(c.text, 70)) + ' | ' + (DZ_VERDICT_NAME[c.verdict] || 'Not resolved') + ' | ' + (c.conf ? c.conf + ' of 10' : '') + ' | ' + dzCell(short(c.real || (c.verdict === 'stays_fiction' ? 'No real version' : ''), 120)) + ' |'); });
+      L.push('');
+    }
+    if(d.summary) L.push('**Closest real version overall:** ' + d.summary, '');
+    if(d.fiction) L.push('**Stays fiction:** ' + d.fiction, '');
+    L.push('## Review flags', '');
+    if(fl.length) fl.forEach(function(x){ L.push('- ' + x); }); else L.push('Nothing flagged.');
+    L.push('', '## Claim by claim', '');
+    cs.forEach(function(c){
+      L.push('### ' + c.id + ': ' + c.text, '');
+      L.push('Verdict: ' + (DZ_VERDICT_NAME[c.verdict] || 'Not resolved') + (c.conf ? ' (confidence ' + c.conf + ' of 10)' : ''));
+      if(c.real) L.push('', 'Closest real version: ' + c.real);
+      if(c.changes) L.push('', 'What had to change: ' + c.changes);
+      if(c.prediction) L.push('', 'Prediction if it works: ' + c.prediction);
+      L.push('', 'Anchors:');
+      if((c.anchors || []).length) c.anchors.forEach(function(x){ L.push('- ' + x.what + ' \u2014 ' + x.source + (x.url ? ' (' + x.url + ')' : '') + ' [' + (x.verified ? 'matches a search result' : 'not matched to a search result') + ']'); });
+      else L.push('- None. ' + (c.noAnchor || ''));
+      L.push('', 'Blockers:');
+      (c.checks || []).forEach(function(k){ L.push('- ' + DZ_AREA_NAME[k.area] + ' \u2014 ' + DZ_KIND_NAME[k.kind] + ': ' + k.finding + (k.scale ? ' (' + k.scale + ')' : '')); });
+      L.push('');
+    });
+    var lg = d.log || [];
+    L.push('## Search log (' + lg.length + ')', '');
+    if(!lg.length) L.push('No searches were recorded.', '');
+    lg.forEach(function(l, i){
+      L.push('### Search ' + (i + 1) + ': ' + l.q, '');
+      L.push(dzDate(l.ts) + ' \u00b7 ' + (l.ok ? (l.provider || 'Search') + ' \u00b7 ' + (l.sources || []).length + ' source' + ((l.sources || []).length === 1 ? '' : 's') : 'Failed'));
+      if(l.via || l.why) L.push('', 'Note: ' + (l.via ? 'only ' + l.via + ' answered. ' : '') + (l.why || ''));
+      if(l.answer) L.push('', 'Answer: ' + l.answer);
+      if((l.sources || []).length){ L.push('', 'Sources:'); l.sources.forEach(function(s){ L.push('- ' + s.title + (s.url ? ' \u2014 ' + s.url : '')); }); }
+      L.push('');
+    });
+    var rj = d.rejects || [];
+    L.push('## Rejected steps (' + rj.length + ')', '');
+    if(!rj.length) L.push('None.', '');
+    rj.forEach(function(r){ L.push('- ' + dzDate(r.ts) + ' \u00b7 ' + r.action + (r.claim ? ' ' + r.claim : '') + ': ' + r.why); });
+    if(rj.length) L.push('');
+    if(d.done) L.push('## Ledger', '', (d.ledger || 0) + ' hypothes' + (d.ledger === 1 ? 'is' : 'es') + ' logged for the claims rated Possible later.', '');
+    return L.join('\n');
+  }
+  function dzSaveReport(p, d){
+    var title = 'Dissection report: ' + short(d.idea, 60), text = short(dzReportText(p, d), 60000), ds = docsOf(p), now = Date.now();
+    var ex = d.docId ? ds.filter(function(x){ return x.id === d.docId; })[0] : null;
+    if(ex){
+      if(ex.text !== text){ pushDocHist(ex); ex.approved = false; }
+      ex.text = text; ex.mod = now;
+    }else{
+      var n = 1, t2 = title;
+      while(ds.some(function(x){ return sameG(x.title, t2); })) t2 = title + ' (' + (++n) + ')';
+      ex = { id:uid(), title:t2, text:text, ts:now, mod:now, kind:'report', format:'markdown', approved:false };
+      ds.push(ex); d.docId = ex.id;
+    }
+    save();
+    return ex;
+  }
   function dzCheck(p, a){
     var ac = dzTxt(a.action).toLowerCase(), d = dzActive(p), i;
     if(DZ_ACTIONS.indexOf(ac) < 0) return 'action must be one of: ' + DZ_ACTIONS.join(', ') + '.';
+    if(ac === 'report') return dzList(p).length ? '' : 'There is no dissection to report on.';
     if(ac === 'start'){
       if(dzTxt(a.idea).length < 15) return 'Give the idea in the person\u2019s own words, at least a full sentence.';
       if(d) return 'A dissection is already in progress (stage ' + DZ_STAGES[dzStageIx(d)] + ': ' + short(d.idea, 50) + '). Carry on with it, or use action drop if the person wants to discard it. ' + dzNext(d);
@@ -6888,9 +6999,10 @@ MStore.ready.then(function(){
       if(dzTxt(a.real_version).length < 15) return 'Describe the real version of this claim in real_version.';
       var cn = parseInt(a.confidence, 10);
       if(!(cn >= 1 && cn <= 10)) return 'Give your confidence in this verdict as a whole number from 1 to 10.';
+      if(vd === 'possible_later' && hard && cn >= 9) return 'Confidence 9 or 10 does not fit a claim with a hard-limit blocker. Give a lower number, or explain in changes why the limit does not apply.';
     }
-    if(vd === 'exists_now' && !c.anchors.some(function(x){ return x.verified; })) return 'exists_now needs at least one anchor that was checked with a web search. Run web_search for ' + c.id + ' and anchor it again, or choose possible_later.';
-    if(vd === 'exists_now' && hard) return c.id + ' has a hard-limit blocker, so it cannot exist now as written. Choose possible_later if your real version avoids the limit, or stays_fiction.';
+    if(vd === 'exists_now' && !c.anchors.some(function(x){ return x.verified; })) return 'exists_now needs at least one anchor that matches a search result. Use a url or title exactly as web_search returned it and anchor ' + c.id + ' again, or choose possible_later.';
+    if(vd !== 'stays_fiction' && hard && dzTxt(a.changes).length < 30) return c.id + ' has a hard-limit blocker on the fictional version. Say in changes how the real version avoids that limit.';
     if(vd === 'possible_later' && dzTxt(a.prediction).length < 12) return 'possible_later needs a prediction: what would be observed if the real version works. It goes into the ledger.';
     return '';
   }
@@ -6900,7 +7012,7 @@ MStore.ready.then(function(){
   }
   function dzLab(a){
     var ac = dzTxt(a.action).toLowerCase(), c = dzTxt(a.claim).toUpperCase();
-    return ({ start:'Start dissection', strip:'Strip into claims', anchor:'Anchor ' + (c || 'claim'), blockers:'Check blockers ' + (c || ''), resolve:'Resolve ' + (c || 'claim'), finish:'Finish dissection', status:'Check dissection progress', drop:'Drop dissection' })[ac] || 'Dissect idea';
+    return ({ start:'Start dissection', strip:'Strip into claims', anchor:'Anchor ' + (c || 'claim'), blockers:'Check blockers ' + (c || ''), resolve:'Resolve ' + (c || 'claim'), finish:'Finish dissection', report:'Save dissection report', status:'Check dissection progress', drop:'Drop dissection' })[ac] || 'Dissect idea';
   }
   function dzStrip(prog){
     var w = el('div', 'dz-strip');
@@ -6929,7 +7041,14 @@ MStore.ready.then(function(){
     icon:'note', follow:true, approveText:'Approve', denyText:'Needs changes',
     label:function(a){ return dzLab(a); },
     force:function(p, a){ var ac = dzTxt(a.action).toLowerCase(); return ac === 'strip' || ac === 'finish' || ac === 'drop'; },
-    pre:function(p, a){ return dzCheck(p, a); },
+    pre:function(p, a){
+      var e = dzCheck(p, a);
+      if(e){
+        var d0 = dzActive(p);
+        if(d0){ d0.rejects = d0.rejects || []; d0.rejects.push({ ts:Date.now(), action:dzTxt(a.action).toLowerCase(), claim:dzTxt(a.claim).toUpperCase(), why:short(e, 300) }); if(d0.rejects.length > 60) d0.rejects.shift(); save(); }
+      }
+      return e;
+    },
     preview:function(seg){
       var a = seg.args || {}, ac = dzTxt(a.action).toLowerCase(), w = el('div'), d = current ? dzActive(current) : null;
       if(ac === 'strip'){
@@ -6947,6 +7066,11 @@ MStore.ready.then(function(){
     },
     run:function(p, a, seg){
       var ac = dzTxt(a.action).toLowerCase(), d = dzActive(p), c, rows;
+      if(ac === 'report'){
+        var ld = dzList(p), dr = d || ld[ld.length - 1], doc = dzSaveReport(p, dr);
+        seg.snap = dzProg(dr); seg.dzv = [['Report', doc.title], ['Searches', String((dr.log || []).length)], ['Flags', String(dzFlags(dr).length)]];
+        return { ok:true, res:'Report saved \u00b7 ' + short(doc.title, 40), result:{ ok:true, message:'The report was saved under Documents as \u201c' + doc.title + '\u201d.', flags:dzFlags(dr) } };
+      }
       if(ac === 'start'){
         d = { id:uid(), ts:Date.now(), sb:dzSearchCount(p), idea:dzTxt(a.idea), origin:dzTxt(a.origin), claims:[], dressing:[], stripOk:false, done:false, dropped:false };
         dzList(p).push(d); save();
@@ -6983,20 +7107,25 @@ MStore.ready.then(function(){
         d.ledger = made;
         jAdd(p, 'idea', 'Dissected: ' + short(d.idea, 90), 'Idea: ' + d.idea + '\n\nClosest real version: ' + d.summary + (d.fiction ? '\n\nStays fiction: ' + d.fiction : '') + '\n\nClaims:\n' + lines.join('\n'), {});
         d.done = true; save();
+        var rep = dzSaveReport(p, d);
         rows = [['Real version', d.summary]].concat(d.claims.map(function(x){ return [x.id, DZ_VERDICT_NAME[x.verdict] + ': ' + short(x.text, 90), x.verdict === 'stays_fiction' ? 'hard' : (x.verdict === 'exists_now' ? 'okc' : 'eng')]; }));
         if(d.fiction) rows.push(['Stays fiction', d.fiction]);
         rows.push(['Ledger', made + ' hypothesis' + (made === 1 ? '' : 'es') + ' logged']);
-        return dzDone(p, seg, d, rows, 'Dissection finished', 'Saved to the journal. ' + made + ' hypothes' + (made === 1 ? 'is' : 'es') + ' logged in the ledger.');
+        rows.push(['Report', rep.title]);
+        var rs = dzDone(p, seg, d, rows, 'Dissection finished', 'Saved to the journal. ' + made + ' hypothes' + (made === 1 ? 'is' : 'es') + ' logged in the ledger, and the full report was saved under Documents.');
+        rs.result.flags = dzFlags(d);
+        rs.result.instruction = 'The results card and the report are the record. Do not list, rank or re-judge the claims, and never call a claim real or fiction unless it matches its stored verdict. In one or two sentences, give the most important caveat (see flags), and say the full report is under Documents.';
+        return rs;
       }
       c = dzClaim(d, a.claim);
       if(ac === 'anchor'){
-        var nowS = dzSearchCount(p), searched = nowS > (d.sb || 0), an = dzAnchors(a.anchors);
-        d.sb = nowS;
-        c.anchors = an.map(function(x){ x.verified = searched; return x; });
+        var an = dzAnchors(a.anchors);
+        c.anchors = an.map(function(x){ x.verified = dzVerifiedBy(d, x); return x; });
         c.noAnchor = an.length ? '' : dzTxt(a.no_anchor);
         c.anchored = true; c.checked = false; c.checks = []; c.verdict = ''; c.real = ''; c.changes = ''; c.conf = 0; c.prediction = ''; save();
         rows = an.length ? c.anchors.map(function(x){ return [x.verified ? 'Checked' : 'Unchecked', x.what + ' (' + x.source + ')', x.verified ? 'okc' : 'eng']; }) : [['No anchor', c.noAnchor, 'hard']];
-        return dzDone(p, seg, d, [[c.id, c.text]].concat(rows), 'Anchored ' + c.id, an.length ? (searched ? c.id + ' anchored with ' + an.length + ' source' + (an.length === 1 ? '' : 's') + '.' : c.id + ' anchored, but no web search has run in this dissection, so the anchors are marked unchecked. Run web_search for this claim and anchor it again to mark them checked. Each claim needs its own search.') : c.id + ' has no real anchor. That is recorded as it is.');
+        var nUn = c.anchors.filter(function(x){ return !x.verified; }).length;
+        return dzDone(p, seg, d, [[c.id, c.text]].concat(rows), 'Anchored ' + c.id, an.length ? (nUn ? c.id + ' anchored, but ' + nUn + ' of ' + an.length + ' anchor' + (an.length === 1 ? '' : 's') + ' do not match any source a search in this dissection returned, so they are marked unchecked. Give the url or title exactly as web_search returned it.' : c.id + ' anchored with ' + an.length + ' source' + (an.length === 1 ? '' : 's') + ', all matched to search results.') : c.id + ' has no real anchor. That is recorded as it is.');
       }
       if(ac === 'blockers'){
         c.checks = dzChecks(a.checks); c.checked = true; c.verdict = ''; c.real = ''; c.changes = ''; c.conf = 0; c.prediction = ''; save();
@@ -7015,6 +7144,7 @@ MStore.ready.then(function(){
       var c = tcard('note', 'Idea dissection', dzLab(seg.args || {}), [ac === 'finish' ? 'Finished' : DZ_STAGES[Math.min((function(){ var i = 0; while(i < prog.length && prog[i]) i++; return i; })(), 5)], ac === 'finish' ? 'ok' : '']);
       c.body.appendChild(dzStrip(prog));
       if(seg.dzv && seg.dzv.length) c.body.appendChild(dzRows(seg.dzv));
+      if(ac === 'finish' || ac === 'report') c.row.appendChild(mkBtn('ghost', 'Open report', '', function(){ go('docs'); }));
       return c.root;
     }
   });
@@ -7294,17 +7424,17 @@ MStore.ready.then(function(){
     journal_save:{ d:'Propose a Discovery Journal entry. Only when the person wants something kept. A hypothesis is not a fact and an observation is not a conclusion, so choose the category carefully.', p:{ type:STR('One of: hypothesis, question, method, observation, result, insight, decision, assumption, idea'), title:STR('Short title'), text:STR('The entry'), task:STR('Optional related task number or title') }, req:['type', 'title', 'text'] },
     focus_group:{ d:'Switch the task group you are working on. The lab already moves to the next group by itself when one finishes; use this only to switch on purpose, for example when the person asks for a different group.', p:{ group:STR('Name of the group') }, req:['group'] },
     read_attachment:{ d:'Read a file or pasted text the person attached in this chat. Without a name it lists them. The chat only contains the first 40,000 characters of a long one, so use this to read the rest in pieces: pass from_line, then next_from_line from the result.', p:{ name:STR('The attached file name, for example pasted-text-1.txt'), from_line:S('INTEGER', 'First line to read, default 1') } },
-    dissect_idea:{ d:'Dissect a fictional idea into its closest real-world version, in stages: start, strip, anchor, blockers, resolve, finish. The lab stores the state, refuses a stage that is out of order, and asks the person to approve the claims after strip and the result at finish. Read the next field in every result. status shows where things stand and drop discards it.', p:{
-      action:STR('start, strip, anchor, blockers, resolve, finish, status or drop'),
+    dissect_idea:{ d:'Dissect a fictional idea into its closest real-world version, in stages: start, strip, anchor, blockers, resolve, finish. The lab stores the state, refuses a stage that is out of order, and asks the person to approve the claims after strip and the result at finish. Read the next field in every result. report saves a full report of the whole dissection, with every search, under Documents at any time; finish saves it automatically. status shows where things stand and drop discards it.', p:{
+      action:STR('start, strip, anchor, blockers, resolve, finish, report, status or drop'),
       idea:STR('start: the idea in the person\u2019s own words'),
       origin:STR('start: whose idea it is, for example their own fiction or a named series'),
       claims:LIST('strip: the numbered claims as full sentences, each one thing the idea does, needs or costs. The lab numbers them C1, C2 and so on'),
       dressing:LIST('strip: story elements you dropped because they do no mechanical work, such as names, lore and drama'),
       claim:STR('anchor, blockers, resolve: the claim id, for example C1'),
-      anchors:{ type:'ARRAY', description:'anchor: real science or engineering that touches this claim', items:{ type:'OBJECT', properties:{ what:STR('What the real work shows'), source:STR('The paper, standard, organisation or page it came from, taken from a web search'), url:STR('Web address if there is one') }, required:['what', 'source'] } },
+      anchors:{ type:'ARRAY', description:'anchor: real science or engineering that touches this claim', items:{ type:'OBJECT', properties:{ what:STR('What the real work shows'), source:STR('The paper, standard, organisation or page it came from, taken from a web search'), url:STR('The web address exactly as web_search returned it. An anchor counts as checked only when its url or title matches a search result') }, required:['what', 'source'] } },
       no_anchor:STR('anchor: use instead of anchors when nothing real touches this claim, and say what was searched'),
       checks:{ type:'ARRAY', description:'blockers: exactly one check for each of the five areas', items:{ type:'OBJECT', properties:{ area:STR('energy, information, biology_materials, scale_time or control'), finding:STR('What stops or limits it here, with the reason'), kind:STR('hard_limit (physics or biology says no), engineering (solvable with effort) or none'), scale:STR('A rough size, such as an order of magnitude, if there is one') }, required:['area', 'finding', 'kind'] } },
-      verdict:STR('resolve: exists_now, possible_later or stays_fiction'),
+      verdict:STR('resolve, about the REAL version: exists_now (a real technology does this today), possible_later (plausible with development) or stays_fiction (no real version)'),
       real_version:STR('resolve: the real version of this claim, unless it stays fiction'),
       changes:STR('resolve: what had to be different from the fictional version, or that nothing changed'),
       confidence:S('INTEGER', 'resolve: how sure you are of the verdict, 1 to 10, unless it stays fiction'),
@@ -8371,7 +8501,7 @@ MStore.ready.then(function(){
     if(seg.st === 'undone') return slim(I.icon, 'Undone \u00b7 ' + label, 'warn');
     if(seg.st === 'fail'){
       if(seg.cmd != null && I.card) return I.card(m, seg);
-      return slim(I.icon, 'Could not ' + lc(label), 'bad');
+      return slim(I.icon, 'Could not ' + lc(label) + (seg.res ? ': ' + short(seg.res, 100) : ''), 'bad');
     }
     return I.card(m, seg);
   }
@@ -8672,7 +8802,7 @@ MStore.ready.then(function(){
         R.push('Tasks: when the person\u2019s goal needs several steps, add one task per step and give them all the same group name; that group becomes the focus. Work through every task in the focus group, in order, and finish each before the next. Never skip a task, leave one half done, or start a task from another group or an ungrouped one unless the person asks. Starting a task is only an attempt. Do its work with tools, then check it against \u201cDone when\u201d: a task is complete only when the work was really performed and each criterion is met, and complete_task is refused if no work was recorded. If it was tried and did not pass, call fail_task with what went wrong. If it cannot continue, or the person declined a step it needs, call block_task with the reason, then say so plainly and either carry on with a task that does not wait on it or stop and ask. A group is finished only when every task in it is completed; when it is, report briefly and stop, and ask which group is next instead of starting one. Before you stop, save progress with update_task (checkpoint = what is done and the next step). A task never overrides what the person just asked.');
       }
       if(has('read_assembly')) R.push('How you work, every time. (1) Understand: if the request is unclear, ask one question with ask_user, otherwise carry on. If the person names a file or shows an error from one, work on exactly that file first. (2) Plan: for more than one small change, add tasks grouped by theme. The lab focuses the group for you and moves to the next one itself; switch on purpose with focus_group. (3) Look before you change: read the lines or file you will edit, and read a failing output from the first error down. (4) Change small: one change per step with the narrowest edit tool, never a rewrite for a small fix. (5) Check: run it after each change and read the result. (6) If a run fails, fix the first error only. Never repeat an edit you already made, and after two failed attempts at the same error stop and tell the person what you know. (7) Finish: complete the task with evidence, and use the ledger when you are testing an idea. (8) Reply briefly: the result, why anything failed, and one next step.');
-      if(has('dissect_idea')) R.push('Idea dissection: when the person brings a fictional idea (a power, technology, creature or system) and wants its real-world version, use dissect_idea and follow the stages in order. The lab stores the state and refuses a stage that is out of order. (1) action start with the idea in their words. (2) action strip: split it into numbered claims, each one thing it does, needs or costs, and list the story dressing you dropped (names, lore, drama). The person must approve the claims; if they decline, ask what is wrong and submit again. (3) For each claim run web_search, then action anchor with the real science or engineering that touches it and a source taken from the results; if nothing real exists, use no_anchor and say what was searched. Never use your own memory as a source. (4) For each claim, action blockers: check all five areas (energy, information, biology_materials, scale_time, control) and tag each one hard_limit (physics or biology says no), engineering (solvable with effort) or none, with a rough size where you can. (5) action resolve for each claim: exists_now, possible_later or stays_fiction, and what had to change; possible_later also needs a prediction and a confidence. (6) action finish with the closest real version assembled from the surviving claims; the person approves it. Do not skip a claim. Read the next field in every result. If a step is refused or fails, tell the person plainly and do not describe it as done.');
+      if(has('dissect_idea')) R.push('Idea dissection: when the person brings a fictional idea (a power, technology, creature or system) and wants its real-world version, use dissect_idea and follow the stages in order. The lab stores the state and refuses a stage that is out of order. (1) action start with the idea in their words. (2) action strip: split it into numbered claims, each one thing it does, needs or costs, and list the story dressing you dropped (names, lore, drama). The person must approve the claims; if they decline, ask what is wrong and submit again. (3) For each claim run web_search, then action anchor with the real science or engineering that touches it and a source taken from the results, giving its url exactly as the search returned it (the lab checks each anchor against the search log); if nothing real exists, use no_anchor and say what was searched. Never use your own memory as a source. (4) For each claim, action blockers: check all five areas (energy, information, biology_materials, scale_time, control) and tag each one hard_limit (physics or biology says no), engineering (solvable with effort) or none, with a rough size where you can. (5) action resolve for each claim: exists_now, possible_later or stays_fiction, and what had to change; possible_later also needs a prediction and a confidence. (6) action finish with the closest real version assembled from the surviving claims; the person approves it. Do not skip a claim. Read the next field in every result. The verdict is about the real version, and what changed from the fiction goes in changes. After finish, the results card and the saved report are the record: do not list or re-judge the claims, and anything you say must match the stored verdicts. If a step is refused or fails, tell the person plainly and do not describe it as done.');
       var dzs = dzActive(p);
       if(has('dissect_idea') && dzs) R.push('A dissection is in progress: ' + short(dzs.idea, 160) + '. Progress: ' + dzProgText(dzs) + '. Claims: ' + (dzs.claims.length ? dzs.claims.map(function(c){ return c.id + ' ' + short(c.text, 60) + ' [' + (c.verdict || (c.checked ? 'checked' : c.anchored ? 'anchored' : 'open')) + ']'; }).join('; ') : 'none yet') + '. ' + dzNext(dzs) + ' Keep going stage by stage without stopping to chat. The person is only asked at the strip and finish approvals.');
       if(has('log_hypothesis')) R.push('Ledger: when a claim can be tested, log it with log_hypothesis (claim, why, prediction, confidence 1 to 10). Plan how to test it with plan_experiment and link the task that does the work. When it has run, call log_result with the verdict and real evidence, never a hope: a hypothesis is only supported or refuted by a result you actually observed.');
