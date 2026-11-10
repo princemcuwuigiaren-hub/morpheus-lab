@@ -2839,7 +2839,7 @@ MStore.ready.then(function(){
      pool: ids that passed the Auto scan, best first.
      fixed: the model Fixed mode is locked to.
      health: quiet memory of trouble per model { fails, until, last }. */
-  var G = { key:'', mode:'auto', models:[], pool:[], fixed:{ id:'', locked:false }, health:{}, prefer:'', scanKey:'', integ:{} };
+  var G = { key:'', tavily:'', mode:'auto', models:[], pool:[], fixed:{ id:'', locked:false }, health:{}, prefer:'', scanKey:'', integ:{} };
 
   function load(){
     projects = Array.isArray(MStore.initial.projects) ? MStore.initial.projects : [];
@@ -2853,6 +2853,7 @@ MStore.ready.then(function(){
         G.fixed = (g.fixed && typeof g.fixed === 'object') ? { id:g.fixed.id || '', locked:!!g.fixed.locked } : { id:'', locked:false };
         G.health = (g.health && typeof g.health === 'object') ? g.health : {};
         G.prefer = g.prefer || '';
+        G.tavily = typeof g.tavily === 'string' ? g.tavily : '';
         G.integ = (g.integ && typeof g.integ === 'object') ? g.integ : {};
         G.ext = (g.ext && typeof g.ext === 'object') ? g.ext : { on:false, base:'', key:'', model:'' };
         /* scanKey: the key the saved models were tested with. Older saves had none. */
@@ -4242,7 +4243,7 @@ MStore.ready.then(function(){
     body.appendChild(xc);
     function paintProv(){
       var own = !!EX().on;
-      conn.style.display = own ? 'none' : ''; sc.style.display = own ? 'none' : ''; xc.style.display = own ? '' : 'none';
+      conn.style.display = own ? 'none' : ''; xc.style.display = own ? '' : 'none';
     }
 
     var conn = el('div', 'tool on');
@@ -4279,18 +4280,26 @@ MStore.ready.then(function(){
     sinfo.addEventListener('click', function(){ sc.classList.toggle('open'); });
     stp.appendChild(sinfo);
     sc.appendChild(stp);
-    sc.appendChild(el('div', 'tool-info', 'The AI searches with Google Search through your Gemini key, using a model that supports it. The test runs one real search and shows which model answered, or why it failed.'));
+    sc.appendChild(el('div', 'tool-info', 'The AI searches with Tavily when a Tavily key is saved here. Tavily is free at tavily.com with no card. Without one, it uses Google Search through your Gemini key, and then Wikipedia. The test runs one real search and shows which one answered, or why it failed. The key stays in this browser and goes only to Tavily.'));
+    sc.appendChild(el('div', 'hint', 'Tavily API key'));
+    var tkr = el('div', 'keyrow'), tk = el('input', 'field');
+    tk.type = 'password'; tk.value = G.tavily || '';
+    tk.setAttribute('autocomplete', 'off'); tk.setAttribute('spellcheck', 'false'); tk.setAttribute('autocapitalize', 'off'); tk.setAttribute('aria-label', 'Tavily API key');
+    tk.addEventListener('input', function(){ G.tavily = tk.value.trim(); saveG(); });
+    var teye = el('button', 'chip'); teye.innerHTML = ICON.eye; teye.setAttribute('aria-label', 'Show or hide key');
+    teye.addEventListener('click', function(){ tk.type = tk.type === 'password' ? 'text' : 'password'; });
+    tkr.appendChild(tk); tkr.appendChild(teye); sc.appendChild(tkr);
     var srow = el('div', 'btnrow'), sbtn = el('button', 'btn solid', 'Test search');
     srow.appendChild(sbtn);
     sc.appendChild(srow);
     var sres = el('div', 'status'); sres.style.whiteSpace = 'pre-line';
     sc.appendChild(sres);
     sbtn.addEventListener('click', async function(){
-      if(!G.key){ UI.alert('API key needed', 'Paste your Gemini API key first.'); return; }
+      if(!G.key && !G.tavily){ UI.alert('Key needed', 'Paste a Tavily key or your Gemini API key first.'); return; }
       sbtn.disabled = true; sres.className = 'status'; sres.textContent = 'Testing...';
       try{
         var r = await testSearch(), L = [];
-        L.push(r.ok ? (r.grounded ? 'Search works.' : 'The model answered but returned no sources, so it may not have searched.') : 'Search is not available.');
+        L.push(r.ok ? (r.grounded ? 'Search works.' : 'The search answered but returned no sources, so it may not have searched.') : 'Search is not available.');
         L.push('Provider: ' + r.provider);
         if(r.model) L.push('Model ' + (r.ok ? 'tested' : 'last tried') + ': ' + r.model);
         if(r.ok){
@@ -6095,7 +6104,15 @@ MStore.ready.then(function(){
   }
   /* one real search that reports whether search works, which model answered, and why it failed if it did not */
   async function testSearch(){
-    var t0 = Date.now(), trace = [], out = { ok:false, grounded:false, provider:'Google Search through the Gemini API', model:'', sources:0, ms:0, why:'', tried:trace };
+    var t0 = Date.now(), trace = [], out = { ok:false, grounded:false, provider:G.tavily ? 'Tavily' : 'Google Search through the Gemini API', model:'', sources:0, ms:0, why:'', tried:trace };
+    if(G.tavily){
+      try{
+        var r0 = await tavilySearch('What is the latest stable version of Node.js?');
+        out.ok = true; out.sources = r0.sources.length; out.grounded = r0.sources.length > 0;
+      }catch(e0){ out.why = String((e0 && e0.message) || errText(e0)); }
+      out.ms = Date.now() - t0;
+      return out;
+    }
     if(!G.key){ out.why = 'No API key is saved.'; return out; }
     try{
       var r = await searchWeb('What is the latest stable version of Node.js?', null, trace);
@@ -6106,6 +6123,33 @@ MStore.ready.then(function(){
     }
     out.ms = Date.now() - t0;
     return out;
+  }
+  /* Tavily: a search service built for AI tools. The key stays in this browser and goes only to Tavily. */
+  function tavilyFail(msg){ var e = new Error(msg); e.tavily = true; return e; }
+  async function tavilySearch(q){
+    var ctl = new AbortController(), timer = setTimeout(function(){ ctl.abort(); }, 25000), r;
+    try{
+      try{
+        r = await fetch('https://api.tavily.com/search', {
+          method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + G.tavily }, signal:ctl.signal,
+          body:JSON.stringify({ query:q, search_depth:'basic', max_results:5, include_answer:true })
+        });
+      }catch(e){
+        throw tavilyFail(e && e.name === 'AbortError' ? 'Tavily did not answer within 25 seconds.' : 'The browser could not reach Tavily. Check the connection. If it is fine, the browser is blocking the request (CORS) and a small proxy is needed.');
+      }
+      var j = null, d = '';
+      try{ j = await r.json(); }catch(e){}
+      if(!r.ok){
+        if(j){ if(j.detail) d = typeof j.detail === 'string' ? j.detail : (j.detail.error || ''); else d = j.error || j.message || ''; }
+        var m = ({ 400:'Tavily could not use that search.', 401:'Tavily rejected the key. Check that it was pasted whole.', 429:'Tavily is rate limiting this key. Try again in a minute.', 432:'The Tavily plan allowance for this key is used up.', 433:'The Tavily pay-as-you-go limit for this key is reached.' })[r.status] || ('Tavily answered ' + r.status + '.');
+        throw tavilyFail(m + (typeof d === 'string' && d ? ' (' + short(d, 120) + ')' : ''));
+      }
+      var res = (j && Array.isArray(j.results)) ? j.results : [], parts = [];
+      if(j && j.answer) parts.push(String(j.answer));
+      res.slice(0, 5).forEach(function(x){ if(x && x.content) parts.push((x.title || x.url || 'Result') + ': ' + short(String(x.content), 600)); });
+      if(!parts.length) throw tavilyFail('Tavily returned nothing for that search.');
+      return { text:short(parts.join('\n\n'), 6000), sources:res.filter(function(x){ return x && x.url; }).map(function(x){ return { title:String(x.title || x.url), url:String(x.url) }; }), model:'Tavily' };
+    }finally{ clearTimeout(timer); }
   }
   /* a backup that needs no key: Wikipedia summaries. It covers general facts, not recent or technical topics. */
   async function wikiSearch(q){
@@ -6129,21 +6173,37 @@ MStore.ready.then(function(){
     icon:'compass', read:true,
     label:function(a){ return 'Search the web: ' + short(a.query || '', 40); },
     run:async function(p, a, seg){
-      var q = String(a.query || '').slice(0, 300), why = '';
-      try{
-        var r = await searchWeb(q);
-        seg.data = { q:short(a.query || '', 120), sources:r.sources, model:r.model };
-        return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
-          result:{ answer:r.text, sources:r.sources, model:r.model, instruction:'Use this to answer, and name the source for each fact.' + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
-      }catch(e){
-        if(e && e.aborted) throw e;
-        why = searchErr(e);
+      var q = String(a.query || '').slice(0, 300), whys = [], why = '', r;
+      var instr = 'Use this to answer, and name the source for each fact.';
+      /* 1. Tavily when a key is saved, 2. Google Search through the Gemini key, 3. Wikipedia */
+      if(G.tavily){
+        try{
+          r = await tavilySearch(q);
+          seg.data = { q:short(a.query || '', 120), sources:r.sources, provider:'Tavily' };
+          return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
+            result:{ answer:r.text, sources:r.sources, provider:'Tavily', instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') } };
+        }catch(e){
+          if(e && e.aborted) throw e;
+          whys.push(String((e && e.message) || errText(e)));
+        }
       }
+      if(G.key){
+        try{
+          r = await searchWeb(q);
+          seg.data = { q:short(a.query || '', 120), sources:r.sources, model:r.model, provider:'Google Search', why:whys.join(' ') };
+          return { ok:true, res:'Searched \u00b7 ' + r.sources.length + ' source' + (r.sources.length === 1 ? '' : 's'),
+            result:{ answer:r.text, sources:r.sources, model:r.model, instruction:instr + (r.sources.length ? '' : ' The search returned no sources, so say the answer is unverified.') + (whys.length ? ' Tavily failed (' + whys.join(' ') + '), so this came from Google Search instead. Tell the person that.' : '') } };
+        }catch(e){
+          if(e && e.aborted) throw e;
+          whys.push('Google Search: ' + searchErr(e));
+        }
+      }else if(!G.tavily) whys.push('No search key is saved. Add a Tavily key in Settings.');
+      why = whys.join(' ');
       try{
         var w = await wikiSearch(q);
         seg.data = { q:short(a.query || '', 120), sources:w.sources, via:'Wikipedia', why:why };
         return { ok:true, res:'Searched \u00b7 Wikipedia only \u00b7 ' + w.sources.length + ' source' + (w.sources.length === 1 ? '' : 's'),
-          result:{ answer:w.text, sources:w.sources, note:'Google Search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
+          result:{ answer:w.text, sources:w.sources, note:'The web search failed (' + why + ') so this comes from Wikipedia only. Tell the person that, and that it may not cover recent or technical topics.' } };
       }catch(e2){
         var msg = 'Search did not work: ' + why + ' The Wikipedia backup also found nothing (' + errText(e2) + '). Answer from what you know and say it is unverified.';
         return { ok:false, res:'Search did not work: ' + short(why, 120), result:{ error:msg } };
@@ -6151,8 +6211,8 @@ MStore.ready.then(function(){
     },
     card:function(m, seg){
       var d = seg.data || {}, srcs = d.sources || [];
-      var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's'), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
-      if(d.via && d.why) c.body.appendChild(el('div', 'txt dim', 'Google Search did not work: ' + d.why));
+      var c = tcard('compass', d.via ? 'Searched ' + d.via + ' only' : 'Searched the web', short(d.q || '', 80), [srcs.length + ' source' + (srcs.length === 1 ? '' : 's') + (d.provider ? ' \u00b7 ' + d.provider : ''), srcs.length ? (d.via ? 'warn' : 'ok') : 'warn']);
+      if(d.why) c.body.appendChild(el('div', 'txt dim', (d.via ? 'The main search did not work: ' : 'Tavily did not work, so this used Google: ') + d.why));
       srcs.forEach(function(x){
         var a = el('a', 'hint', short(x.title, 60)); a.href = x.url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block'; a.style.textDecoration = 'underline';
         c.body.appendChild(a);
