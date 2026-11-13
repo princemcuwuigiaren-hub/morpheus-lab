@@ -11150,7 +11150,7 @@ MStore.ready.then(function(){
           result:STR('Optional: the final answer or the point to remember') }, req:['title', 'steps'] },
       make_quiz:{
         d:'Create an interactive quiz from what was just taught or from the learner\'s notes. Ask 3 to 10 questions. Every question needs the correct answer and a one-line explanation. For multiple choice, the answer must be exactly one of the options.',
-        p:{ title:STR('Short title'), questions:ARR('The questions', OBJ({ q:STR('The question'), type:STR('choice, truefalse or short'), options:LIST('choice only: two to five options'),
+        p:{ title:STR('Short title'), questions:ARR('The questions', OBJ({ q:STR('The question'), type:STR('Exactly one of these words: choice, truefalse, short. No spaces, no capitals'), options:LIST('choice only: two to five options'),
           answer:STR('The correct answer. For choice it must match one option exactly. For truefalse use true or false'), explanation:STR('One line on why this is the answer'), topic:STR('Optional: the sub-topic') }, ['q', 'type', 'answer', 'explanation'])) }, req:['title', 'questions'] },
       make_flashcards:{
         d:'Create a set of flashcards. One idea per card. The front is a prompt, the back is the answer in a sentence or less.',
@@ -11163,8 +11163,63 @@ MStore.ready.then(function(){
   })();
 
   /* checks run before anything is drawn; a failure goes back to the model as a plain error so it can fix the call */
+  /* lite models bend the schema: accept the common variants instead of refusing the call */
+  function learnQType(q){
+    var t = String(q.type == null ? '' : q.type).toLowerCase().replace(/[^a-z]/g, '');
+    if(/^(choice|multiplechoice|multichoice|multiplechoicequestion|mcq|mc|singlechoice|select|options)$/.test(t)) return 'choice';
+    if(/^(truefalse|tf|boolean|bool|trueorfalse|yesno)$/.test(t)) return 'truefalse';
+    if(/^(short|shortanswer|text|open|openended|fillintheblank|fillblank|fill|freetext|written|answer|input|recall)$/.test(t)) return 'short';
+    if(Array.isArray(q.options) && q.options.length >= 2) return 'choice';
+    if(/^(true|false)$/i.test(String(q.answer).trim())) return 'truefalse';
+    return 'short';
+  }
+  function learnNorm(name, a){
+    if(name === 'make_quiz'){
+      (a.questions || []).forEach(function(q){
+        if(!q || typeof q !== 'object') return;
+        if(q.q == null) q.q = q.question || q.text || '';
+        if(typeof q.options === 'string') q.options = q.options.split(/\s*(?:\||\n|;)\s*/).filter(Boolean);
+        q.type = learnQType(q);
+        if(q.answer === true || q.answer === false) q.answer = String(q.answer);
+        if(q.answer == null) q.answer = q.correct || q.correct_answer || '';
+        q.answer = String(q.answer).trim();
+        q.explanation = String(q.explanation || '');
+        if(q.type === 'truefalse'){
+          var x = q.answer.toLowerCase();
+          q.answer = (x === 't' || x === 'yes') ? 'true' : (x === 'f' || x === 'no') ? 'false' : x;
+        }
+        if(q.type === 'choice' && Array.isArray(q.options)){
+          var o = q.options.map(String);
+          q.options = o;
+          if(o.indexOf(q.answer) < 0){
+            var low = o.filter(function(z){ return z.trim().toLowerCase() === q.answer.toLowerCase(); })[0];
+            if(low) q.answer = low;
+            else {
+              var m = q.answer.match(/^\(?([A-Za-z])[).:]\s*(.+)$/) || q.answer.match(/^\(?([A-Za-z])\)?$/);
+              if(m){
+                var byTxt = m[2] && o.filter(function(z){ return z.trim().toLowerCase() === m[2].trim().toLowerCase(); })[0];
+                var byLet = o[m[1].toUpperCase().charCodeAt(0) - 65];
+                if(byTxt) q.answer = byTxt; else if(byLet) q.answer = byLet;
+              }
+            }
+          }
+        }
+      });
+    }
+    if(name === 'make_flashcards'){
+      a.cards = (a.cards || []).map(function(c){
+        if(Array.isArray(c)) return { front:String(c[0] || ''), back:String(c[1] || '') };
+        c = c || {};
+        return { front:String(c.front || c.term || c.question || c.q || ''), back:String(c.back || c.definition || c.answer || c.a || '') };
+      }).filter(function(c){ return c.front && c.back; });
+    }
+    if(name === 'show_table'){
+      a.rows = (a.rows || []).map(function(r){ return Array.isArray(r) ? { cells:r.map(String) } : r; });
+    }
+  }
   function learnCheck(name, a){
     a = a || {};
+    learnNorm(name, a);
     if(name === 'show_diagram'){
       var ids = {}, ns = a.nodes || [];
       ns.forEach(function(n){ ids[n.id] = 1; });
@@ -11188,7 +11243,7 @@ MStore.ready.then(function(){
           if((q.options || []).indexOf(q.answer) < 0) return 'Question ' + (i + 1) + ': the answer is not one of the options. Copy it exactly.';
         } else if(q.type === 'truefalse'){
           if(!/^(true|false)$/i.test(q.answer || '')) return 'Question ' + (i + 1) + ': a true/false answer must be true or false.';
-        } else if(q.type !== 'short') return 'Question ' + (i + 1) + ': type must be choice, truefalse or short.';
+        } else if(q.type !== 'short') return 'Question ' + (i + 1) + ': type must be exactly choice, truefalse or short.';
       }
     }
     if(name === 'make_flashcards' && !(a.cards || []).length) return 'A card set needs at least one card.';
