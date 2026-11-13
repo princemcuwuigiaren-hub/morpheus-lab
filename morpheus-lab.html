@@ -813,12 +813,12 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 :root{
   --hglow:rgba(122,140,255,.11);--hglow2:rgba(122,140,255,.07);
   --c-app-bg:#1e463f;--c-app-fg:#8fe0cf;--c-mod-bg:#4a3a22;--c-mod-fg:#f0c27a;
-  --c-ds-bg:#23402c;--c-ds-fg:#9be0ab;--c-sp-bg:#223a63;--c-sp-fg:#9dc0f7;
+  --c-ds-bg:#23402c;--c-ds-fg:#9be0ab;--c-sp-bg:#223a63;--c-sp-fg:#9dc0f7;--c-ln-bg:#3a2a5c;--c-ln-fg:#c9b2f5;
 }
 :root[data-theme="light"]{
   --hglow:rgba(90,110,255,.09);--hglow2:rgba(90,110,255,.06);
   --c-app-bg:#d6efe9;--c-app-fg:#1d7566;--c-mod-bg:#f5e6cc;--c-mod-fg:#9a6410;
-  --c-ds-bg:#dbf0df;--c-ds-fg:#2a7f48;--c-sp-bg:#dce8fc;--c-sp-fg:#2b5cb3;
+  --c-ds-bg:#dbf0df;--c-ds-fg:#2a7f48;--c-sp-bg:#dce8fc;--c-sp-fg:#2b5cb3;--c-ln-bg:#e9defc;--c-ln-fg:#5b3aa8;
 }
 #home{background:radial-gradient(120% 52% at 50% 0%,var(--hglow),transparent 72%),var(--bg);--neon:168,85,247;--neon2:124,58,237;--neon-a:1}
 :root[data-theme="light"] #home{--neon-a:.55}
@@ -856,7 +856,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qwrap{display:flex;flex-direction:column;gap:40px;margin-top:24px}
 #home.typing .qwrap{display:none}
 .qhead{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 6px 12px}
-.qgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px}
+.qgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px 4px}
 .rlist{display:flex;flex-direction:column;gap:8px}
 .rrow{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding-right:2px;transition:background .15s}
 .rrow:active{background:var(--press)}
@@ -897,6 +897,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .qtile:nth-child(2) .qic,.qtile:nth-child(2)::before{animation-delay:-1s}
 .qtile:nth-child(3) .qic,.qtile:nth-child(3)::before{animation-delay:-2s}
 .qtile:nth-child(4) .qic,.qtile:nth-child(4)::before{animation-delay:-3s}
+.qtile:nth-child(5) .qic,.qtile:nth-child(5)::before{animation-delay:-.6s}
 @keyframes floatY{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
 @keyframes glowSway{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.82)}}
 @media (prefers-reduced-motion:reduce){.qic,.qtile::before,#home::after{animation:none}}
@@ -905,7 +906,64 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .t-mod{--tbg:var(--c-mod-bg);--tfg:var(--c-mod-fg)}
 .t-ds{--tbg:var(--c-ds-bg);--tfg:var(--c-ds-fg)}
 .t-sp{--tbg:var(--c-sp-bg);--tfg:var(--c-sp-fg)}
+.t-ln{--tbg:var(--c-ln-bg);--tfg:var(--c-ln-fg)}
 
+/* learn project type */
+.lrn{margin-top:2px}
+.lrn-h{font-weight:600;font-size:15px;margin-bottom:8px}
+.lrn svg{width:100%;height:auto;display:block}
+.lrn-box{fill:var(--chip);stroke:var(--line);stroke-width:1.2}
+.lrn-nt{fill:var(--text);font-size:11px;text-anchor:middle;dominant-baseline:middle}
+.lrn-el{fill:var(--muted);font-size:9.5px;text-anchor:middle}
+.lrn-ed{stroke:var(--muted);stroke-width:1.3;fill:none}
+.lrn-g{cursor:pointer}
+.lrn-g.on .lrn-box{stroke:var(--text)}
+.lrn-note,.lrn-cap{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.45}
+.lrn-tl{display:flex;flex-direction:column;gap:0;border-left:2px solid var(--line);margin-left:6px}
+.lrn-tr{position:relative;padding:0 0 14px 16px}
+.lrn-tr::before{content:"";position:absolute;left:-7px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--c-ln-fg);border:2px solid var(--card)}
+.lrn-tw{font-size:12px;font-weight:600;color:var(--c-ln-fg)}
+.lrn-tt{font-size:14px;font-weight:500}
+.lrn-td{font-size:13px;color:var(--muted);margin-top:2px}
+.lrn-tw2{overflow-x:auto}
+.lrn-t{border-collapse:collapse;font-size:13px;min-width:100%}
+.lrn-t th,.lrn-t td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+.lrn-t th{background:var(--chip);font-weight:600}
+.lrn-st{display:flex;flex-direction:column;gap:10px}
+.lrn-s{display:flex;gap:10px;align-items:flex-start}
+.lrn-n{flex:none;width:24px;height:24px;border-radius:50%;background:var(--c-ln-bg);color:var(--c-ln-fg);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.lrn-sh{font-size:14px;font-weight:500}
+.lrn-sw{font-size:13px;color:var(--muted);margin-top:2px}
+.lrn-res{font-size:14px;font-weight:500;border-top:1px solid var(--line);padding-top:10px}
+.lrn-score{font-size:12px;font-weight:600;color:var(--muted);margin:0 0 8px}
+.lrn-q{border-top:1px solid var(--line);padding:10px 0}
+.lrn-qt{font-size:14px;font-weight:500;margin-bottom:8px}
+.lrn-qb{display:flex;flex-direction:column;gap:6px}
+.lrn-opt{text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--chip);color:var(--text);font-size:14px}
+.lrn-opt:disabled{opacity:1}
+.lrn-opt.ok{border-color:var(--ok);color:var(--ok)}
+.lrn-opt.bad{border-color:var(--bad,#e5646b);color:var(--bad,#e5646b)}
+.lrn-fb{border-radius:12px;padding:8px 10px;font-size:13px;background:var(--chip)}
+.lrn-fb.ok .lrn-ft{color:var(--ok)}
+.lrn-fb.bad .lrn-ft{color:var(--bad,#e5646b)}
+.lrn-ft{font-weight:600}
+.lrn-fx,.lrn-you{color:var(--muted);margin-top:2px;font-size:13px}
+.lrn-card{display:block;width:100%;min-height:120px;border:1px solid var(--line);border-radius:16px;background:var(--chip);color:var(--text);padding:16px;text-align:center}
+.lrn-card.back{background:var(--c-ln-bg);border-color:var(--c-ln-fg)}
+.lrn-cs{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.lrn-cx{font-size:16px;line-height:1.4}
+
+.lrn-imgs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 10px}
+.lrn-fig{margin:0;display:flex;flex-direction:column;gap:5px;min-width:0}
+.lrn-imgw{position:relative;aspect-ratio:4/3;border-radius:12px;overflow:hidden;background:var(--chip);border:1px solid var(--line)}
+.lrn-imgw img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none;-webkit-user-drag:none;user-select:none}
+.lrn-imgw::after{content:"";position:absolute;inset:0}
+.lrn-imgx{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted)}
+.lrn-ct{font-size:12px;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.lrn-cr{font-size:11px;color:var(--muted);line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lrn-cr a{color:var(--c-ln-fg);text-decoration:underline}
+.lrn-g.ok .lrn-box{stroke:var(--ok)}
+.lrn-g.bad .lrn-box{stroke:var(--bad,#e5646b)}
 /* math from the AI */
 .mm.kx{font-size:1em}
 .mmb.kx{padding:6px 12px}
@@ -919,6 +977,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .t-mod{--m1:#fbe9b8;--m2:#d9a840;--m3:#85591a;--mi:#44290a}
 .t-ds{--m1:#d3f1da;--m2:#6cbf83;--m3:#2c6a42;--mi:#103a21}
 .t-sp{--m1:#d6e5fc;--m2:#7ea7e8;--m3:#2e4f8a;--mi:#12274f}
+.t-ln{--m1:#e6dcfb;--m2:#a98ae8;--m3:#5b3aa8;--mi:#271451}
 .qic{
   color:var(--mi);border:1px solid rgba(255,255,255,.4);
   background:
@@ -999,6 +1058,7 @@ table.mt{border-collapse:collapse;width:max-content;min-width:100%;font-size:14.
 .t-mod{--b1:#fbe9b8;--b2:#d9a840}
 .t-ds{--b1:#d3f1da;--b2:#6cbf83}
 .t-sp{--b1:#d6e5fc;--b2:#7ea7e8}
+.t-ln{--b1:#e6dcfb;--b2:#a98ae8}
 .qrec .qic{--m1:#f4f5f8;--m2:#aeb2bd;--m3:#5c606c;--mi:#23252c}
 .qbadge{border:1px solid var(--b2,var(--m2));color:var(--b1,var(--m1))}
 .nowrapbtns{flex-wrap:wrap}
@@ -2726,7 +2786,25 @@ MStore.ready.then(function(){
     {id:'dissect_idea', group:'Discovery', name:'Dissect idea', perm:'allow',
      desc:'Turns a fictional idea into its closest real-world version in fixed stages: strip into claims, anchor in real science, check blockers, resolve, output. You approve the claims and the final result, and the lab refuses any stage out of order.'},
     {id:'read_attachment', group:'References', name:'Read attachment', perm:'allow',
-     desc:'Lets the AI read the rest of a long file or pasted text you attached. The chat only sends the first 40,000 characters, so this reads the whole file in pieces.'}
+     desc:'Lets the AI read the rest of a long file or pasted text you attached. The chat only sends the first 40,000 characters, so this reads the whole file in pieces.'},
+    {id:'set_teaching_profile', group:'Learn', name:'Set teaching profile', perm:'allow',
+     desc:'Writes a short profile of the subject and how it is best taught. You can edit it. It is added to every later turn.'},
+    {id:'show_diagram', group:'Learn', name:'Show diagram', perm:'allow',
+     desc:'Draws a flow, cycle, hierarchy or concept map in the chat.'},
+    {id:'show_timeline', group:'Learn', name:'Show timeline', perm:'allow',
+     desc:'Draws ordered events in the chat.'},
+    {id:'show_table', group:'Learn', name:'Show table', perm:'allow',
+     desc:'Shows a comparison table in the chat.'},
+    {id:'explain_steps', group:'Learn', name:'Explain steps', perm:'allow',
+     desc:'Shows a worked process one step at a time, with the reason for each step.'},
+    {id:'make_quiz', group:'Learn', name:'Make quiz', perm:'allow',
+     desc:'Creates an interactive quiz in the chat. The score is kept as you answer.'},
+    {id:'make_flashcards', group:'Learn', name:'Make flashcards', perm:'allow',
+     desc:'Creates a set of flashcards in the chat.'},
+    {id:'save_learning', group:'Learn', name:'Save to project', perm:'allow',
+     desc:'Keeps a quiz result or a card set in the project.'},
+    {id:'show_images', group:'Learn', name:'Show pictures', perm:'allow',
+     desc:'Searches Wikimedia Commons and Openverse and shows pictures in the chat with creator, licence and source. They are view only and are never saved with the project. The search words are sent to those two sites.'}
   ];
   var PERMS = [['allow','Allow'],['ask','Ask'],['deny','Deny']];
 
@@ -2741,7 +2819,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['read_attachment', 'web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note'];
+  var M_READ = ['read_attachment', 'web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images'];
   /* while a group is in focus or a task is active, the status tools stay loaded whatever mode Auto picks, so work is never left half-recorded */
   var TASK_KEEP = ['start_task', 'update_task', 'block_task', 'fail_task', 'complete_task'];
   function taskKeep(p, id){ return TASK_KEEP.indexOf(id) >= 0 && !!(p && (focusGroup(p) || activeTask(p))); }
@@ -2832,14 +2910,15 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['read_attachment', 'dissect_idea', 'capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search'];
+  var TALK_SET = ['read_attachment', 'dissect_idea', 'capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
     TOOLS.forEach(function(t){
       if(!IMPL[t.id] || !DECL[t.id] || !st[t.id].enabled || st[t.id].perm === 'deny' || (INTG[t.id] && !intgUp(INTG[t.id]))) return;
       var ok = (!MODE_ONLY[t.id] || mo === MODE_ONLY[t.id]) && (!set || (INTG[t.id] ? (mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk)) : (set.indexOf(t.id) >= 0 || taskKeep(p, t.id))));
-      if((typeOf(p) === 'dataset' || typeOf(p) === 'spec') && t.group === 'Code' && !(gate && gate.code)) ok = false;
+      if((typeOf(p) === 'dataset' || typeOf(p) === 'spec' || typeOf(p) === 'learn') && t.group === 'Code' && !(gate && gate.code)) ok = false;
+      if(t.group === 'Learn' && typeOf(p) !== 'learn') ok = false;
       if(intent === 'talk' && TALK_SET.indexOf(t.id) < 0 && !(typeOf(p) === 'dataset' && t.id === 'dataset_add')) ok = false;
       (ok ? can : cannot).push(t.name.toLowerCase());
     });
@@ -4132,9 +4211,10 @@ MStore.ready.then(function(){
     module:'<svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg>',
     dataset:'<svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>',
     spec:'<svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 16h5"/></svg>',
+    learn:'<svg viewBox=\"0 0 24 24\"><path d=\"M3 8.5L12 4l9 4.5-9 4.5z\"/><path d=\"M7 11v4.5c0 1 2.2 2.5 5 2.5s5-1.5 5-2.5V11M21 8.5V14\"/></svg>',
     all:'<svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg>'
   };
-  var TYPE_CLS = { app:'t-app', module:'t-mod', dataset:'t-ds', spec:'t-sp' };
+  var TYPE_CLS = { app:'t-app', module:'t-mod', dataset:'t-ds', spec:'t-sp', learn:'t-ln' };
   var pickedType = '';
   function typeName(ty){ return (PTYPES.filter(function(x){ return x[0] === ty; })[0] || [ty, ty])[1]; }
   function paintTypeChip(){
@@ -4180,7 +4260,7 @@ MStore.ready.then(function(){
   function paintHome(){
     var tg = $('typeGrid'), rg = $('recentGrid');
     tg.innerHTML = ''; rg.innerHTML = '';
-    ['app', 'module', 'dataset', 'spec'].forEach(function(ty){
+    ['app', 'module', 'dataset', 'spec', 'learn'].forEach(function(ty){
       tg.appendChild(homeTile(TYPE_CLS[ty], TYPE_ICON[ty], typeName(ty), function(){
         pickedType = pickedType === ty ? '' : ty;
         paintTypeChip(); paintHome(); nameInput.focus();
@@ -6041,7 +6121,7 @@ MStore.ready.then(function(){
     preview:function(seg){ return el('div', 'txt', (seg.args || {}).description || ''); },
     run:function(p, a, seg){
       var np = { id:uid(), name:short(a.name || 'Sub-project', 40), created:Date.now(), parent:p.id, desc:short(a.description || a.brief || '', 6000) };
-      np.type = ['app', 'module', 'dataset', 'spec'].indexOf(a.kind) >= 0 ? a.kind : 'app'; np.opMode = TYPE_MODE[np.type];
+      np.type = ['app', 'module', 'dataset', 'spec', 'learn'].indexOf(a.kind) >= 0 ? a.kind : 'app'; np.opMode = TYPE_MODE[np.type];
       toolState(np); projects.push(np); save(); renderSide();
       seg.data = { id:np.id, name:np.name, desc:np.desc };
       return { ok:true, res:'Created "' + np.name + '"', result:{ ok:true, message:'Sub-project created.' } };
@@ -7381,7 +7461,7 @@ MStore.ready.then(function(){
   var STR = function(d){ return S('STRING', d); };
   var LIST = function(d){ return { type:'ARRAY', items:{ type:'STRING' }, description:d }; };
   var DECL = {
-    create_subproject:{ d:'Start a sub-project to explore one direction on its own.', p:{ name:STR('Short name'), description:STR('What this direction should explore'), kind:STR('app, module, dataset or spec. Default app') }, req:['name', 'description'] },
+    create_subproject:{ d:'Start a sub-project to explore one direction on its own.', p:{ name:STR('Short name'), description:STR('What this direction should explore'), kind:STR('app, module, dataset, spec or learn. Default app') }, req:['name', 'description'] },
     list_subprojects:{ d:'List the sub-projects of this project and where each one stands.' },
     read_related:{ d:'Read a connected project (the main project, a sub-project or a sibling): its type, description, code and documents. Call with no name to list them.', p:{ name:STR('Exact project name. Leave empty to list the connected projects') } },
     delete_subproject:{ d:'Delete a sub-project of this project by its exact name.', p:{ name:STR('Exact sub-project name') }, req:['name'] },
@@ -8413,7 +8493,8 @@ MStore.ready.then(function(){
       if((t.id === 'journal_save' || t.id === 'journal_list') && !gate.journal) return false;
       if(t.id === 'write_note' && !gate.note) return false;
       if(MODE_ONLY[t.id] && mo !== MODE_ONLY[t.id]) return false;
-      if((ty === 'dataset' || ty === 'spec') && t.group === 'Code' && !gate.code) return false;
+      if((ty === 'dataset' || ty === 'spec' || ty === 'learn') && t.group === 'Code' && !gate.code) return false;
+      if(t.group === 'Learn' && ty !== 'learn') return false;
       if(intent === 'talk' && TALK_SET.indexOf(t.id) < 0 && !(ty === 'dataset' && t.id === 'dataset_add')) return false;
       if(!set) return true;
       if(INTG[t.id]) return mo === 'test' && !!(IMPL[t.id].read || IMPL[t.id].testOk);
@@ -8789,7 +8870,7 @@ MStore.ready.then(function(){
       }else if(has('run_sandbox')){
         R.push('You can call run_sandbox and read_sandbox_output to run the page and read its console. analyze_code checks the page, or code you pass in, for mistakes.');
       }
-      if(has('create_subproject')) R.push('Sub-projects are connected workspaces inside this project, each with its own chats, code and type (app, module, dataset or spec). Use create_subproject when part of the work needs a different type or must stay apart: a module this project will use, a spec to plan first, a dataset to gather material, or a test or experiment that must not touch the main page. Never build test apps inside the main page. Use read_related to look at the main project or a sub-project before you build on it. You cannot edit another project from here; its card has an Open button for the person.');
+      if(has('create_subproject')) R.push('Sub-projects are connected workspaces inside this project, each with its own chats, code and type (app, module, dataset, spec or learn). Use create_subproject when part of the work needs a different type or must stay apart: a module this project will use, a spec to plan first, a dataset to gather material, a learn project to teach or quiz on a topic, or a test or experiment that must not touch the main page. Never build test apps inside the main page. Use read_related to look at the main project or a sub-project before you build on it. You cannot edit another project from here; its card has an Open button for the person.');
       if(has('web_search')) R.push('Use web_search for facts that may have changed, for sources, and whenever you are not sure. Say what the search found and name the source. Do not rely on memory for current facts.');
       if(has('propose_direction') || has('deliberate')){
         R.push((has('propose_direction') ? 'For a big or uncertain piece of work, call propose_direction first and wait for the answer. ' : '') +
@@ -11035,6 +11116,478 @@ MStore.ready.then(function(){
     card:function(m, seg){ return slim('note', seg.res || 'Read the dataset'); }
   });
 
+  /* =====================================================================
+     LEARN project type: teaching tools that draw in the chat.
+     Nothing here names a subject. The model sends structured data and the lab draws it.
+     ===================================================================== */
+  (function(){
+    var OBJ = function(props, req){ return { type:'OBJECT', properties:props, required:req || [] }; };
+    var ARR = function(d, item){ return { type:'ARRAY', description:d, items:item }; };
+    var LD = {
+      set_teaching_profile:{
+        d:'Write the teaching profile for this project once the person has said what they want to learn. Say what the subject is, how it is best taught, and the level of the learner. Call it again to revise it.',
+        p:{ subject:STR('The subject in a few words, in the person\'s own terms'), level:STR('The learner\'s level, taken from what they said or from a quick check'),
+          methods:LIST('How this subject is best taught here, such as diagrams, worked steps, recall questions, timelines, comparisons'),
+          notes:STR('Anything else that should shape the teaching: goal, exam, deadline, source material') }, req:['subject', 'methods'] },
+      show_diagram:{
+        d:'Draw a diagram in the chat. Give nodes and the links between them; the lab does the drawing. Use it for flows, cycles, hierarchies and concept maps. Keep it to 4 to 12 nodes.',
+        p:{ title:STR('Short title'), kind:STR('flow, cycle, hierarchy or map'),
+          nodes:ARR('The boxes in the diagram', OBJ({ id:STR('Short unique id such as n1'), label:STR('Text shown in the box, a few words'), note:STR('Optional: one short line shown when the box is tapped') }, ['id', 'label'])),
+          edges:ARR('The links between nodes', OBJ({ from:STR('id of the node it starts at'), to:STR('id of the node it ends at'), label:STR('Optional: what the link means') }, ['from', 'to'])),
+          caption:STR('Optional: one sentence on what to notice') }, req:['title', 'kind', 'nodes', 'edges'] },
+      show_timeline:{
+        d:'Draw ordered events in the chat. Use it when order or dates matter.',
+        p:{ title:STR('Short title'), events:ARR('Events in order, earliest first', OBJ({ when:STR('Date, period or step number'), what:STR('The event in a few words'), detail:STR('Optional: one short line of detail') }, ['when', 'what'])) }, req:['title', 'events'] },
+      show_table:{
+        d:'Show a comparison table in the chat. Every row must have one cell for each column.',
+        p:{ title:STR('Short title'), columns:LIST('Column headings'), rows:ARR('The rows', OBJ({ cells:LIST('One cell per column, in column order') }, ['cells'])) }, req:['title', 'columns', 'rows'] },
+      explain_steps:{
+        d:'Show a worked process one step at a time. Each step says what is done and why. Use it for solving a problem, running a method or following a mechanism.',
+        p:{ title:STR('What is being worked out'), steps:ARR('The steps, in order', OBJ({ step:STR('What is done in this step'), why:STR('Why it is done, in one sentence') }, ['step', 'why'])),
+          result:STR('Optional: the final answer or the point to remember') }, req:['title', 'steps'] },
+      make_quiz:{
+        d:'Create an interactive quiz from what was just taught or from the learner\'s notes. Ask 3 to 10 questions. Every question needs the correct answer and a one-line explanation. For multiple choice, the answer must be exactly one of the options.',
+        p:{ title:STR('Short title'), questions:ARR('The questions', OBJ({ q:STR('The question'), type:STR('choice, truefalse or short'), options:LIST('choice only: two to five options'),
+          answer:STR('The correct answer. For choice it must match one option exactly. For truefalse use true or false'), explanation:STR('One line on why this is the answer'), topic:STR('Optional: the sub-topic') }, ['q', 'type', 'answer', 'explanation'])) }, req:['title', 'questions'] },
+      make_flashcards:{
+        d:'Create a set of flashcards. One idea per card. The front is a prompt, the back is the answer in a sentence or less.',
+        p:{ title:STR('Short title'), cards:ARR('The cards', OBJ({ front:STR('Prompt or term'), back:STR('Answer or meaning') }, ['front', 'back'])) }, req:['title', 'cards'] },
+      save_learning:{
+        d:'Keep something from this session in the project: a quiz result, a missed question or a set of cards.',
+        p:{ kind:STR('quiz_result, missed_question or cards'), title:STR('Short title'), text:STR('The content to keep'), topic:STR('Optional: the sub-topic') }, req:['kind', 'title', 'text'] }
+    };
+    for(var k in LD) DECL[k] = LD[k];
+  })();
+
+  /* checks run before anything is drawn; a failure goes back to the model as a plain error so it can fix the call */
+  function learnCheck(name, a){
+    a = a || {};
+    if(name === 'show_diagram'){
+      var ids = {}, ns = a.nodes || [];
+      ns.forEach(function(n){ ids[n.id] = 1; });
+      if(ns.length < 2 || ns.length > 14) return 'A diagram needs 2 to 14 nodes.';
+      if((a.edges || []).some(function(e){ return !ids[e.from] || !ids[e.to]; })) return 'Some links point to a node id that does not exist. Fix the ids and call again.';
+    }
+    if(name === 'show_timeline' && !(a.events || []).length) return 'A timeline needs at least one event.';
+    if(name === 'explain_steps' && !(a.steps || []).length) return 'Needs at least one step.';
+    if(name === 'show_table'){
+      var n = (a.columns || []).length;
+      if(!n) return 'A table needs columns.';
+      if((a.rows || []).some(function(r){ return (r.cells || []).length !== n; })) return 'Every row needs exactly one cell per column.';
+    }
+    if(name === 'make_quiz'){
+      var qs = a.questions || [];
+      if(!qs.length) return 'A quiz needs at least one question.';
+      for(var i = 0; i < qs.length; i++){
+        var q = qs[i];
+        if(q.type === 'choice'){
+          if((q.options || []).length < 2) return 'Question ' + (i + 1) + ' is multiple choice but has fewer than two options.';
+          if((q.options || []).indexOf(q.answer) < 0) return 'Question ' + (i + 1) + ': the answer is not one of the options. Copy it exactly.';
+        } else if(q.type === 'truefalse'){
+          if(!/^(true|false)$/i.test(q.answer || '')) return 'Question ' + (i + 1) + ': a true/false answer must be true or false.';
+        } else if(q.type !== 'short') return 'Question ' + (i + 1) + ': type must be choice, truefalse or short.';
+      }
+    }
+    if(name === 'make_flashcards' && !(a.cards || []).length) return 'A card set needs at least one card.';
+    if(name === 'show_images' && !String(a.query || '').trim()) return 'Give a search query.';
+    return '';
+  }
+  function learnProfileText(p){
+    var f = p && p.learnProfile;
+    if(!f) return '';
+    if(f.text) return f.text;
+    var o = 'Subject: ' + (f.subject || '');
+    if(f.level) o += '\nLevel: ' + f.level;
+    if((f.methods || []).length) o += '\nTeach with: ' + f.methods.join(', ');
+    if(f.notes) o += '\nNotes: ' + f.notes;
+    return o;
+  }
+  function learnSave(p, kind, title, text, topic){
+    return Promise.resolve(dsAdd(p, [{ title:short('[' + String(kind).replace(/_/g, ' ') + '] ' + title, 120), text:short(text, 20000), source:'Learn' + (topic ? ': ' + short(topic, 80) : '') }], true));
+  }
+  var lrnN = 0;
+  function lrnHead(t){ return t ? el('div', 'lrn-h', t) : document.createTextNode(''); }
+
+  function lrnDiagram(a){
+    var W = 340, nodes = (a.nodes || []).slice(0, 14), idx = {}, pos = [], H, bh = 44;
+    nodes.forEach(function(n, i){ idx[n.id] = i; });
+    var edges = (a.edges || []).filter(function(e){ return idx[e.from] != null && idx[e.to] != null; });
+    if(a.kind === 'cycle'){
+      var rx = (W - 100) / 2 - 4, ry = Math.min(130, 36 + nodes.length * 16), cy = ry + bh / 2 + 10;
+      H = cy + ry + bh / 2 + 10;
+      nodes.forEach(function(n, i){ var ang = -Math.PI / 2 + 2 * Math.PI * i / nodes.length; pos.push({ x:W / 2 + rx * Math.cos(ang), y:cy + ry * Math.sin(ang), w:96 }); });
+    } else {
+      var inc = nodes.map(function(){ return 0; }), lvl = nodes.map(function(){ return -1; }), q = [];
+      edges.forEach(function(e){ inc[idx[e.to]]++; });
+      nodes.forEach(function(n, i){ if(!inc[i]){ lvl[i] = 0; q.push(i); } });
+      if(!q.length){ lvl[0] = 0; q.push(0); }
+      while(q.length){ var u = q.shift(); edges.forEach(function(e){ if(idx[e.from] === u){ var v = idx[e.to]; if(lvl[v] < 0){ lvl[v] = lvl[u] + 1; q.push(v); } } }); }
+      var maxL = 0, rows = {};
+      nodes.forEach(function(n, i){ if(lvl[i] < 0) lvl[i] = 0; maxL = Math.max(maxL, lvl[i]); (rows[lvl[i]] = rows[lvl[i]] || []).push(i); });
+      for(var l = 0; l <= maxL; l++){
+        var r = rows[l] || [], slot = W / Math.max(1, r.length);
+        r.forEach(function(i, j){ pos[i] = { x:slot * (j + 0.5), y:12 + bh / 2 + l * (bh + 34), w:Math.min(108, slot - 10) }; });
+      }
+      H = (maxL + 1) * (bh + 34) - 34 + 24;
+    }
+    function wrap(t, w){
+      var max = Math.max(6, Math.floor((w - 10) / 6.2)), words = String(t).split(/\s+/), out = [], cur = '';
+      words.forEach(function(x){ if(cur && (cur + ' ' + x).length > max){ out.push(cur); cur = x; } else cur = (cur ? cur + ' ' : '') + x; });
+      if(cur) out.push(cur);
+      return out.slice(0, 3);
+    }
+    function edgePt(c, tx, ty){
+      var dx = tx - c.x, dy = ty - c.y, sx = dx ? (c.w / 2) / Math.abs(dx) : 1e9, sy = dy ? (bh / 2) / Math.abs(dy) : 1e9, s = Math.min(sx, sy, 1);
+      return { x:c.x + dx * s, y:c.y + dy * s };
+    }
+    function norm(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim(); }
+    function same(v, label){
+      var x = norm(v), y = norm(label);
+      return !!x && (x === y || (x.length >= 4 && (y.indexOf(x) >= 0 || x.indexOf(y) >= 0)));
+    }
+    var lines = nodes.map(function(n, i){ return wrap(n.label, pos[i].w); });
+    var id = 'lrnArr' + (++lrnN), drill = false, state = {};
+    function build(){
+      var s = '<defs><marker id="' + id + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>';
+      edges.forEach(function(e){
+        var A = pos[idx[e.from]], B = pos[idx[e.to]], p1 = edgePt(A, B.x, B.y), p2 = edgePt(B, A.x, A.y);
+        s += '<path class="lrn-ed" d="M' + p1.x.toFixed(1) + ' ' + p1.y.toFixed(1) + 'L' + p2.x.toFixed(1) + ' ' + p2.y.toFixed(1) + '" marker-end="url(#' + id + ')"/>';
+        if(e.label) s += '<text class="lrn-el" x="' + ((p1.x + p2.x) / 2).toFixed(1) + '" y="' + (((p1.y + p2.y) / 2) - 3).toFixed(1) + '">' + esc(short(e.label, 22)) + '</text>';
+      });
+      nodes.forEach(function(n, i){
+        var c = pos[i], st = state[i], ls = (drill && !st) ? ['?'] : lines[i], y0 = c.y - (ls.length - 1) * 6.5;
+        s += '<g class="lrn-g' + (st ? (st.ok ? ' ok' : ' bad') : '') + '" data-i="' + i + '"><rect class="lrn-box" x="' + (c.x - c.w / 2).toFixed(1) + '" y="' + (c.y - bh / 2) + '" width="' + c.w.toFixed(1) + '" height="' + bh + '" rx="10"/>';
+        ls.forEach(function(t, k){ s += '<text class="lrn-nt" x="' + c.x.toFixed(1) + '" y="' + (y0 + k * 13).toFixed(1) + '">' + esc(t) + '</text>'; });
+        s += '</g>';
+      });
+      return s;
+    }
+    var root = el('div', 'lrn'), svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), note = el('div', 'lrn-note'), score = el('div', 'lrn-score'), row = el('div', 'act-row');
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Math.round(H));
+    note.style.display = 'none'; score.style.display = 'none';
+    function draw(){ svg.innerHTML = build(); }
+    function tally(){
+      var n = 0, ok = 0;
+      nodes.forEach(function(x, i){ if(state[i]){ n++; if(state[i].ok) ok++; } });
+      score.textContent = ok + ' / ' + nodes.length + (n === nodes.length ? ' \u00b7 done' : '');
+    }
+    function ask(i){
+      note.innerHTML = ''; note.style.display = '';
+      var f = el('input', 'field'); f.maxLength = 80; f.setAttribute('autocomplete', 'off');
+      var go = mkBtn('ghost', 'Check', '', function(){
+        var v = f.value.trim(); if(!v) return;
+        state[i] = { ok:same(v, nodes[i].label) }; note.style.display = 'none'; draw(); tally();
+      });
+      f.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); go.click(); } });
+      var r = el('div', 'act-row'); r.appendChild(go);
+      note.appendChild(el('div', 'lrn-qt', 'Name this part')); note.appendChild(f); note.appendChild(r);
+      f.focus();
+    }
+    svg.addEventListener('click', function(ev){
+      var g = ev.target.closest ? ev.target.closest('.lrn-g') : null;
+      if(!g) return;
+      var i = +g.getAttribute('data-i'), nd = nodes[i];
+      if(drill){ if(!state[i]) ask(i); return; }
+      var on = g.classList.contains('on');
+      Array.prototype.forEach.call(svg.querySelectorAll('.lrn-g.on'), function(x){ x.classList.remove('on'); });
+      if(on || !nd.note){ note.style.display = 'none'; return; }
+      g.classList.add('on'); note.textContent = nd.note; note.style.display = '';
+    });
+    var dbtn = mkBtn('ghost', 'Quiz me', '', function(){
+      drill = !drill; state = {}; note.style.display = 'none';
+      dbtn.querySelector('span').textContent = drill ? 'Show labels' : 'Quiz me';
+      score.style.display = drill ? '' : 'none'; tally(); draw();
+    });
+    row.appendChild(dbtn);
+    draw(); tally();
+    root.appendChild(lrnHead(a.title)); root.appendChild(svg); root.appendChild(note);
+    if(a.caption) root.appendChild(el('div', 'lrn-cap', a.caption));
+    root.appendChild(score); root.appendChild(row);
+    return root;
+  }
+  function lrnTimeline(a){
+    var root = el('div', 'lrn'), tl = el('div', 'lrn-tl');
+    root.appendChild(lrnHead(a.title));
+    (a.events || []).forEach(function(e){
+      var row = el('div', 'lrn-tr'), b = el('div', 'lrn-tb');
+      row.appendChild(el('div', 'lrn-tw', e.when)); b.appendChild(el('div', 'lrn-tt', e.what));
+      if(e.detail) b.appendChild(el('div', 'lrn-td', e.detail));
+      row.appendChild(b); tl.appendChild(row);
+    });
+    root.appendChild(tl);
+    return root;
+  }
+  function lrnTable(a){
+    var root = el('div', 'lrn'), wrapEl = el('div', 'lrn-tw2'), t = document.createElement('table'), th = document.createElement('tr');
+    t.className = 'lrn-t';
+    (a.columns || []).forEach(function(c){ th.appendChild(el('th', '', c)); });
+    t.appendChild(th);
+    (a.rows || []).forEach(function(r){ var tr = document.createElement('tr'); (r.cells || []).forEach(function(c){ tr.appendChild(el('td', '', c)); }); t.appendChild(tr); });
+    wrapEl.appendChild(t); root.appendChild(lrnHead(a.title)); root.appendChild(wrapEl);
+    return root;
+  }
+  function lrnSteps(d){
+    var root = el('div', 'lrn'), steps = d.steps || [], list = el('div', 'lrn-st'), row = el('div', 'act-row');
+    root.appendChild(lrnHead(d.title)); root.appendChild(list); root.appendChild(row);
+    if(!d.shown) d.shown = 1;
+    function paint(){
+      list.innerHTML = ''; row.innerHTML = '';
+      steps.forEach(function(s, i){
+        if(i >= d.shown) return;
+        var it = el('div', 'lrn-s'); it.appendChild(el('span', 'lrn-n', String(i + 1)));
+        var b = el('div', 'lrn-sb'); b.appendChild(el('div', 'lrn-sh', s.step)); b.appendChild(el('div', 'lrn-sw', s.why));
+        it.appendChild(b); list.appendChild(it);
+      });
+      if(d.shown < steps.length){
+        row.appendChild(mkBtn('ghost', 'Next step', '', function(){ d.shown++; save(); paint(); }));
+        row.appendChild(mkBtn('ghost', 'Show all', '', function(){ d.shown = steps.length; save(); paint(); }));
+      } else if(d.result){ list.appendChild(el('div', 'lrn-res', d.result)); }
+    }
+    paint();
+    return root;
+  }
+  function lrnQuiz(d){
+    var qs = d.questions || [], st = d.picked = d.picked || {}, root = el('div', 'lrn'), score = el('div', 'lrn-score'), end = el('div', 'act-row');
+    function norm(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9. -]/g, '').replace(/\s+/g, ' ').trim(); }
+    function tally(){
+      var n = 0, ok = 0;
+      qs.forEach(function(q, i){ if(st[i]){ n++; if(st[i].ok) ok++; } });
+      score.textContent = 'Score ' + ok + ' / ' + qs.length;
+      end.innerHTML = '';
+      if(qs.length && n === qs.length){
+        end.appendChild(mkBtn('ghost', 'Save result', '', function(){
+          var missed = qs.filter(function(q, i){ return !st[i].ok; }).map(function(q){ return q.q + ' Answer: ' + q.answer; });
+          learnSave(current, 'quiz_result', d.title || 'Quiz', 'Score ' + ok + ' / ' + qs.length + (missed.length ? '\nMissed:\n' + missed.join('\n') : ''), '').then(function(r){ end.innerHTML = ''; end.appendChild(el('div', 'lrn-note', r && r.added ? 'Saved to the project' : 'Already saved')); });
+        }));
+      }
+    }
+    root.appendChild(lrnHead(d.title)); root.appendChild(score);
+    qs.forEach(function(q, i){
+      var box = el('div', 'lrn-q'), body = el('div', 'lrn-qb');
+      box.appendChild(el('div', 'lrn-qt', (i + 1) + '. ' + q.q)); box.appendChild(body);
+      function done(v, ok){ st[i] = { v:v, ok:ok }; save(); paint(); tally(); }
+      function feedback(){
+        var fb = el('div', 'lrn-fb ' + (st[i].ok ? 'ok' : 'bad'));
+        fb.appendChild(el('div', 'lrn-ft', st[i].ok ? 'Correct' : 'Answer: ' + q.answer));
+        if(q.explanation) fb.appendChild(el('div', 'lrn-fx', q.explanation));
+        return fb;
+      }
+      function paint(){
+        body.innerHTML = '';
+        if(q.type === 'short'){
+          if(!st[i]){
+            var f = el('input', 'field'); f.maxLength = 200; f.setAttribute('autocomplete', 'off');
+            var go = mkBtn('ghost', 'Check', '', function(){ var v = f.value.trim(); if(!v) return; done(v, norm(v) === norm(q.answer)); });
+            f.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); go.click(); } });
+            body.appendChild(f); body.appendChild(el('div', 'act-row')).appendChild(go);
+          } else {
+            body.appendChild(el('div', 'lrn-you', 'You: ' + st[i].v)); body.appendChild(feedback());
+            if(!st[i].ok){ var rr = el('div', 'act-row'); rr.appendChild(mkBtn('ghost', 'Count as correct', '', function(){ done(st[i].v, true); })); body.appendChild(rr); }
+          }
+          return;
+        }
+        var opts = q.type === 'truefalse' ? ['True', 'False'] : (q.options || []);
+        opts.forEach(function(o){
+          var b = el('button', 'lrn-opt', o), isAns = norm(o) === norm(q.answer);
+          if(st[i]){
+            b.disabled = true;
+            if(isAns) b.classList.add('ok'); else if(st[i].v === o) b.classList.add('bad');
+          } else b.addEventListener('click', function(){ done(o, isAns); });
+          body.appendChild(b);
+        });
+        if(st[i]) body.appendChild(feedback());
+      }
+      paint(); root.appendChild(box);
+    });
+    root.appendChild(end); tally();
+    return root;
+  }
+  function lrnCards(d){
+    var cards = d.cards || [], root = el('div', 'lrn'), i = d.pos || 0, flip = false, face = el('button', 'lrn-card'), cnt = el('div', 'lrn-score'), row = el('div', 'act-row');
+    if(i >= cards.length) i = 0;
+    function paint(){
+      face.innerHTML = ''; face.className = 'lrn-card' + (flip ? ' back' : '');
+      face.appendChild(el('div', 'lrn-cs', flip ? 'Answer' : 'Prompt')); face.appendChild(el('div', 'lrn-cx', flip ? cards[i].back : cards[i].front));
+      cnt.textContent = (i + 1) + ' / ' + cards.length;
+    }
+    function go(n){ i = (i + n + cards.length) % cards.length; d.pos = i; flip = false; save(); paint(); }
+    face.addEventListener('click', function(){ flip = !flip; paint(); });
+    row.appendChild(mkBtn('ghost', 'Back', '', function(){ go(-1); }));
+    row.appendChild(mkBtn('ghost', 'Next', '', function(){ go(1); }));
+    var sv = mkBtn('ghost', 'Save set', '', function(){
+      learnSave(current, 'cards', d.title || 'Cards', cards.map(function(c){ return c.front + ' = ' + c.back; }).join('\n'), '').then(function(r){ sv.querySelector('span').textContent = r && r.added ? 'Saved' : 'Already saved'; sv.disabled = true; });
+    });
+    row.appendChild(sv);
+    root.appendChild(lrnHead(d.title)); root.appendChild(face); root.appendChild(cnt); root.appendChild(row); paint();
+    return root;
+  }
+  function lrnCard(icon, title, sub, node){
+    var c = tcard(icon, title, sub);
+    c.body.appendChild(node);
+    return c.root;
+  }
+
+  T('set_teaching_profile', {
+    icon:'note',
+    label:function(a){ return 'Teaching profile: ' + short(a.subject || '', 40); },
+    run:function(p, a, seg){
+      var subj = short(String(a.subject || '').trim(), 120);
+      if(!subj) return terr('Give the subject.');
+      var old = p.learnProfile || {};
+      p.learnProfile = { subject:subj, level:short(a.level || '', 120), methods:(a.methods || []).map(function(x){ return short(x, 60); }).slice(0, 8), notes:short(a.notes || '', 400) };
+      if(old.text && !a.methods && !a.notes) p.learnProfile.text = old.text;
+      save();
+      return { ok:true, res:'Profile set \u00b7 ' + subj, result:{ ok:true } };
+    },
+    card:function(m, seg){
+      var p = current, c = tcard('note', 'Teaching profile', (p && p.learnProfile && p.learnProfile.subject) || (seg.args || {}).subject || '', ['Saved', 'ok']);
+      var tx = el('div', 'lrn-note', learnProfileText(p) || ''); tx.style.whiteSpace = 'pre-wrap';
+      c.body.appendChild(tx);
+      c.row.appendChild(mkBtn('ghost', 'Edit', '', async function(){
+        var v = await UI.prompt('Edit teaching profile', { value:learnProfileText(p), multi:true, maxLength:800, confirmText:'Save' });
+        if(v == null || !p.learnProfile) return;
+        p.learnProfile.text = v; save(); tx.textContent = v;
+      }));
+      return c.root;
+    }
+  });
+  function learnTool(id, label, icon, build){
+    T(id, {
+      icon:icon,
+      label:function(a){ return label + (a.title ? ': ' + short(a.title, 40) : ''); },
+      run:function(p, a, seg){
+        var err = learnCheck(id, a);
+        if(err) return terr(err);
+        seg.data = JSON.parse(JSON.stringify(a));
+        return { ok:true, res:label + ' shown', result:{ ok:true, message:'The ' + label.toLowerCase() + ' is on screen. Do not repeat its content in words.' } };
+      },
+      card:function(m, seg){ var d = seg.data || seg.args || {}; return build(d); }
+    });
+  }
+  learnTool('show_diagram', 'Diagram', 'note', lrnDiagram);
+  learnTool('show_timeline', 'Timeline', 'note', lrnTimeline);
+  learnTool('show_table', 'Table', 'note', lrnTable);
+  learnTool('explain_steps', 'Steps', 'note', lrnSteps);
+  learnTool('make_quiz', 'Quiz', 'note', lrnQuiz);
+  learnTool('make_flashcards', 'Flashcards', 'note', lrnCards);
+  T('save_learning', {
+    icon:'note',
+    label:function(a){ return 'Keep: ' + short(a.title || '', 40); },
+    run:async function(p, a, seg){
+      var text = String(a.text || '').trim();
+      if(!text) return terr('No text was given.');
+      var r = await learnSave(p, a.kind || 'note', a.title || 'Untitled', text, a.topic || '');
+      if(!r || !r.added) return terr('That is already saved. Do not save it again.');
+      save();
+      return { ok:true, res:'Kept \u00b7 ' + dsStatOf(p).n + ' records', result:{ ok:true, records:dsStatOf(p).n } };
+    },
+    card:function(m, seg){ return slim('note', seg.res || 'Kept in the project', 'ok'); }
+  });
+
+  /* ---- pictures from the web, view only: Wikimedia Commons and Openverse (both free, no key). Only the link and credit are kept, never the image itself ---- */
+  DECL.show_images = { d:'Show real pictures from the web in the chat, each with its creator, licence and source link. Use it when seeing the real thing helps: places, specimens, anatomy, equipment, artworks, events. The search is done by the lab. Describe only what the titles support, and never claim a picture shows more than that.',
+    p:{ query:STR('What to search for, a few plain words'), count:S('INTEGER', 'How many pictures, 2 to 6. Default 4'), title:STR('Optional: a short heading for the set') }, req:['query'] };
+  async function lrnGet(url, ms){
+    var ctl = new AbortController(), t = setTimeout(function(){ ctl.abort(); }, ms || 10000);
+    try{
+      var r = await fetch(url, { signal:ctl.signal });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } finally { clearTimeout(t); }
+  }
+  function lrnPlain(h){
+    try{ return (new DOMParser().parseFromString(String(h || ''), 'text/html').body.textContent || '').replace(/\s+/g, ' ').trim(); }catch(e){ return String(h || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim(); }
+  }
+  function lrnLicence(l, v){
+    l = String(l || '').toLowerCase();
+    if(!l) return '';
+    if(l === 'cc0') return 'CC0';
+    if(l === 'pdm') return 'Public domain';
+    return 'CC ' + l.toUpperCase() + (v ? ' ' + v : '');
+  }
+  function lrnHost(u){ try{ return new URL(u).hostname.replace(/^www\./, ''); }catch(e){ return ''; } }
+  function lrnCommons(j){
+    var pages = (j && j.query && j.query.pages) ? Object.keys(j.query.pages).map(function(k){ return j.query.pages[k]; }) : [];
+    pages.sort(function(a, b){ return (a.index || 0) - (b.index || 0); });
+    var out = [];
+    pages.forEach(function(p){
+      var ii = p.imageinfo && p.imageinfo[0], em = ii && ii.extmetadata;
+      if(!ii || !em || !/^image\/(jpeg|png|webp|svg\+xml)$/.test(ii.mime || '')) return;
+      var lic = em.LicenseShortName && lrnPlain(em.LicenseShortName.value), page = ii.descriptionurl, th = ii.thumburl || ii.url;
+      if(!lic || !page || !th) return;
+      out.push({ thumb:th, title:short(String(p.title || '').replace(/^File:/, '').replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' '), 90),
+        creator:short(lrnPlain(em.Artist && em.Artist.value) || 'Unknown', 60), license:short(lic, 30), page:page });
+    });
+    return out;
+  }
+  function lrnOpenverse(j){
+    var out = [];
+    ((j && j.results) || []).forEach(function(r){
+      var lic = lrnLicence(r.license, r.license_version), page = r.foreign_landing_url || r.url, th = r.thumbnail || r.url;
+      if(!lic || !page || !th) return;
+      out.push({ thumb:th, title:short(r.title || 'Untitled', 90), creator:short(r.creator || 'Unknown', 60), license:lic, page:page });
+    });
+    return out;
+  }
+  async function lrnImages(q, n){
+    var enc = encodeURIComponent(q), errs = [];
+    var jobs = [
+      lrnGet('https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrlimit=10&gsrsearch=' + enc + '&prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=640&format=json&origin=*').then(lrnCommons),
+      lrnGet('https://api.openverse.org/v1/images/?q=' + enc + '&page_size=10&mature=false').then(lrnOpenverse)
+    ].map(function(p, i){
+      return p.catch(function(e){ errs.push((i ? 'Openverse' : 'Wikimedia Commons') + ': ' + (e && e.name === 'AbortError' ? 'timed out' : (e instanceof TypeError ? 'could not connect' : (e && e.message) || 'failed'))); return []; });
+    });
+    var res = await Promise.all(jobs), out = [], seen = {};
+    for(var k = 0; k < 10 && out.length < n; k++){
+      for(var s = 0; s < 2 && out.length < n; s++){
+        var it = res[s][k];
+        if(it && !seen[it.thumb]){ seen[it.thumb] = 1; out.push(it); }
+      }
+    }
+    return { items:out, errs:errs };
+  }
+  function lrnImgFig(it){
+    var fig = el('figure', 'lrn-fig'), w = el('div', 'lrn-imgw'), img = document.createElement('img');
+    img.alt = it.title; img.draggable = false; img.loading = 'lazy'; img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', function(){ img.remove(); w.appendChild(el('div', 'lrn-imgx', 'Image unavailable')); });
+    ['contextmenu', 'dragstart'].forEach(function(t){ w.addEventListener(t, function(e){ e.preventDefault(); }); });
+    img.src = it.thumb;
+    w.appendChild(img);
+    var cap = el('figcaption', 'lrn-cap2');
+    cap.appendChild(el('div', 'lrn-ct', it.title));
+    cap.appendChild(el('div', 'lrn-cr', it.creator + ' \u00b7 ' + it.license));
+    if(/^https?:\/\//i.test(it.page)){
+      var a = document.createElement('a'), box = el('div', 'lrn-cr');
+      a.href = it.page; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Source: ' + (lrnHost(it.page) || 'link');
+      box.appendChild(a); cap.appendChild(box);
+    }
+    fig.appendChild(w); fig.appendChild(cap);
+    return fig;
+  }
+  T('show_images', {
+    icon:'note',
+    label:function(a){ return 'Pictures: ' + short(a.query || '', 40); },
+    run:async function(p, a, seg){
+      var q = String(a.query || '').trim();
+      if(!q) return terr('Give a search query.');
+      var n = Math.max(2, Math.min(6, parseInt(a.count, 10) || 4)), r;
+      try{ r = await lrnImages(q, n); }catch(e){ return terr('The picture search failed: ' + ((e && e.message) || 'unknown error')); }
+      if(!r.items.length) return terr(r.errs.length ? 'Could not search for pictures (' + r.errs.join('; ') + ').' : 'No pictures with a known source and licence matched. Try other words.');
+      seg.data = { query:q, title:short(a.title || '', 80), items:r.items };
+      return { ok:true, res:r.items.length + ' picture' + (r.items.length === 1 ? '' : 's') + ' shown', result:{ shown:r.items.length,
+        pictures:r.items.map(function(x){ return { title:x.title, creator:x.creator, licence:x.license, source:lrnHost(x.page) }; }),
+        note:'The pictures are on screen with credits and are view only. Do not describe more than the titles support.' } };
+    },
+    card:function(m, seg){
+      var d = seg.data || {}, root = el('div', 'lrn'), grid = el('div', 'lrn-imgs');
+      if(!(d.items || []).length) return slim('note', seg.res || 'Pictures', 'ok');
+      root.appendChild(lrnHead(d.title || d.query));
+      d.items.forEach(function(it){ grid.appendChild(lrnImgFig(it)); });
+      root.appendChild(grid);
+      return root;
+    }
+  });
+
   /* dataset page */
   function pickDataFiles(then){
     var inp = document.createElement('input');
@@ -11752,16 +12305,18 @@ MStore.ready.then(function(){
     ['app', 'App', 'Something with a screen that you look at and tap: a page, a tool, a game, a website. Use it when the result is something people open and use.'],
     ['module', 'Module', 'Code with no screen: functions, logic, calculations, game systems, utilities, scripts. Use it for a piece you want to build and test on its own, which an App can use later. It runs in a test view that shows what it prints.'],
     ['dataset', 'Dataset', 'A collection of information: facts, records, notes and files gathered on a topic. Use it when you need material before you build, or data to keep, search and export.'],
-    ['spec', 'Spec', 'Written plans and documents: ideas, designs, rules, outlines, requirements. No code. Use it when you are still working out what you want.']
+    ['spec', 'Spec', 'Written plans and documents: ideas, designs, rules, outlines, requirements. No code. Use it when you are still working out what you want.'],
+    ['learn', 'Learn', 'Teaching and practice on any subject: explanations, diagrams, quizzes and flashcards. Use it when you want to understand or revise something.']
   ];
-  var TYPE_MODE = { module:'discovery', dataset:'research', spec:'design', app:'build' };
-  function typeOf(p){ return p && ['app', 'module', 'dataset', 'spec'].indexOf(p.type) >= 0 ? p.type : 'app'; }
+  var TYPE_MODE = { module:'discovery', dataset:'research', spec:'design', app:'build', learn:'research' };
+  function typeOf(p){ return p && ['app', 'module', 'dataset', 'spec', 'learn'].indexOf(p.type) >= 0 ? p.type : 'app'; }
   function typeText(p){
     var ty = typeOf(p);
     var sw = ' The person can change the project type in Project settings at any time, and can start a sub-project of another type. If the work clearly belongs in a different type, say so in one sentence instead of forcing it.';
     if(ty === 'module') return 'PROJECT TYPE: Module. This project is code with no screen: functions, classes and logic that do one job and can be tested on their own. The code is one plain script (no HTML, no import or export, no buttons, forms or styling): define things with const, class or function at the top level so they can be called. The lab runs it in a test view that shows what it prints. Do not build a page here; if a visual app is wanted, suggest a sub-project of type App.' + sw;
     if(ty === 'dataset') return 'PROJECT TYPE: Dataset. This project gathers information on a topic. Your job is finding, collecting and organizing material: use web_search for facts, then save each useful piece with dataset_add (a clean excerpt or a summary in your own words, with its source). One topic per record. Never save something you did not find. Do not build apps or write code here unless the person asks for a script.' + sw;
     if(ty === 'spec') return 'PROJECT TYPE: Spec. This project is for written plans and documents. Write them with write_doc so the person can read, edit and export them. Do not write code or build apps here unless the person asks.' + sw;
+    if(ty === 'learn') return 'PROJECT TYPE: Learn. This project is for teaching and learning, on any subject. Teach, do not lecture: find out what the person already knows, then explain in small pieces. Show instead of telling when structure helps: show_diagram, show_timeline, show_table or explain_steps; check understanding with make_quiz or make_flashcards. When seeing the real thing helps (places, specimens, anatomy, equipment, artworks), use show_images; credits appear on their own, so only say what the titles support. Take facts from web_search or the notes the person attached, never from guesswork, and say when you are unsure. Check every quiz answer before you send it. When the person first says what they want to learn, check list_docs and list_references once for a syllabus or notes and teach from them if they exist, then call set_teaching_profile once. After a visual or quiz is shown, do not repeat its content in words. Do not write code or build apps here unless the person asks.' + (learnProfileText(p) ? '\nTEACHING PROFILE (set with the person):\n' + learnProfileText(p) : '') + sw;
     return '';
   }
   /* a module has no page, so it is run inside a small harness that shows what it prints */
@@ -11773,7 +12328,7 @@ MStore.ready.then(function(){
     return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>' + css + '</style></head><body><h1>Module output</h1><div id="out"></div><script>' + cap + '<\/script><script>\n' +
       String(src).replace(/<\/script/gi, '<\\/script') + '\n<\/script></body></html>';
   }
-  var TYPE_BLURB = { module:'code with no screen', dataset:'collected information', spec:'plans and documents', app:'a screen you use' };
+  var TYPE_BLURB = { module:'code with no screen', dataset:'collected information', spec:'plans and documents', app:'a screen you use', learn:'teaching and practice' };
   function askType(title){
     return UI.sheet(title || 'What kind of project?', PTYPES.map(function(x){ return { label:x[1] + ' \u00b7 ' + TYPE_BLURB[x[0]], value:x[0] }; }));
   }
