@@ -2804,7 +2804,9 @@ MStore.ready.then(function(){
     {id:'save_learning', group:'Learn', name:'Save to project', perm:'allow',
      desc:'Keeps a quiz result or a card set in the project.'},
     {id:'show_images', group:'Learn', name:'Show pictures', perm:'allow',
-     desc:'Searches Wikimedia Commons and Openverse and shows pictures in the chat with creator, licence and source. They are view only and are never saved with the project. The search words are sent to those two sites.'}
+     desc:'Searches Wikimedia Commons and Openverse and shows pictures in the chat with creator, licence and source. They are view only and are never saved with the project. The search words are sent to those two sites.'},
+    {id:'set_syllabus', group:'Learn', name:'Set syllabus', perm:'ask',
+     desc:'Turns a syllabus into a checklist of topics in Tasks. You approve it first. The lab marks a topic done when a checked quiz on it passes the pass mark, never the AI.'}
   ];
   var PERMS = [['allow','Allow'],['ask','Ask'],['deny','Deny']];
 
@@ -2819,7 +2821,7 @@ MStore.ready.then(function(){
     ['build', 'Build', 'Create and change code.'],
     ['test', 'Test', 'Run, inspect and diagnose. Nothing gets changed.']
   ];
-  var M_READ = ['read_attachment', 'web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images'];
+  var M_READ = ['read_attachment', 'web_search', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_notes', 'read_assembly', 'read_sandbox_output', 'read_xray', 'list_tasks', 'read_task', 'get_active_task', 'journal_list', 'journal_save', 'deliberate', 'write_note', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images', 'set_syllabus'];
   /* while a group is in focus or a task is active, the status tools stay loaded whatever mode Auto picks, so work is never left half-recorded */
   var TASK_KEEP = ['start_task', 'update_task', 'block_task', 'fail_task', 'complete_task'];
   function taskKeep(p, id){ return TASK_KEEP.indexOf(id) >= 0 && !!(p && (focusGroup(p) || activeTask(p))); }
@@ -2910,7 +2912,7 @@ MStore.ready.then(function(){
     var t = lastUserText(ch);
     return { journal:JOURNAL_RE.test(t), note:NOTE_RE.test(t), code:/\b(?:code|script|function|program|app|page|html|javascript|module|class)\b/i.test(t) };
   }
-  var TALK_SET = ['read_attachment', 'dissect_idea', 'capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images'];
+  var TALK_SET = ['read_attachment', 'dissect_idea', 'capture_idea', 'park_question', 'log_hypothesis', 'save_finding', 'log_decision', 'list_docs', 'read_doc', 'write_doc', 'list_references', 'read_reference', 'dataset_info', 'read_assembly', 'read_notes', 'list_tasks', 'read_task', 'get_active_task', 'list_subprojects', 'read_related', 'list_files', 'read_file', 'ask_user', 'read_sandbox_output', 'web_search', 'set_teaching_profile', 'show_diagram', 'show_timeline', 'show_table', 'explain_steps', 'make_quiz', 'make_flashcards', 'save_learning', 'show_images', 'set_syllabus'];
   /* tells the model exactly what this mode lets it do, so it never promises what is not there */
   function capText(p, ov, gate, intent){
     var mo = opModeOf(p), st = toolState(p), set = ov ? null : MODE_SETS[mo], can = [], cannot = [];
@@ -6656,6 +6658,7 @@ MStore.ready.then(function(){
       var t = findTask(p, a.task);
       if(!t) return NOTASK;
       if(t.status === 'completed') return 'That task is already completed.';
+      if(t.learn) return 'This is a syllabus topic. The lab marks it done when a checked quiz on it passes the pass mark. Run a quiz on it with make_quiz and give the topic title.';
       if(t.status !== 'active') return 'Start it with start_task and do its work first. A task that was never started cannot be completed.';
       var w = unmetDeps(p, t);
       if(w.length) return 'It still waits on: ' + w.map(function(x){ return '#' + x.seq; }).join(', ') + '.';
@@ -11349,15 +11352,19 @@ MStore.ready.then(function(){
   function lrnQuiz(d){
     var qs = d.questions || [], st = d.picked = d.picked || {}, root = el('div', 'lrn'), score = el('div', 'lrn-score'), end = el('div', 'act-row');
     function norm(s){ return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9. -]/g, '').replace(/\s+/g, ' ').trim(); }
-    function tally(){
+    function paintScore(){
       var n = 0, ok = 0;
       qs.forEach(function(q, i){ if(st[i]){ n++; if(st[i].ok) ok++; } });
-      score.textContent = 'Score ' + ok + ' / ' + qs.length;
+      score.textContent = 'Score ' + ok + ' / ' + qs.length + (d.verified === true ? ' \u00b7 checked' : (d.verified === false ? ' \u00b7 not checked' : '')) + (d.removed ? ' \u00b7 ' + d.removed + ' removed' : '');
       end.innerHTML = '';
       if(qs.length && n === qs.length){
+        var res = current ? learnTopicResult(current, d, ok, n) : '';
+        if(res) end.appendChild(el('div', 'lrn-note', res));
+        var pr = current && d.topic ? learnProgress(current) : '';
+        if(pr) end.appendChild(el('div', 'lrn-note', pr));
         end.appendChild(mkBtn('ghost', 'Save result', '', function(){
           var missed = qs.filter(function(q, i){ return !st[i].ok; }).map(function(q){ return q.q + ' Answer: ' + q.answer; });
-          learnSave(current, 'quiz_result', d.title || 'Quiz', 'Score ' + ok + ' / ' + qs.length + (missed.length ? '\nMissed:\n' + missed.join('\n') : ''), '').then(function(r){ end.innerHTML = ''; end.appendChild(el('div', 'lrn-note', r && r.added ? 'Saved to the project' : 'Already saved')); });
+          learnSave(current, 'quiz_result', d.title || 'Quiz', 'Score ' + ok + ' / ' + qs.length + (missed.length ? '\nMissed:\n' + missed.join('\n') : ''), d.topic || '').then(function(r){ end.innerHTML = ''; end.appendChild(el('div', 'lrn-note', r && r.added ? 'Saved to the project' : 'Already saved')); });
         }));
       }
     }
@@ -11365,7 +11372,7 @@ MStore.ready.then(function(){
     qs.forEach(function(q, i){
       var box = el('div', 'lrn-q'), body = el('div', 'lrn-qb');
       box.appendChild(el('div', 'lrn-qt', (i + 1) + '. ' + q.q)); box.appendChild(body);
-      function done(v, ok){ st[i] = { v:v, ok:ok }; save(); paint(); tally(); }
+      function done(v, ok){ st[i] = { v:v, ok:ok }; save(); paint(); paintScore(); }
       function feedback(){
         var fb = el('div', 'lrn-fb ' + (st[i].ok ? 'ok' : 'bad'));
         fb.appendChild(el('div', 'lrn-ft', st[i].ok ? 'Correct' : 'Answer: ' + q.answer));
@@ -11399,7 +11406,7 @@ MStore.ready.then(function(){
       }
       paint(); root.appendChild(box);
     });
-    root.appendChild(end); tally();
+    root.appendChild(end); paintScore();
     return root;
   }
   function lrnCards(d){
@@ -11585,6 +11592,143 @@ MStore.ready.then(function(){
       d.items.forEach(function(it){ grid.appendChild(lrnImgFig(it)); });
       root.appendChild(grid);
       return root;
+    }
+  });
+
+  /* ---- quiz answers are checked by a second, stronger model before the quiz is shown; a syllabus topic is passed by the lab, never by the AI ---- */
+  function learnPassMark(v){ var n = parseInt(v, 10); return isNaN(n) ? 80 : Math.max(50, Math.min(100, n)); }
+  function learnVerifierIds(){
+    if(extReady()) return extIds().slice().reverse().map(function(m){ return 'ext:' + m; });
+    if(G.mode === 'fixed') return (G.fixed && G.fixed.id) ? [G.fixed.id] : [];
+    return G.pool.filter(function(id){ return !cooling(id); }).sort(function(a, b){ var x = rankOf(a), y = rankOf(b); return (y[0] - x[0]) || (y[1] - x[1]); });
+  }
+  function learnParse(t){
+    t = String(t || '');
+    var a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if(a < 0 || b <= a) return null;
+    try{
+      var j = JSON.parse(t.slice(a, b + 1)), out = {};
+      (j.results || []).forEach(function(r){ var n = parseInt(r.n, 10); if(n) out[n] = { verdict:String(r.verdict || '').toLowerCase(), correct:String(r.correct || ''), reason:String(r.reason || '') }; });
+      return Object.keys(out).length ? out : null;
+    }catch(e){ return null; }
+  }
+  async function learnVerify(qs){
+    var ids = learnVerifierIds().slice(0, 2);
+    if(!ids.length) return null;
+    var lines = qs.map(function(q, i){
+      return (i + 1) + '. [' + q.type + '] ' + q.q + (q.type === 'choice' ? '\nOptions: ' + (q.options || []).join(' | ') : '') + '\nKeyed answer: ' + q.answer + (q.explanation ? '\nExplanation: ' + q.explanation : '');
+    }).join('\n\n');
+    var sys = 'You are a strict checker of quiz answer keys. For each question decide, from your own knowledge, whether the keyed answer is correct, is the only correct choice, and the question is not ambiguous. Verdicts: ok; wrong (the key is incorrect); unclear (ambiguous, more than one answer could be right, or you are not sure). Be conservative: if you are not sure, say unclear. Reply with JSON only, no other text, in this shape: {"results":[{"n":1,"verdict":"ok","correct":"","reason":""}]}. Put the right answer in correct only when the verdict is wrong. Keep reason under 20 words.';
+    var body = { systemInstruction:{ parts:[{ text:sys }] }, contents:[{ role:'user', parts:[{ text:lines }] }], generationConfig:{ maxOutputTokens:3000, temperature:0 } };
+    return enqueue(async function(){
+      for(var k = 0; k < ids.length; k++){
+        try{
+          if(!isExt(ids[k]) && !fits(ids[k], body)) continue;
+          var r = await attempt(ids[k], body, { ms:45000, tries:2 });
+          var m = learnParse(r && r.text);
+          if(m) return m;
+        }catch(e){ if(e && e.aborted) throw e; }
+      }
+      return null;
+    });
+  }
+  function learnProgress(p){
+    var g = groupsOf(p).filter(function(x){ return sameG(x.name, 'Syllabus') && x.tasks.some(function(t){ return t.learn; }); })[0];
+    if(!g) return '';
+    var o = tally(g.tasks);
+    return 'Syllabus: ' + o.done + ' of ' + o.n + ' topics passed';
+  }
+  /* records a finished quiz against its syllabus topic; returns a short line for the card */
+  function learnTopicResult(p, d, ok, n){
+    if(!d.topic || !n) return '';
+    var t = findTask(p, d.topic);
+    if(!t || !t.learn) return '';
+    if(d.countedScore === ok) return d.lastRes || '';
+    if(d.countedScore == null) t.attempts = (t.attempts || 0) + 1;
+    d.countedScore = ok;
+    var pct = Math.round(100 * ok / n), need = p.learnPass || 80, counts = d.verified === true && n >= 4;
+    t.mod = Date.now();
+    var line = 'Quiz \u201c' + short(d.title || 'Quiz', 40) + '\u201d: ' + ok + '/' + n + ' (' + pct + '%)', res;
+    if(t.status === 'completed') res = 'Already passed';
+    else if(counts && pct >= need){
+      setStatus(t, 'completed'); t.doneAt = Date.now(); deactivate(p, t);
+      line += ', passed'; res = 'Topic passed: ' + short(t.title, 40);
+    } else if(counts){ line += ', below ' + need + '%'; res = 'Needs ' + need + '% to pass this topic'; }
+    else { line += ', did not count'; res = 'Did not count: needs a checked quiz of 4 or more questions'; }
+    t.notes = (t.notes || []).concat([{ ts:Date.now(), t:line }]).slice(-30);
+    d.lastRes = res;
+    save();
+    return res;
+  }
+
+  DECL.make_quiz.p.topic = STR('Optional: the syllabus topic this quiz covers, exactly as it is listed in the syllabus');
+  DECL.make_quiz.d += ' Answers are checked by a second model before the quiz is shown, and unsure questions are removed. When teaching from a syllabus, give the topic.';
+  DECL.set_syllabus = { d:'Turn the person\'s syllabus into a checklist of topics, in teaching order. They approve it first. A topic is marked done by the lab only when a checked quiz on it passes the pass mark; you can never mark it done yourself.',
+    p:{ topics:{ type:'ARRAY', description:'The topics in order, 2 to 40', items:{ type:'OBJECT', properties:{ title:STR('Short topic title'), summary:STR('Optional: what the topic covers, one line') }, required:['title'] } },
+      pass_mark:S('INTEGER', 'Percent needed on a checked quiz, 50 to 100. Default 80') }, req:['topics'] };
+
+  T('make_quiz', {
+    icon:'note',
+    label:function(a){ return 'Quiz' + (a.title ? ': ' + short(a.title, 40) : ''); },
+    run:async function(p, a, seg){
+      var err = learnCheck('make_quiz', a);
+      if(err) return terr(err);
+      var d = JSON.parse(JSON.stringify(a)), qs = d.questions, note = '', v = null;
+      try{ v = await learnVerify(qs); }catch(e){ v = null; }
+      if(v){
+        var bad = [];
+        qs.forEach(function(q, i){ var r = v[i + 1]; if(!r || r.verdict !== 'ok') bad.push({ i:i, r:r }); });
+        if(bad.length){
+          var report = bad.map(function(b){
+            var q = qs[b.i], r = b.r;
+            return 'Q' + (b.i + 1) + ' \u201c' + short(q.q, 60) + '\u201d keyed \u201c' + short(q.answer, 40) + '\u201d: ' + (r ? (r.verdict === 'wrong' ? 'the checker says \u201c' + short(r.correct || '?', 60) + '\u201d' : 'the checker says unclear') + (r.reason ? ' (' + short(r.reason, 100) + ')' : '') : 'the checker gave no verdict');
+          }).join('; ');
+          if(qs.length - bad.length < 3) return terr('The answer check disagreed with ' + bad.length + ' of ' + qs.length + ' answers: ' + report + '. Fix or replace those questions and call make_quiz again. Do not show a quiz you are unsure of.');
+          d.questions = qs.filter(function(q, i){ return !bad.some(function(b){ return b.i === i; }); });
+          d.removed = bad.length;
+          note = ' Removed after checking: ' + report + '. Do not teach those points as the quiz had them.';
+        }
+        d.verified = true;
+      } else {
+        d.verified = false;
+        note = ' The answers could not be double-checked, so this quiz will not count toward syllabus progress. Tell the person briefly.';
+      }
+      seg.data = d;
+      return { ok:true, res:'Quiz shown \u00b7 ' + (d.verified ? 'checked' : 'not checked'), result:{ ok:true, questions:d.questions.length, message:'The quiz is on screen. Do not repeat its content in words.' + note } };
+    },
+    card:function(m, seg){ return lrnQuiz(seg.data || seg.args || {}); }
+  });
+
+  T('set_syllabus', {
+    icon:'task',
+    label:function(a){ return 'Set syllabus (' + ((a.topics || []).length) + ' topics)'; },
+    preview:function(seg){
+      var a = seg.args || {}, w = el('div');
+      (a.topics || []).slice(0, 40).forEach(function(t, i){ w.appendChild(el('div', 'txt', (i + 1) + '. ' + short((t && t.title) || '', 80))); });
+      w.appendChild(el('div', 'txt', 'A topic is done when a checked quiz scores ' + learnPassMark(a.pass_mark) + '% or more.'));
+      return w;
+    },
+    run:function(p, a, seg){
+      var ts = (a.topics || []).filter(function(t){ return t && String(t.title || '').trim(); });
+      if(ts.length < 2 || ts.length > 40) return terr('A syllabus needs 2 to 40 topics, each with a title.');
+      var pm = learnPassMark(a.pass_mark), added = 0, have = tasksOf(p);
+      ts.forEach(function(t){
+        var title = short(String(t.title).trim(), 120);
+        if(have.some(function(x){ return x.learn && sameG(x.title, title); })) return;
+        var nt = newTask(p, { title:title, desc:t.summary, group:'Syllabus', criteria:'Score ' + pm + '% or more on a checked quiz of 4 or more questions on this topic. The lab records it.' });
+        nt.learn = true; added++;
+      });
+      if(!added) return terr('Those topics are already in the syllabus.');
+      p.learnPass = pm;
+      save();
+      seg.data = { n:added, pass:pm };
+      return { ok:true, res:'Syllabus \u00b7 ' + added + ' topics', result:{ ok:true, message:added + ' topics added to Tasks. The lab marks a topic done when a checked quiz on it scores ' + pm + '% or more. Teach in order, pass the exact topic title to make_quiz, check list_tasks before choosing the next topic, and never mark these tasks done yourself.' } };
+    },
+    card:function(m, seg){
+      var d = seg.data || {}, c = tcard('task', 'Syllabus', (d.n || 0) + ' topics \u00b7 pass mark ' + (d.pass || 80) + '%', ['Added', 'ok']);
+      var pr = current ? learnProgress(current) : '';
+      if(pr) c.body.appendChild(el('div', 'lrn-note', pr));
+      return c.root;
     }
   });
 
@@ -12316,7 +12460,7 @@ MStore.ready.then(function(){
     if(ty === 'module') return 'PROJECT TYPE: Module. This project is code with no screen: functions, classes and logic that do one job and can be tested on their own. The code is one plain script (no HTML, no import or export, no buttons, forms or styling): define things with const, class or function at the top level so they can be called. The lab runs it in a test view that shows what it prints. Do not build a page here; if a visual app is wanted, suggest a sub-project of type App.' + sw;
     if(ty === 'dataset') return 'PROJECT TYPE: Dataset. This project gathers information on a topic. Your job is finding, collecting and organizing material: use web_search for facts, then save each useful piece with dataset_add (a clean excerpt or a summary in your own words, with its source). One topic per record. Never save something you did not find. Do not build apps or write code here unless the person asks for a script.' + sw;
     if(ty === 'spec') return 'PROJECT TYPE: Spec. This project is for written plans and documents. Write them with write_doc so the person can read, edit and export them. Do not write code or build apps here unless the person asks.' + sw;
-    if(ty === 'learn') return 'PROJECT TYPE: Learn. This project is for teaching and learning, on any subject. Teach, do not lecture: find out what the person already knows, then explain in small pieces. Show instead of telling when structure helps: show_diagram, show_timeline, show_table or explain_steps; check understanding with make_quiz or make_flashcards. When seeing the real thing helps (places, specimens, anatomy, equipment, artworks), use show_images; credits appear on their own, so only say what the titles support. Take facts from web_search or the notes the person attached, never from guesswork, and say when you are unsure. Check every quiz answer before you send it. When the person first says what they want to learn, check list_docs and list_references once for a syllabus or notes and teach from them if they exist, then call set_teaching_profile once. After a visual or quiz is shown, do not repeat its content in words. Do not write code or build apps here unless the person asks.' + (learnProfileText(p) ? '\nTEACHING PROFILE (set with the person):\n' + learnProfileText(p) : '') + sw;
+    if(ty === 'learn') return 'PROJECT TYPE: Learn. This project is for teaching and learning, on any subject. Teach, do not lecture: find out what the person already knows, then explain in small pieces. Show instead of telling when structure helps: show_diagram, show_timeline, show_table or explain_steps; check understanding with make_quiz or make_flashcards. When seeing the real thing helps (places, specimens, anatomy, equipment, artworks), use show_images; credits appear on their own, so only say what the titles support. Take facts from web_search or the notes the person attached, never from guesswork, and say when you are unsure. Check every quiz answer before you send it. When the person first says what they want to learn, check list_docs and list_references once for a syllabus or notes and teach from them if they exist, then call set_teaching_profile once. If there is a syllabus, call set_syllabus once with its topics in order; the person approves it. Teach one topic at a time, give each quiz its topic title, check list_tasks before choosing what comes next, and never mark syllabus tasks done yourself: the lab records a topic when a checked quiz passes. After a visual or quiz is shown, do not repeat its content in words. Do not write code or build apps here unless the person asks.' + (learnProfileText(p) ? '\nTEACHING PROFILE (set with the person):\n' + learnProfileText(p) : '') + sw;
     return '';
   }
   /* a module has no page, so it is run inside a small harness that shows what it prints */
